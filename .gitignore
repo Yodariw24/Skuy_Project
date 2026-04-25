@@ -1,0 +1,13 @@
+# Abaikan library
+node_modules/
+
+# Abaikan rahasia negara
+.env
+.env.local
+
+# Abaikan hasil build
+dist/
+build/
+
+# Abaikan file upload sementara
+backend/uploads/*
