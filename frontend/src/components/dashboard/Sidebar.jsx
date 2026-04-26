@@ -3,12 +3,13 @@ import { Wallet, LogIn, Activity, Tv, LogOut, User, Moon, Zap, ChevronRight, Shi
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import { skuyAlert } from '../../utils/alerts';
+// --- PERBAIKAN: Import supabase untuk logout yang bersih ---
+import { supabase } from '../../supabaseClient';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  const isCreator = user?.role === 'creator';
+  const isCreator = user?.role === 'creator' || user?.role === 'streamer';
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   
-  // Set default tertutup kalau kita tidak sedang di halaman overlay
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
 
   const handleShowTips = () => {
@@ -22,6 +23,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     skuyAlert('SKUY TIPS 💡', randomTip, 'info');
   };
 
+  // --- PERBAIKAN: Logout Native Supabase ---
   const logout = async () => {
     const result = await Swal.fire({
       title: 'KELUAR SESI?',
@@ -37,8 +39,10 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         cancelButton: 'bg-slate-100 text-slate-400 text-[9px] font-black px-5 py-2 rounded-lg mx-1'
       }
     });
+
     if (result.isConfirmed) {
-      localStorage.clear();
+      await supabase.auth.signOut(); // Logout dari Cloud
+      localStorage.clear(); // Bersihkan sisa data
       navigate('/auth');
     }
   };
@@ -53,7 +57,8 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           if (isLocked) return;
           if (onClickCustom) onClickCustom();
           else {
-            setActiveMenu(id); // Sekarang memicu navigasi URL di DashboardPage
+            if (isSub) setActiveSubMenu(id);
+            else setActiveMenu(id);
           }
         }}
         disabled={isLocked}
@@ -100,7 +105,6 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar">
-        {/* REVENUE CONTROL */}
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Revenue Control</p>
           <nav className="space-y-1">
@@ -109,7 +113,6 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           </nav>
         </div>
 
-        {/* LIVE TOOLS */}
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Live Tools</p>
           <nav className="space-y-1">
@@ -120,7 +123,8 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
               label="Overlay Setup" 
               onClickCustom={() => {
                 setIsOverlayOpen(!isOverlayOpen);
-                if (!overlayTabs.includes(activeSubMenu)) setActiveMenu('tip');
+                setActiveMenu('overlay');
+                if (!overlayTabs.includes(activeSubMenu)) setActiveSubMenu('tip');
               }} 
             />
             <AnimatePresence>
@@ -141,19 +145,16 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           </nav>
         </div>
 
-        {/* PREFERENCES */}
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Preferences</p>
           <nav className="space-y-1">
             <NavButton id="profile" icon={User} label="Profile Edit" />
             <NavButton id="security" icon={ShieldCheck} label="Security (2FA)" />
-            {/* --- MENU APPEARANCE SUDAH KEMBALI DI SINI --- */}
             <NavButton id="appearance" icon={Palette} label="Appearance" />
           </nav>
         </div>
       </div>
 
-      {/* USER & LOGOUT SECTION */}
       <div className="p-6 mt-auto border-t border-slate-50 bg-slate-50/30">
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm mb-4 group cursor-pointer hover:border-violet-200 transition-all" onClick={() => setActiveMenu('profile')}>
           <div className="w-10 h-10 rounded-xl bg-violet-50 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
