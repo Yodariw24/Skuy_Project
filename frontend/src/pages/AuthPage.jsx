@@ -3,207 +3,107 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GoogleLogin } from '@react-oauth/google'
 import { skuyAlert } from '../utils/alerts'
-// --- PERBAIKAN: Pakai Supabase Client ---
 import { supabase } from '../supabaseClient' 
 import { 
-  User, Mail, Lock, ArrowRight, 
-  Sparkles, ShieldCheck, Eye, EyeOff, Zap 
+  User, Lock, ArrowRight, Sparkles, ShieldCheck, Fingerprint, Zap
 } from 'lucide-react'
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [formData, setFormData] = useState({
-    username: '', email: '', password: '', full_name: ''
-  });
-
+  const [formData, setFormData] = useState({ identifier: '', password: '' });
   const navigate = useNavigate();
 
-  // --- LOGIKA GOOGLE LOGIN (Fixed for Supabase) ---
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: credentialResponse.credential,
+      let targetEmail = formData.identifier;
+
+      // LOGIKA: JIKA INPUT ADALAH USERNAME (TIDAK ADA @), CARI EMAILNYA DI TABEL STREAMERS
+      if (!formData.identifier.includes('@')) {
+        const { data: streamer, error: dbError } = await supabase
+          .from('streamers')
+          .select('email')
+          .eq('username', formData.identifier)
+          .single();
+        
+        if (dbError || !streamer) throw new Error("ID System tidak ditemukan di pangkalan data.");
+        targetEmail = streamer.email;
+      }
+
+      // PROSES OTENTIKASI KE SUPABASE AUTH
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: formData.password,
       });
+
       if (error) throw error;
-      if (data.session) {
+
+      // Simulasi Protokol 2FA untuk Presentasi
+      if (targetEmail.includes('admin') || formData.identifier === 'ari_wirayuda') {
+        setShow2FA(true);
+        await skuyAlert("SECURITY CHECK", "Otoritas tingkat tinggi terdeteksi. Enkripsi OTP diperlukan.", "info");
+      } else {
         localStorage.setItem('user_token', data.session.access_token);
         localStorage.setItem('user_data', JSON.stringify(data.user));
-        const name = data.user.user_metadata.full_name?.split(' ')[0] || "User";
-        await skuyAlert("AKSES AKTIF", `Selamat datang, ${name}!`, 'success');
+        await skuyAlert("ACCESS GRANTED", "Kredensial disetujui. Memasuki ekosistem Skuy.", "success");
         navigate('/dashboard');
       }
     } catch (err) {
-      skuyAlert("GAGAL", "Autentikasi Google ditolak.", "error");
-    }
-  };
-
-  // --- LOGIKA VERIFIKASI OTP ---
-  const handleVerify2FA = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    // Simulasi untuk presentasi tugas
-    if (otp === "123456" || otp.length === 6) {
-      await skuyAlert("VERIFIKASI", "Protokol keamanan disetujui.", 'success');
-      navigate('/dashboard');
-    } else {
-      skuyAlert("DITOLAK", "Kode OTP tidak valid.", "error");
-    }
-    setLoading(false);
-  };
-
-  // --- LOGIKA REGISTER & LOGIN ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (error) throw error;
-
-        // Trigger 2FA (Bisa diatur manual untuk demo tugas)
-        if (formData.email.includes('admin')) {
-          setShow2FA(true);
-          skuyAlert("KEAMANAN", "Masukkan kode OTP Anda.", "info");
-        } else {
-          localStorage.setItem('user_token', data.session.access_token);
-          localStorage.setItem('user_data', JSON.stringify(data.user));
-          const name = data.user.user_metadata.full_name || data.user.email;
-          await skuyAlert("AKSES AKTIF", `Selamat datang kembali!`, 'success');
-          navigate('/dashboard');
-        }
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: { 
-              username: formData.username, 
-              full_name: formData.full_name 
-            }
-          }
-        });
-        if (error) throw error;
-        skuyAlert("BERHASIL", "Akun terdaftar. Silakan login.", "success");
-        setIsLogin(true);
-      }
-    } catch (err) {
-      skuyAlert("GAGAL", err.message || "Cek kembali data Anda.", "error");
+      skuyAlert("ACCESS DENIED", err.message || "Kegagalan otentikasi sistem.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] text-slate-900 font-sans flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none -z-10">
-        <div className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] bg-violet-100/60 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-cyan-50/40 blur-[120px] rounded-full" />
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-[450px] bg-white rounded-[3rem] border border-slate-100 shadow-[0_30px_80px_-20px_rgba(109,40,217,0.15)] overflow-hidden"
-      >
-        <div className="bg-violet-600 p-10 text-white relative overflow-hidden text-center">
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-5 border border-white/20 shadow-xl rotate-3">
-              {show2FA ? <ShieldCheck className="text-white" size={26} /> : <Sparkles className="text-white" size={26} />}
-            </div>
-            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white">
-              {show2FA ? 'SECURITY' : (isLogin ? 'WELCOME' : 'JOIN US')}
-            </h2>
-          </div>
+    <div className="min-h-screen bg-[#0A0A0B] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-violet-900/20 blur-[120px] rounded-full animate-pulse" />
+      
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-[420px] bg-[#121214] border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden">
+        <div className="bg-violet-600 p-10 text-center relative">
+          <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
+          <Fingerprint className="mx-auto mb-4 relative z-10" size={42} />
+          <h2 className="text-3xl font-black italic tracking-tighter relative z-10">
+            {show2FA ? 'SECURITY CORE' : (isLogin ? 'CORE LOGIN' : 'RECRUITMENT')}
+          </h2>
         </div>
 
-        <div className="p-8 md:p-10">
+        <div className="p-10 space-y-6">
           <AnimatePresence mode="wait">
-            {show2FA ? (
-              <motion.form key="2fa" onSubmit={handleVerify2FA} className="space-y-6">
-                <div className="space-y-2 text-center">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">OTP Code</label>
-                  <input 
-                    type="text" maxLength="6" placeholder="000000" className="w-full bg-slate-50 border-2 border-transparent focus:border-violet-200 focus:bg-white p-5 rounded-3xl outline-none font-black text-3xl text-center tracking-[0.3em]"
-                    value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  />
+            {!show2FA ? (
+              <form onSubmit={handleAuth} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Identity Identifier</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                    <input type="text" placeholder="Username / Email" className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-2xl outline-none focus:border-violet-500/50 transition-all font-bold text-sm" value={formData.identifier} onChange={(e) => setFormData({...formData, identifier: e.target.value})} />
+                  </div>
                 </div>
-                <button type="submit" className="w-full bg-slate-950 text-white font-black py-5 rounded-[1.8rem] text-[11px] uppercase italic tracking-[0.2em] flex items-center justify-center gap-3">
-                  {loading ? 'Verifying...' : 'Continue'} <Zap size={16} fill="white" />
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Access Cipher</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                    <input type="password" placeholder="••••••••" className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-2xl outline-none focus:border-violet-500/50 transition-all font-bold text-sm" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={loading} className="w-full bg-violet-600 hover:bg-violet-500 text-white font-black py-5 rounded-2xl text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all shadow-lg shadow-violet-900/20">
+                  {loading ? 'Verifying...' : 'Initialize Session'} <Zap size={16} />
                 </button>
-              </motion.form>
+              </form>
             ) : (
-              <motion.form key="auth" onSubmit={handleSubmit} className="space-y-5">
-                {!isLogin && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Full Name</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                      <input type="text" placeholder="Ari Wirayuda" required className="w-full bg-slate-50 border-2 border-transparent focus:border-violet-200 p-4 pl-12 rounded-2xl outline-none font-bold text-sm" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} />
-                    </div>
-                  </div>
-                )}
-
-                {!isLogin && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Username</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-600 font-black">@</span>
-                      <input type="text" placeholder="username" required className="w-full bg-slate-50 border-2 border-transparent focus:border-violet-200 p-4 pl-10 rounded-2xl outline-none font-bold text-sm" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value.toLowerCase().replace(/\s/g, '')})} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type="email" placeholder="example@mail.com" required className="w-full bg-slate-50 border-2 border-transparent focus:border-violet-200 p-4 pl-12 rounded-2xl outline-none font-bold text-sm" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type={showPassword ? "text" : "password"} placeholder="••••••••" required className="w-full bg-slate-50 border-2 border-transparent focus:border-violet-200 p-4 pl-12 pr-12 rounded-2xl outline-none font-bold text-sm" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading} className="w-full bg-violet-600 text-white font-black py-5 rounded-[1.8rem] shadow-xl shadow-violet-200 active:scale-95 transition-all text-[11px] uppercase italic tracking-[0.2em] flex items-center justify-center gap-3">
-                  {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')} <ArrowRight size={16} />
-                </button>
-
-                <div className="mt-8 pt-8 border-t border-slate-50 flex flex-col items-center">
-                  <p className="text-[8px] font-black text-slate-300 uppercase mb-5 italic tracking-widest">Social Auth</p>
-                  <div className="w-full flex justify-center scale-90">
-                    <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => skuyAlert("GAGAL", "Google auth bermasalah.", "error")} shape="pill" theme="filled_blue" width="300" />
-                  </div>
-                </div>
-              </motion.form>
+              <div className="space-y-6 text-center">
+                <ShieldCheck className="mx-auto text-violet-400" size={48} />
+                <p className="text-xs text-slate-400 font-bold leading-relaxed">Sistem mendeteksi akses administratif. Masukkan 6-digit enkripsi OTP.</p>
+                <input type="text" maxLength="6" placeholder="000000" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-center text-3xl font-black tracking-[0.5em] outline-none" />
+                <button onClick={() => navigate('/dashboard')} className="w-full bg-white text-black font-black py-4 rounded-xl text-[11px] uppercase">Authorize Access</button>
+              </div>
             )}
           </AnimatePresence>
-          
-          {!show2FA && (
-            <div className="mt-8 text-center">
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-xs text-slate-400 font-bold italic">
-                {isLogin ? "Need an account?" : "Already a member?"} 
-                <span className="text-violet-600 font-black uppercase tracking-widest ml-2 border-b-2 border-violet-100 pb-0.5">
-                  {isLogin ? 'Register' : 'Login'}
-                </span>
-              </button>
-            </div>
-          )}
         </div>
       </motion.div>
     </div>
