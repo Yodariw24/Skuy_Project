@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-// --- PERBAIKAN: Ganti Axios ke Supabase ---
+// --- PERBAIKAN: Gunakan Supabase Client ---
 import { supabase } from '../supabaseClient' 
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
@@ -32,11 +32,12 @@ function DonationPage() {
   const shortcuts = [10000, 25000, 50000, 100000];
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
-  // --- LOGIKA AMBIL DATA DARI SUPABASE ---
+  // --- LOGIKA AMBIL DATA (SUPABASE MULTI-TABLE) ---
   const fetchData = async () => {
     try {
       setLoading(true);
-      // 1. Ambil data streamer berdasarkan username
+      
+      // 1. Ambil Profil Streamer
       const { data: sData, error: sError } = await supabase
         .from('streamers')
         .select('*')
@@ -49,14 +50,22 @@ function DonationPage() {
       }
 
       setStreamer(sData);
-      setBalance(sData.total_saldo || 0);
 
-      // 2. Ambil history donasi terbaru
+      // 2. Ambil Saldo dari tabel balance
+      const { data: bData } = await supabase
+        .from('balance')
+        .select('total_saldo')
+        .eq('streamer_id', sData.id)
+        .single();
+      
+      if (bData) setBalance(bData.total_saldo || 0);
+
+      // 3. Ambil history donasi terbaru (Status SUCCESS)
       const { data: hData } = await supabase
         .from('donations')
         .select('*')
         .eq('streamer_id', sData.id)
-        .eq('status', 'SUCCESS') // Hanya yang sukses
+        .eq('status', 'SUCCESS')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -75,7 +84,7 @@ function DonationPage() {
     if (!formData.amount || formData.amount < 1000) return alert("Minimal dukungan adalah Rp 1.000");
     
     try {
-      // Simpan data donasi ke Supabase (Status Pending)
+      // Simpan donasi ke tabel donations dengan status PENDING
       const { data, error } = await supabase
         .from('donations')
         .insert([{
@@ -88,7 +97,8 @@ function DonationPage() {
         .single();
 
       if (error) throw error;
-      // Navigate ke halaman pembayaran (Pastikan kamu sudah buat route /payment/:id)
+      
+      // Arahkan ke halaman pembayaran (Simulasi atau integrasi Midtrans kamu)
       navigate(`/payment/${data.id}`); 
     } catch (err) { 
       alert("Gagal menginisialisasi protokol dukungan! 🔥"); 
@@ -98,7 +108,10 @@ function DonationPage() {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF]">
       <div className="w-12 h-12 border-4 border-slate-100 border-t-violet-600 rounded-full animate-spin mb-4" />
-      <p className="text-violet-600 font-black italic uppercase tracking-widest text-sm">Synchronizing Database...</p>
+      <p className="text-violet-600 font-black italic uppercase tracking-widest text-sm text-center">
+        SYNCHRONIZING DATABASE<br/>
+        <span className="text-[10px] opacity-40">CONNECTING TO SECURE CORE...</span>
+      </p>
     </div>
   );
 
@@ -106,13 +119,15 @@ function DonationPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF] text-red-500 font-black uppercase gap-4 text-center p-6">
       <Skull size={64} className="animate-bounce" />
       <h2 className="text-2xl italic tracking-tighter">Creator Not Found 404</h2>
-      <p className="text-slate-400 text-[10px] tracking-widest leading-relaxed">Sistem tidak menemukan ID @{username} <br/> dalam pangkalan data Skuy.</p>
-      <Link to="/" className="text-[10px] bg-slate-950 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest mt-4">Back to Home</Link>
+      <p className="text-slate-400 text-[10px] tracking-widest leading-relaxed font-bold">
+        SISTEM TIDAK MENEMUKAN ID @{username.toUpperCase()} <br/> DALAM PANGKALAN DATA CLOUD SKUY.
+      </p>
+      <Link to="/" className="text-[10px] bg-slate-950 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest mt-4 hover:bg-violet-600 transition-all">Back to Home</Link>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-20 selection:bg-slate-900/10">
+    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-20 selection:bg-violet-100">
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className={`absolute top-[-10%] left-[-5%] w-[50%] h-[50%] ${theme.bgLight} opacity-40 blur-[120px] rounded-full`} />
         <div className={`absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] ${theme.bgLight} opacity-30 blur-[120px] rounded-full`} />
@@ -121,7 +136,7 @@ function DonationPage() {
       <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/70 border-b border-slate-100 p-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-slate-950 transition-all font-black text-[10px] uppercase tracking-widest">
-            <ArrowLeft size={16} strokeWidth={3} /> Explore
+            <ArrowLeft size={16} strokeWidth={3} /> Explore Hub
           </Link>
           <div className="text-xl font-black italic uppercase tracking-tighter text-slate-950">SKUY<span className="text-violet-600">.GG</span></div>
         </div>
@@ -143,9 +158,9 @@ function DonationPage() {
               <div className={`absolute -bottom-2 -right-2 ${theme.bg} text-white p-3 rounded-2xl shadow-lg border-4 border-white animate-pulse`}><Zap size={20} fill="currentColor" /></div>
             </div>
             <div className="text-center md:text-left flex-1 relative z-10">
-              <span className={`inline-block ${theme.text} font-black tracking-[0.2em] text-[10px] uppercase ${theme.bgLight} px-4 py-1.5 rounded-full border ${theme.border} mb-4`}>Official Creator</span>
+              <span className={`inline-block ${theme.text} font-black tracking-[0.2em] text-[10px] uppercase ${theme.bgLight} px-4 py-1.5 rounded-full border ${theme.border} mb-4`}>Official SKUY Agent</span>
               <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-slate-950 uppercase mb-4">{streamer.display_name || streamer.full_name}</h1>
-              <p className="text-base text-slate-500 font-medium leading-relaxed mb-8 italic">"{streamer.bio || "Dukung saya terus untuk berkarya! 🚀"}"</p>
+              <p className="text-base text-slate-500 font-medium leading-relaxed mb-8 italic">"{streamer.bio || "Sistem transmisi energi aktif. Dukung saya terus untuk berkarya! 🚀"}"</p>
               <div className="flex gap-4 justify-center md:justify-start">
                 {['instagram', 'tiktok', 'youtube'].map(platform => streamer[platform] && (
                   <a key={platform} href={streamer[platform]} target="_blank" rel="noreferrer" className="p-4 bg-slate-50 hover:bg-white rounded-2xl border border-slate-100 shadow-sm transition-all hover:scale-110 active:scale-95">
@@ -159,7 +174,7 @@ function DonationPage() {
           <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.1}} className={`lg:col-span-4 bg-gradient-to-br ${theme.gradient} p-10 rounded-[3.5rem] text-white flex flex-col justify-between shadow-2xl ${theme.shadow} relative overflow-hidden border border-white/10`}>
             <div className="p-4 bg-white/20 backdrop-blur-xl rounded-2xl border border-white/20 w-fit shadow-xl"><Wallet size={32} className="text-white" /></div>
             <div className="relative z-10">
-              <span className="text-[11px] text-white/70 uppercase font-black tracking-widest block mb-2">Total Power</span>
+              <span className="text-[11px] text-white/70 uppercase font-black tracking-widest block mb-2">Power Collected</span>
               <span className="text-4xl font-black italic tracking-tight text-white drop-shadow-md">Rp {Number(balance).toLocaleString('id-ID')}</span>
             </div>
           </motion.div>
@@ -170,7 +185,7 @@ function DonationPage() {
             <div className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/30">
                 <div className="flex items-center gap-4 mb-10">
                   <div className={`p-3 ${theme.bgLight} ${theme.text} rounded-2xl shadow-lg ${theme.shadow}`}><Heart size={20} fill="currentColor" /></div>
-                  <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900">Transmit Energy</h2>
+                  <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900">Authorize Support</h2>
                 </div>
                 <form onSubmit={handleSend} className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -184,7 +199,7 @@ function DonationPage() {
                       </div>
                     </div>
                     <div className="space-y-6">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Zap size={12} strokeWidth={3}/> Nominal Value</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Zap size={12} strokeWidth={3}/> Energy Amount</label>
                       <div className="relative group">
                         <span className={`absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 font-black text-2xl group-focus-within:${theme.text}`}>Rp</span>
                         <input type="number" required placeholder="0" className={`w-full bg-slate-50 p-8 pl-18 rounded-[2.5rem] outline-none ${theme.text} text-5xl font-black border-2 border-transparent ${theme.focusBorder} focus:bg-white focus:ring-8 ${theme.ring} transition-all`} value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
@@ -201,10 +216,10 @@ function DonationPage() {
                     </div>
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Info size={12} strokeWidth={3}/> Encrypted Message</label>
-                      <textarea placeholder="Tulis pesan..." className={`w-full bg-slate-50 p-6 rounded-[2.5rem] h-40 outline-none text-slate-700 font-bold border-2 border-transparent ${theme.focusBorder} focus:bg-white transition-all resize-none`} value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} />
+                      <textarea placeholder="Tulis pesan untuk agen..." className={`w-full bg-slate-50 p-6 rounded-[2.5rem] h-40 outline-none text-slate-700 font-bold border-2 border-transparent ${theme.focusBorder} focus:bg-white transition-all resize-none`} value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} />
                     </div>
                     <button type="submit" className={`w-full group ${theme.bg} text-white font-black py-8 rounded-[3rem] uppercase italic text-xl shadow-2xl ${theme.shadow} active:scale-95 transition-all hover:brightness-110 flex items-center justify-center gap-4`}>
-                      <span>Authorize Support</span><div className="p-2 bg-white/20 rounded-xl group-hover:rotate-12 transition-transform"><Heart size={20} fill="currentColor" /></div>
+                      <span>Initiate Transmission</span><div className="p-2 bg-white/20 rounded-xl group-hover:rotate-12 transition-transform"><Zap size={20} fill="currentColor" /></div>
                     </button>
                 </form>
             </div>
@@ -212,7 +227,7 @@ function DonationPage() {
 
           <div className="lg:col-span-5 space-y-8">
             <div className="bg-white p-8 md:p-10 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/20">
-              <h3 className="text-lg font-black mb-10 italic uppercase tracking-tighter flex items-center gap-3 text-slate-900"><div className={`p-2 ${theme.bgLight} ${theme.text} rounded-xl`}><History size={20} strokeWidth={3} /></div>Latest Transmissions</h3>
+              <h3 className="text-lg font-black mb-10 italic uppercase tracking-tighter flex items-center gap-3 text-slate-900"><div className={`p-2 ${theme.bgLight} ${theme.text} rounded-xl`}><History size={20} strokeWidth={3} /></div>Transmission Log</h3>
               <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {history.length > 0 ? history.map((h, i) => (
                   <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} transition={{delay: i * 0.1}} key={i} className={`group bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 hover:${theme.border} hover:bg-white transition-all shadow-sm`}>
