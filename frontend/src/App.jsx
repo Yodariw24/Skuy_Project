@@ -9,9 +9,14 @@ import WidgetClient from './pages/WidgetClient'
 
 import 'animate.css';
 
+// --- PERBAIKAN 1: Logic Protected Route ---
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('user_token');
+  // Pastikan key-nya sama dengan yang kamu simpan saat login di AuthPage.jsx
+  // Biasanya Supabase menyimpan session di localStorage dengan format tertentu
+  const token = localStorage.getItem('user_token'); 
+  
   if (!token) {
+    // Kalau tidak ada token, lempar ke login
     return <Navigate to="/auth" replace />;
   }
   return children;
@@ -19,12 +24,14 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
+    // Pastikan Client ID Google ini sudah didaftarkan juga URL Vercel-nya di Google Console
     <GoogleOAuthProvider clientId="195922640796-u1uucrttadnkjshpvn009lredf9bqoro.apps.googleusercontent.com">
-      {/* DIBERSIHKAN: 
-          - Hapus bg-white agar warna asli Landing Page tidak tertutup
-          - Hapus min-h-screen dan text-left yang bikin scroll terkunci
+      
+      {/* PERBAIKAN 2: 
+          Tambahkan min-h-screen kembali tapi tanpa overflow hidden 
+          agar background warna tidak terpotong saat konten sedikit.
       */}
-      <div className="w-full font-sans antialiased">
+      <div className="w-full min-h-screen font-sans antialiased">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
@@ -49,7 +56,10 @@ function App() {
             element={<Navigate to="/dashboard/wallet" replace />} 
           />
           
-          {/* Rute dinamis untuk halaman donasi streamer */}
+          {/* PERBAIKAN 3: Rute dinamis 
+              Hati-hati rute ini (/:username) bisa "memakan" rute lain.
+              Pastikan rute ini ditaruh paling bawah.
+          */}
           <Route path="/:username" element={<DonationPage />} />
         </Routes>
       </div>
