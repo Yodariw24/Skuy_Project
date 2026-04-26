@@ -4,8 +4,11 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
 import { 
   Sun, Moon, Play, ChevronRight, Sparkles, 
   Heart, ArrowRight, Star, Trophy, Target, Zap, 
-  HelpCircle, ChevronDown, UserCircle2, Video, Activity
+  HelpCircle, ChevronDown, UserCircle2, Video, Activity, AlertCircle
 } from 'lucide-react'
+
+// --- IMPORT KONEKSI SUPABASE ---
+import { supabase } from '../supabaseClient' 
 
 // --- COMPONENT: SAKURA PETAL ---
 const SakuraPetal = ({ delay }) => {
@@ -48,10 +51,11 @@ function HomePage() {
   const navBg = useTransform(scrollY, [0, 50], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(10, 10, 12, 0.9)" : "rgba(255, 255, 255, 0.9)"]);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/streamers')
-      .then(res => res.json())
-      .then(data => setStreamers(data.data || data))
-      .catch(err => console.log("Backend offline?"));
+    const fetchStreamers = async () => {
+      const { data } = await supabase.from('streamers').select('*')
+      if (data) setStreamers(data)
+    }
+    fetchStreamers()
   }, []);
 
   return (
@@ -96,18 +100,15 @@ function HomePage() {
         <Link to="/auth" className="bg-violet-600 text-white font-black px-14 py-6 rounded-[2.5rem] shadow-[0_20px_50px_-10px_rgba(109,40,217,0.6)] hover:shadow-violet-600/80 transition-all text-xl uppercase italic">Gabung Squad Kuy</Link>
       </section>
 
-      {/* --- 4. BENTO TOOLS SQUAD (THE ULTIMATE UX UPGRADE) --- */}
+      {/* --- BENTO TOOLS SQUAD --- */}
       <section className="max-w-7xl mx-auto px-6 py-24 relative z-10">
         <div className="flex flex-col items-center mb-24 text-center">
           <span className="text-violet-600 font-black text-[10px] uppercase tracking-[0.5em] mb-4">Elite Ecosystem</span>
           <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter mb-4">TOOLSNYA <span className="text-violet-600">SQUAD KREATIF</span></h2>
           <div className="w-20 h-1.5 bg-violet-600 rounded-full mb-6" />
-          <p className="text-slate-400 font-medium italic max-w-lg">Segala yang kamu butuhkan untuk jadi Legend Creator ada di sini.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          
-          {/* A. TIP DONATION (Interaktif Feed) */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-7 p-12 rounded-[4rem] border relative overflow-hidden group transition-all ${darkMode ? 'bg-white/5 border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.3)]' : 'bg-white border-slate-100 shadow-2xl shadow-slate-200/40'}`}>
             <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity"><Activity size={120} /></div>
             <div className="flex justify-between items-start mb-16">
@@ -128,12 +129,9 @@ function HomePage() {
             <p className="text-slate-400 text-sm font-bold italic">Terima energi dukungan secepat kilat via QRIS tanpa potongan ribet.</p>
           </motion.div>
 
-          {/* B. MEDIASHARE (Premium Player Look) */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-5 p-12 rounded-[4rem] border flex flex-col justify-between transition-all bg-gradient-to-br from-violet-600 via-indigo-700 to-violet-900 text-white shadow-2xl border-white/10 relative overflow-hidden group`}>
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
             <div className="aspect-video bg-black/30 backdrop-blur-xl rounded-[3rem] flex items-center justify-center border border-white/20 shadow-2xl relative overflow-hidden">
-               <div className="absolute inset-0 bg-gradient-to-t from-violet-950/50 to-transparent" />
-               <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} className="bg-white p-7 rounded-full text-violet-600 shadow-[0_0_30px_rgba(255,255,255,0.4)] relative z-10"><Play fill="currentColor" size={32}/></motion.div>
+               <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} className="bg-white p-7 rounded-full text-violet-600 relative z-10"><Play fill="currentColor" size={32}/></motion.div>
             </div>
             <div className="mt-10 relative z-10 text-right">
               <h3 className="text-4xl font-black italic uppercase leading-none mb-2 tracking-tighter">MEDIA<br/>SHARE</h3>
@@ -141,7 +139,6 @@ function HomePage() {
             </div>
           </motion.div>
 
-          {/* C. MILESTONE (Dynamic Target) */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-5 p-12 rounded-[4rem] border flex flex-col justify-between transition-all ${darkMode ? 'bg-[#0f0f12] border-white/5 shadow-inner' : 'bg-white border-slate-100 shadow-xl'}`}>
             <div className="relative">
               <div className="flex items-center justify-between mb-8">
@@ -162,7 +159,6 @@ function HomePage() {
             </div>
           </motion.div>
 
-          {/* D. LEADERBOARD (Elite Ranking Visual) */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-7 rounded-[4rem] border overflow-hidden flex flex-col transition-all ${darkMode ? 'bg-[#0f0f12] border-white/5 shadow-2xl' : 'bg-white border-slate-100 shadow-xl'}`}>
             <div className="bg-violet-600 p-6 flex justify-between items-center text-white">
               <div className="flex items-center gap-3"><Trophy size={22} className="text-yellow-300" /><span className="text-[11px] font-black uppercase tracking-[0.4em]">Elite Ranking Squad</span></div>
@@ -187,8 +183,35 @@ function HomePage() {
         </div>
       </section>
 
+      {/* --- EXPLORE CREATORS --- */}
+      <section className="max-w-7xl mx-auto px-6 py-20 relative z-10 text-center">
+        <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-4">ELITE <span className="text-violet-600">CREATORS</span></h2>
+        <div className="flex items-center justify-center gap-2 text-slate-400 mb-20 animate-pulse">
+          <AlertCircle size={14} className="text-amber-500" />
+          <p className="text-[10px] font-bold uppercase tracking-widest italic">Data updated live from database system</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 text-left">
+          {streamers.map((s) => (
+            <motion.div key={s.id} whileHover={{ y: -15 }} className={`group p-10 rounded-[4rem] border transition-all ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-white border-slate-100 hover:shadow-2xl shadow-violet-900/10'}`}>
+              <div className="w-20 h-20 bg-slate-100 dark:bg-white/10 rounded-[2.5rem] mb-10 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl group-hover:border-violet-600 transition-all">
+                <img 
+                  src={s.profile_picture ? (s.profile_picture.startsWith('http') ? s.profile_picture : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${s.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`} 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                  alt={s.username}
+                  onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
+                />
+              </div>
+              <h3 className="text-3xl font-black italic mb-2 uppercase tracking-tighter leading-none">{s.full_name || s.username}</h3>
+              <p className="text-slate-400 text-[12px] font-bold mb-10 italic line-clamp-1">"{s.bio || 'Legend Creator Gacor'}"</p>
+              <Link to={`/${s.username}`} className="inline-flex items-center gap-2 text-[11px] font-black uppercase text-violet-600 tracking-widest group">Gas Support <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" /></Link>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       {/* --- FAQ SQUAD --- */}
-      <section className="max-w-4xl mx-auto px-6 py-24 relative z-10">
+      <section className="max-w-4xl mx-auto px-6 py-24 relative z-10 text-left">
         <div className="flex items-center gap-6 mb-16"><div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-violet-600/30"><HelpCircle size={24}/></div><h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter">FAQ <span className="text-violet-600">SQUAD</span></h2></div>
         <div className="space-y-2">
           <FAQItem darkMode={darkMode} question="Apa itu Skuy?" answer="Skuy adalah platform yang bisa bantu kamu dapetin dukungan finansial langsung dari fans." />
@@ -197,24 +220,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* --- EXPLORE CREATORS --- */}
-      <section className="max-w-7xl mx-auto px-6 py-20 relative z-10 text-center">
-        <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-20">ELITE <span className="text-violet-600">CREATORS</span></h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 text-left">
-          {streamers.map((s) => (
-            <motion.div key={s.id} whileHover={{ y: -15, scale: 1.02 }} className={`group p-10 rounded-[4rem] border transition-all ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-white border-slate-100 hover:shadow-2xl shadow-violet-900/10'}`}>
-              <div className="w-20 h-20 bg-slate-100 dark:bg-white/10 rounded-[2.5rem] mb-10 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl group-hover:border-violet-600 transition-all">
-                <img src={s.profile_picture ? `http://localhost:3000/uploads/${s.profile_picture}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-              </div>
-              <h3 className="text-3xl font-black italic mb-2 uppercase tracking-tighter leading-none">{s.display_name || s.username}</h3>
-              <p className="text-slate-400 text-[12px] font-bold mb-10 italic line-clamp-1">"{s.bio || 'Legend Creator Gacor'}"</p>
-              <Link to={`/${s.username}`} className="inline-flex items-center gap-2 text-[11px] font-black uppercase text-violet-600 tracking-widest group">Gas Support <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" /></Link>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* --- FOOTER (RUNNING TEXT) --- */}
+      {/* --- FOOTER --- */}
       <footer className="mt-32 relative bg-violet-600 text-white overflow-hidden py-32 selection:bg-white selection:text-violet-700">
         <div className="absolute top-1/2 left-0 -translate-y-1/2 flex whitespace-nowrap opacity-10 pointer-events-none select-none">
           <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="text-[200px] font-black italic uppercase px-4">SKUY.GG SKUY.GG SKUY.GG SKUY.GG SKUY.GG</motion.div>
@@ -232,9 +238,17 @@ function HomePage() {
         </div>
       </footer>
 
+      {/* --- FIX SCROLL & SAKURA --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        html, body { 
+          font-family: 'Plus Jakarta Sans', sans-serif; 
+          overflow-y: auto !important; 
+          height: auto !important;
+          margin: 0;
+          padding: 0;
+        }
+        #root { height: auto !important; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-thumb { background: #6d28d9; border-radius: 10px; }
         @keyframes sakuraFall {
@@ -242,7 +256,7 @@ function HomePage() {
           10% { opacity: 0.6; }
           100% { transform: translateY(100vh) rotate(360deg) translateX(30px); opacity: 0; }
         }
-        .animate-sakura-fall { animation-name: sakuraFall; animation-timing-function: linear; animation-iteration-count: infinite; }
+        .animate-sakura-fall { animation: sakuraFall linear infinite; }
       `}</style>
     </div>
   )

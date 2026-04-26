@@ -4,19 +4,32 @@
 :root {
   font-family: "Plus Jakarta Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: transparent !important;
 }
 
-/* PERBAIKAN: Paksa Body Transparan */
-body {
-  background-color: transparent !important;
-  background: transparent !important;
+/* --- FIX: BODY & SCROLL SYSTEM --- */
+html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  /* Memastikan scroll vertikal aktif dan scroll horizontal mati */
+  overflow-x: hidden !important; 
+  overflow-y: auto !important; 
+  /* Biar tinggi halaman mengikuti konten, bukan ukuran layar */
+  height: auto !important;
+  min-height: 100% !important;
+  background-color: #ffffff; 
+  color: #1e293b;
+  scroll-behavior: smooth;
 }
 
-/* --- SKUY ULTRA SLIM TOAST --- */
+/* Memastikan container utama (Vite biasanya pakai #root) tidak mengunci layar */
+#root {
+  width: 100%;
+  height: auto !important;
+  min-height: 100vh;
+  display: block;
+}
+
+/* --- SKUY ULTRA SLIM TOAST (MODERN LOOK) --- */
 .skuy-slim-toast {
   width: auto !important;
   min-width: 200px !important;
@@ -43,7 +56,31 @@ body {
   letter-spacing: 0.5px;
 }
 
-.skuy-toast-content span { font-weight: 500; opacity: 0.8; }
+.skuy-toast-content span { 
+  font-weight: 500; 
+  opacity: 0.8; 
+}
 
-.swal2-timer-progress-bar { background: #7c3aed !important; height: 2px !important; }
-.swal2-icon { transform: scale(0.45) !important; margin: 0 6px 0 0 !important; }
+.swal2-timer-progress-bar { 
+  background: #7c3aed !important; 
+  height: 2px !important; 
+}
+
+.swal2-icon { 
+  transform: scale(0.45) !important; 
+  margin: 0 6px 0 0 !important; 
+}
+
+/* Custom Scrollbar biar estetik (Skuy Style) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #7c3aed;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

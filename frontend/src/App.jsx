@@ -5,7 +5,7 @@ import DonationPage from './pages/DonationPage'
 import AuthPage from './pages/AuthPage' 
 import DashboardPage from './pages/DashboardPage' 
 import PaymentPage from './pages/PaymentPage'
-import WidgetClient from './pages/WidgetClient' // Import komponen widget yang baru dibuat
+import WidgetClient from './pages/WidgetClient'
 
 import 'animate.css';
 
@@ -20,7 +20,11 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <GoogleOAuthProvider clientId="195922640796-u1uucrttadnkjshpvn009lredf9bqoro.apps.googleusercontent.com">
-      <div className="min-h-screen bg-white font-sans text-left"> {/* Ditambah text-left agar konsisten */}
+      {/* DIBERSIHKAN: 
+          - Hapus bg-white agar warna asli Landing Page tidak tertutup
+          - Hapus min-h-screen dan text-left yang bikin scroll terkunci
+      */}
+      <div className="w-full font-sans antialiased">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
@@ -28,7 +32,6 @@ function App() {
           <Route path="/payment/:donationId" element={<PaymentPage />} />
 
           {/* --- WIDGET ROUTE (PUBLIC) --- */}
-          {/* Taruh di atas :username agar tidak dianggap sebagai nama user */}
           <Route path="/v4/widget/:type/:key" element={<WidgetClient />} />
 
           {/* --- DASHBOARD ROUTING --- */}
