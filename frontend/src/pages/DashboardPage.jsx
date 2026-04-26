@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion' 
-// --- PERBAIKAN: Ganti api (axios) jadi supabase ---
-import { supabase } from '../supabaseClient'
+import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
 import ActivityFeed from '../components/dashboard/ActivityFeed'
@@ -13,6 +11,7 @@ import SecurityView from '../components/dashboard/SecurityView'
 import OverlayPage from '../components/dashboard/OverlayPage'
 import Swal from 'sweetalert2'
 
+// --- HELPER STYLE POP-UP SUPER GACOR (BRUTALIST STYLE) ---
 const skuyAlert = Swal.mixin({
   customClass: {
     popup: 'skuy-popup rounded-[2rem] p-10',
@@ -26,163 +25,219 @@ const skuyAlert = Swal.mixin({
 });
 
 function DashboardPage() {
-  const { tab } = useParams();
-  const navigate = useNavigate();
-  const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
+  const [activeMenu, setActiveMenu] = useState('wallet')
   
-  const handleNavigate = (target) => {
-    navigate(`/dashboard/${target}`);
-  };
-
+  // 1. STATE KRUSIAL UNTUK SUB-MENU (JANGAN DIHAPUS)
+  const [activeSubMenu, setActiveSubMenu] = useState('tip') 
+  
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
   const [showBalance, setShowBalance] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  
   const [qrCode, setQrCode] = useState('')
   const [otp, setOtp] = useState('')
   const [loading2FA, setLoading2FA] = useState(false)
-  const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
-  const [formDataBank, setFormDataBank] = useState({ bank_name: '', account_number: '', account_name: '' })
+
+  const [bankData, setBankData] = useState({ 
+    bank_name: 'Belum Diatur', account_number: '-', account_name: '-' 
+  })
+  
+  const [formDataBank, setFormDataBank] = useState({ 
+    bank_name: '', account_number: '', account_name: '' 
+  })
+
+  const navigate = useNavigate()
 
   const getProcessedUser = (userData) => {
     if (!userData) return null;
     const pic = userData.profile_picture;
     let finalPic = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`;
     if (pic) {
-      // Perbaikan path gambar agar tidak nyari ke localhost
-      finalPic = pic.startsWith('http') ? pic : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${pic}`;
+      finalPic = pic.startsWith('http') ? pic : `http://localhost:3000/uploads/${pic}`;
     }
     return { ...userData, profile_picture: finalPic };
   };
 
-  // --- PERBAIKAN: Fungsi penarikan data menggunakan Supabase ---
-  const fetchDashboardData = async (userEmail) => {
+  const handleGenerateQR = async () => {
+    setLoading2FA(true);
     try {
-      const { data: streamer, error } = await supabase
-        .from('streamers')
-        .select('*')
-        .eq('email', userEmail)
-        .single();
+      const res = await api.post('/auth/setup-2fa', { userId: user.id }); 
+      if (res.data.success) setQrCode(res.data.qrCode);
+    } catch (err) {
+      skuyAlert.fire({
+        title: 'SISTEM ERROR',
+        text: 'Gagal memproses kunci enkripsi keamanan.',
+        icon: 'error',
+        confirmButtonText: 'KEMBALI'
+      });
+    } finally {
+      setLoading2FA(false);
+    }
+  };
 
-      if (error) throw error;
-
-      if (streamer) {
-        setBalance(streamer.total_saldo || 0);
-        setBankData({ 
-          bank_name: streamer.bank_name || 'Belum Diatur', 
-          account_number: streamer.account_number || '-', 
-          account_name: streamer.account_name || '-' 
+  const handleVerify2FA = async () => {
+    setLoading2FA(true);
+    try {
+      const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
+      if (res.data.success) {
+        skuyAlert.fire({
+          title: 'VERIFIKASI BERHASIL',
+          text: 'Autentikasi dua langkah (2FA) telah aktif untuk akun Anda.',
+          icon: 'success',
+          confirmButtonText: 'LANJUTKAN'
         });
-        setFormDataBank({ 
-          bank_name: streamer.bank_name || '', 
-          account_number: streamer.account_number || '', 
-          account_name: streamer.account_name || '' 
-        });
-        
-        // Simpan data streamer ke state user
-        setUser(streamer);
-        localStorage.setItem('user_data', JSON.stringify(streamer));
+        const updatedUser = { ...user, is_two_fa_enabled: true };
+        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setQrCode(''); setOtp('');
       }
     } catch (err) {
-      console.error("Gagal sinkronisasi data:", err.message);
+      skuyAlert.fire({
+        title: 'KODE TIDAK VALID',
+        text: 'Kode verifikasi salah atau sudah kedaluwarsa.',
+        icon: 'error',
+        confirmButtonText: 'COBA LAGI'
+      });
+    } finally {
+      setLoading2FA(false);
     }
-  }
+  };
+
+  const handleDisable2FA = async () => {
+    const result = await skuyAlert.fire({
+      title: 'NONAKTIFKAN 2FA?',
+      text: 'Tindakan ini akan menurunkan level keamanan akun Anda secara signifikan.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'YA, NONAKTIFKAN',
+      cancelButtonText: 'BATALKAN',
+      reverseButtons: true
+    });
+
+    if (result.isConfirmed) {
+      setLoading2FA(true);
+      try {
+        const res = await api.post('/auth/disable-2fa', { userId: user.id });
+        if (res.data.success) {
+          skuyAlert.fire({
+            title: 'PROTOKOL MATI',
+            text: 'Keamanan dua langkah telah dinonaktifkan dari sistem.',
+            icon: 'info',
+            confirmButtonText: 'MENGERTI'
+          });
+          const updatedUser = { ...user, is_two_fa_enabled: false };
+          localStorage.setItem('user_data', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+          setQrCode('');
+        }
+      } catch (err) {
+        skuyAlert.fire('GAGAL', 'Terjadi kesalahan pada server.', 'error');
+      } finally {
+        setLoading2FA(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user_data');
     if (!savedUser) return navigate('/auth');
-    
     const userData = JSON.parse(savedUser);
-    // Kita tetap set data awal, tapi kita refresh dari Supabase biar balance-nya update
     setUser(userData);
-    fetchDashboardData(userData.email);
+    if (userData.role !== 'creator') setActiveMenu('profile');
+    if (userData.bank_name) {
+      setBankData({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
+      setFormDataBank({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
+    }
+    fetchDashboardData(userData.id);
   }, [navigate]);
 
-  // --- PERBAIKAN: Update Bank via Supabase ---
+  const fetchDashboardData = async (userId) => {
+    try {
+      const resBal = await api.get(`/auth/${userId}/balance`);
+      setBalance(resBal.data.total_saldo || 0);
+    } catch (err) { console.error(err); }
+  }
+
   const handleSaveBank = async (e) => {
     e.preventDefault();
     try {
-      const { data, error } = await supabase
-        .from('streamers')
-        .update(formDataBank)
-        .eq('id', user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      setBankData(data);
-      setIsEditModalOpen(false);
-      setUser(data);
-      localStorage.setItem('user_data', JSON.stringify(data));
-      skuyAlert.fire({ title: 'DATA DIPERBARUI', icon: 'success' });
+      const res = await api.put(`/streamers/bank/${user.id}`, formDataBank);
+      if (res.data.success) {
+        setBankData(res.data.data);
+        setIsEditModalOpen(false);
+        const updatedUser = { ...user, ...res.data.data };
+        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        skuyAlert.fire({
+          title: 'DATA DIPERBARUI',
+          text: 'Informasi rekening bank berhasil disimpan ke sistem.',
+          icon: 'success',
+          confirmButtonText: 'OKE'
+        });
+      }
     } catch (err) { 
-      skuyAlert.fire('KESALAHAN', 'Gagal update database.', 'error'); 
+      skuyAlert.fire('KESALAHAN', 'Gagal memperbarui data perbankan.', 'error'); 
     }
   }
-
-  // --- HANDLER LAINNYA (Simulasi agar tidak error saat presentasi) ---
-  const handleGenerateQR = () => { setQrCode('QR_SIMULATION'); skuyAlert.fire('READY', 'Kode QR Terenkripsi', 'info'); };
-  const handleVerify2FA = () => { skuyAlert.fire('BERHASIL', 'Security Aktif', 'success'); };
-  const handleDisable2FA = () => { skuyAlert.fire('DISABLED', 'Security Mati', 'warning'); };
 
   if (!user) return null;
   const displayUser = getProcessedUser(user);
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
+      {/* 2. OPER SEMUA PROPS KE SIDEBAR */}
       <Sidebar 
-        activeMenu={overlayTabs.includes(tab) ? 'overlay' : tab} 
-        setActiveMenu={handleNavigate} 
-        activeSubMenu={tab}
-        setActiveSubMenu={handleNavigate}
+        activeMenu={activeMenu} 
+        setActiveMenu={setActiveMenu} 
+        activeSubMenu={activeSubMenu}       // <-- PENTING
+        setActiveSubMenu={setActiveSubMenu} // <-- PENTING
         user={displayUser} 
         navigate={navigate} 
       />
 
-      <main className="flex-1 p-8 overflow-y-auto custom-scrollbar">
-        <header className="mb-10">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-violet-600 bg-violet-50 px-3 py-1 rounded-full italic w-fit">
-              {user.role === 'streamer' || user.role === 'creator' ? 'Creator Workspace' : 'User Preferences'}
-            </span>
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-slate-950 mt-3 leading-none italic">
-                Control <span className="text-violet-600">Center</span>
-            </h1>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">
-                Active Path: <span className="text-slate-900">/dashboard/{tab}</span>
-            </p>
-          </div>
+      <main className="flex-1 p-8 overflow-y-auto">
+        <header className="mb-8">
+          <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">
+            {user.role === 'creator' ? 'Creator Hub' : 'Member Area'}
+          </h1>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+            LOGGED IN AS: <span className="text-violet-600">{user.role}</span>
+          </p>
         </header>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            {tab === 'wallet' && (
-              <EarningsView 
-                user={displayUser} balance={balance} showBalance={showBalance} 
-                setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
-              />
-            )}
-            
-            {tab === 'activity' && <ActivityFeed userId={user.id} />}
-            {overlayTabs.includes(tab) && <OverlayPage activeSubMenu={tab} user={displayUser} />}
-            {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
-            {tab === 'security' && (
-              <SecurityView 
-                user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
-                onVerify={handleVerify2FA} onDisable={handleDisable2FA}
-                otp={otp} setOtp={setOtp} loading={loading2FA} 
-              />
-            )}
-            {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
-          </motion.div>
-        </AnimatePresence>
+        {activeMenu === 'wallet' && (
+          user.role === 'creator' ? (
+            <EarningsView 
+              user={displayUser} balance={balance} showBalance={showBalance} 
+              setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
+            />
+          ) : (
+            <div className="bg-white p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
+              <h2 className="text-xl font-bold italic mb-2 text-slate-800 uppercase">Daftar Akun Kreator</h2>
+              <button className="bg-violet-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase italic">DAFTAR SEKARANG</button>
+            </div>
+          )
+        )}
+        
+        {activeMenu === 'activity' && <ActivityFeed userId={user.id} />}
+        
+        {/* 3. OPER STATE KE OVERLAY PAGE */}
+        {activeMenu === 'overlay' && (
+           <OverlayPage activeSubMenu={activeSubMenu} user={displayUser} />
+        )}
+        
+        {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
+
+        {activeMenu === 'security' && (
+          <SecurityView 
+            user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
+            onVerify={handleVerify2FA} onDisable={handleDisable2FA}
+            otp={otp} setOtp={setOtp} loading={loading2FA} 
+          />
+        )}
+
+        {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
       </main>
 
       <EditBankModal 
