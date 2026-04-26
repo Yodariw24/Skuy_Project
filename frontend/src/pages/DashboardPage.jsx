@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+// --- PERBAIKAN: Gunakan Supabase Client ---
+import { supabase } from '../supabaseClient'
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
 import ActivityFeed from '../components/dashboard/ActivityFeed'
@@ -11,7 +12,6 @@ import SecurityView from '../components/dashboard/SecurityView'
 import OverlayPage from '../components/dashboard/OverlayPage'
 import Swal from 'sweetalert2'
 
-// --- HELPER STYLE POP-UP SUPER GACOR (BRUTALIST STYLE) ---
 const skuyAlert = Swal.mixin({
   customClass: {
     popup: 'skuy-popup rounded-[2rem] p-10',
@@ -26,15 +26,11 @@ const skuyAlert = Swal.mixin({
 
 function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('wallet')
-  
-  // 1. STATE KRUSIAL UNTUK SUB-MENU (JANGAN DIHAPUS)
   const [activeSubMenu, setActiveSubMenu] = useState('tip') 
-  
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
   const [showBalance, setShowBalance] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  
   const [qrCode, setQrCode] = useState('')
   const [otp, setOtp] = useState('')
   const [loading2FA, setLoading2FA] = useState(false)
@@ -42,7 +38,6 @@ function DashboardPage() {
   const [bankData, setBankData] = useState({ 
     bank_name: 'Belum Diatur', account_number: '-', account_name: '-' 
   })
-  
   const [formDataBank, setFormDataBank] = useState({ 
     bank_name: '', account_number: '', account_name: '' 
   })
@@ -54,124 +49,84 @@ function DashboardPage() {
     const pic = userData.profile_picture;
     let finalPic = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`;
     if (pic) {
-      finalPic = pic.startsWith('http') ? pic : `http://localhost:3000/uploads/${pic}`;
+      finalPic = pic.startsWith('http') ? pic : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${pic}`;
     }
     return { ...userData, profile_picture: finalPic };
   };
 
-  const handleGenerateQR = async () => {
-    setLoading2FA(true);
-    try {
-      const res = await api.post('/auth/setup-2fa', { userId: user.id }); 
-      if (res.data.success) setQrCode(res.data.qrCode);
-    } catch (err) {
-      skuyAlert.fire({
-        title: 'SISTEM ERROR',
-        text: 'Gagal memproses kunci enkripsi keamanan.',
-        icon: 'error',
-        confirmButtonText: 'KEMBALI'
-      });
-    } finally {
-      setLoading2FA(false);
-    }
-  };
-
-  const handleVerify2FA = async () => {
-    setLoading2FA(true);
-    try {
-      const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
-      if (res.data.success) {
-        skuyAlert.fire({
-          title: 'VERIFIKASI BERHASIL',
-          text: 'Autentikasi dua langkah (2FA) telah aktif untuk akun Anda.',
-          icon: 'success',
-          confirmButtonText: 'LANJUTKAN'
-        });
-        const updatedUser = { ...user, is_two_fa_enabled: true };
-        localStorage.setItem('user_data', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        setQrCode(''); setOtp('');
-      }
-    } catch (err) {
-      skuyAlert.fire({
-        title: 'KODE TIDAK VALID',
-        text: 'Kode verifikasi salah atau sudah kedaluwarsa.',
-        icon: 'error',
-        confirmButtonText: 'COBA LAGI'
-      });
-    } finally {
-      setLoading2FA(false);
-    }
-  };
-
-  const handleDisable2FA = async () => {
-    const result = await skuyAlert.fire({
-      title: 'NONAKTIFKAN 2FA?',
-      text: 'Tindakan ini akan menurunkan level keamanan akun Anda secara signifikan.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'YA, NONAKTIFKAN',
-      cancelButtonText: 'BATALKAN',
-      reverseButtons: true
-    });
-
-    if (result.isConfirmed) {
-      setLoading2FA(true);
-      try {
-        const res = await api.post('/auth/disable-2fa', { userId: user.id });
-        if (res.data.success) {
-          skuyAlert.fire({
-            title: 'PROTOKOL MATI',
-            text: 'Keamanan dua langkah telah dinonaktifkan dari sistem.',
-            icon: 'info',
-            confirmButtonText: 'MENGERTI'
-          });
-          const updatedUser = { ...user, is_two_fa_enabled: false };
-          localStorage.setItem('user_data', JSON.stringify(updatedUser));
-          setUser(updatedUser);
-          setQrCode('');
-        }
-      } catch (err) {
-        skuyAlert.fire('GAGAL', 'Terjadi kesalahan pada server.', 'error');
-      } finally {
-        setLoading2FA(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user_data');
-    if (!savedUser) return navigate('/auth');
-    const userData = JSON.parse(savedUser);
-    setUser(userData);
-    if (userData.role !== 'creator') setActiveMenu('profile');
-    if (userData.bank_name) {
-      setBankData({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
-      setFormDataBank({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
-    }
-    fetchDashboardData(userData.id);
-  }, [navigate]);
-
+  // --- LOGIKA DASHBOARD (SUPABASE NATIVE) ---
   const fetchDashboardData = async (userId) => {
     try {
-      const resBal = await api.get(`/auth/${userId}/balance`);
-      setBalance(resBal.data.total_saldo || 0);
-    } catch (err) { console.error(err); }
+      // 1. Ambil Profil & Bank & Saldo secara paralel
+      const [resProfile, resBal, resBank] = await Promise.all([
+        supabase.from('streamers').select('*').eq('id', userId).single(),
+        supabase.from('balance').select('total_saldo').eq('streamer_id', userId).single(),
+        supabase.from('payment_methods').select('*').eq('streamer_id', userId).single()
+      ]);
+
+      if (resProfile.data) {
+        setUser(resProfile.data);
+      }
+      
+      if (resBal.data) {
+        setBalance(resBal.data.total_saldo || 0);
+      }
+
+      if (resBank.data) {
+        setBankData({
+          bank_name: resBank.data.bank_name || 'Belum Diatur',
+          account_number: resBank.data.account_number || '-',
+          account_name: resBank.data.account_name || '-'
+        });
+        setFormDataBank({
+          bank_name: resBank.data.bank_name || '',
+          account_number: resBank.data.account_number || '',
+          account_name: resBank.data.account_name || ''
+        });
+      }
+    } catch (err) {
+      console.error("Gagal sinkronisasi data:", err);
+    }
   }
 
+  useEffect(() => {
+    const initDashboard = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        return navigate('/auth');
+      }
+
+      // Jalankan pengambilan data berdasarkan UUID Supabase
+      fetchDashboardData(session.user.id);
+    };
+
+    initDashboard();
+  }, [navigate]);
+
+  // --- LOGIKA UPDATE BANK (SUPABASE NATIVE) ---
   const handleSaveBank = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.put(`/streamers/bank/${user.id}`, formDataBank);
-      if (res.data.success) {
-        setBankData(res.data.data);
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .update({
+          bank_name: formDataBank.bank_name,
+          account_number: formDataBank.account_number,
+          account_name: formDataBank.account_name,
+        })
+        .eq('streamer_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setBankData(data);
         setIsEditModalOpen(false);
-        const updatedUser = { ...user, ...res.data.data };
-        localStorage.setItem('user_data', JSON.stringify(updatedUser));
-        setUser(updatedUser);
         skuyAlert.fire({
           title: 'DATA DIPERBARUI',
-          text: 'Informasi rekening bank berhasil disimpan ke sistem.',
+          text: 'Informasi rekening bank berhasil disimpan ke sistem Cloud.',
           icon: 'success',
           confirmButtonText: 'OKE'
         });
@@ -181,17 +136,34 @@ function DashboardPage() {
     }
   }
 
+  // --- LOGIKA 2FA (SIMULASI UNTUK DEMO) ---
+  const handleGenerateQR = () => {
+    setLoading2FA(true);
+    setTimeout(() => {
+      setQrCode('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SKUY-SECURITY-ACTIVE');
+      setLoading2FA(false);
+    }, 1000);
+  };
+
+  const handleVerify2FA = () => {
+    skuyAlert.fire({ title: 'VERIFIKASI BERHASIL', text: '2FA Aktif.', icon: 'success' });
+    setQrCode(''); setOtp('');
+  };
+
+  const handleDisable2FA = () => {
+    skuyAlert.fire({ title: 'PROTOKOL MATI', text: '2FA Dinonaktifkan.', icon: 'info' });
+  };
+
   if (!user) return null;
   const displayUser = getProcessedUser(user);
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
-      {/* 2. OPER SEMUA PROPS KE SIDEBAR */}
       <Sidebar 
         activeMenu={activeMenu} 
         setActiveMenu={setActiveMenu} 
-        activeSubMenu={activeSubMenu}       // <-- PENTING
-        setActiveSubMenu={setActiveSubMenu} // <-- PENTING
+        activeSubMenu={activeSubMenu} 
+        setActiveSubMenu={setActiveSubMenu}
         user={displayUser} 
         navigate={navigate} 
       />
@@ -199,34 +171,22 @@ function DashboardPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
           <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">
-            {user.role === 'creator' ? 'Creator Hub' : 'Member Area'}
+            {user.role === 'streamer' || user.role === 'creator' ? 'Creator Hub' : 'Member Area'}
           </h1>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-            LOGGED IN AS: <span className="text-violet-600">{user.role}</span>
+            STATUS: <span className="text-violet-600">Authorized Session</span>
           </p>
         </header>
 
         {activeMenu === 'wallet' && (
-          user.role === 'creator' ? (
-            <EarningsView 
-              user={displayUser} balance={balance} showBalance={showBalance} 
-              setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
-            />
-          ) : (
-            <div className="bg-white p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
-              <h2 className="text-xl font-bold italic mb-2 text-slate-800 uppercase">Daftar Akun Kreator</h2>
-              <button className="bg-violet-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase italic">DAFTAR SEKARANG</button>
-            </div>
-          )
+          <EarningsView 
+            user={displayUser} balance={balance} showBalance={showBalance} 
+            setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
+          />
         )}
         
         {activeMenu === 'activity' && <ActivityFeed userId={user.id} />}
-        
-        {/* 3. OPER STATE KE OVERLAY PAGE */}
-        {activeMenu === 'overlay' && (
-           <OverlayPage activeSubMenu={activeSubMenu} user={displayUser} />
-        )}
-        
+        {activeMenu === 'overlay' && <OverlayPage activeSubMenu={activeSubMenu} user={displayUser} />}
         {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
 
         {activeMenu === 'security' && (
