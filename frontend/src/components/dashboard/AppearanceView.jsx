@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Palette, Check, Sparkles, Layout, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import api from '../../api/axios'
+// --- PERBAIKAN: Gunakan Supabase Client ---
+import { supabase } from '../../supabaseClient'
 
 const THEMES = [
   { id: 'violet', name: 'Royal Purple', class: 'bg-violet-600', shadow: 'shadow-violet-200' },
@@ -18,34 +19,36 @@ export default function AppearanceView({ user, setUser }) {
   const [showToast, setShowToast] = useState(false)
 
   const handleSaveTheme = async (themeId) => {
-    if (themeId === selectedTheme) return; // Gak perlu save kalau warnanya sama
+    if (themeId === selectedTheme) return; 
 
-    setSelectedTheme(themeId)
     setLoading(true)
     try {
-      // Kita kirim data lengkap ke backend agar sinkron dengan Controller baru kita
-      const payload = { 
-        ...user, 
-        theme_color: themeId 
-      }
-      
-      const res = await api.put(`/streamers/profile/${user.id}`, payload)
-      
-      if (res.data.success) {
-        // Update Global State (Dashboard & Navbar ikut berubah)
-        const updatedUser = { ...user, ...res.data.data }
+      // PROSES UPDATE KE SUPABASE CLOUD
+      const { data, error } = await supabase
+        .from('streamers')
+        .update({ theme_color: themeId })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        // Update Local State agar UI berubah seketika
+        setSelectedTheme(themeId)
+        const updatedUser = { ...user, theme_color: themeId }
         setUser(updatedUser)
         
-        // Simpan ke LocalStorage agar pas refresh gak balik lagi
+        // Simpan ke LocalStorage agar sesi tetap konsisten
         localStorage.setItem('user_data', JSON.stringify(updatedUser))
         
-        // Munculkan notifikasi sukses
+        // Trigger Toast Gacor
         setShowToast(true)
         setTimeout(() => setShowToast(false), 3000)
       }
     } catch (err) {
-      console.error("Gagal update tema:", err)
-      alert("Gagal koneksi ke server ⚠️")
+      console.error("Gagal update tema cloud:", err.message)
+      alert("Gagal sinkronisasi tema ke pangkalan data cloud ⚠️")
     } finally {
       setLoading(false)
     }
@@ -66,7 +69,7 @@ export default function AppearanceView({ user, setUser }) {
             <div className="bg-emerald-500 p-1.5 rounded-full">
                <CheckCircle2 size={16} strokeWidth={3} />
             </div>
-            <p className="text-[10px] font-black uppercase italic tracking-widest">Tema Berhasil Diterapkan! ✨</p>
+            <p className="text-[10px] font-black uppercase italic tracking-widest">Visual Protocol Applied! ✨</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -76,7 +79,7 @@ export default function AppearanceView({ user, setUser }) {
         <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none mb-4">
           Appearance
         </h1>
-        <p className="text-xs text-slate-400 font-bold italic uppercase tracking-widest">Ganti identitas visual halaman publik kamu dalam satu klik</p>
+        <p className="text-xs text-slate-400 font-bold italic uppercase tracking-widest">Sesuaikan aura visual halaman publik Skuy kamu secara real-time</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
@@ -90,8 +93,8 @@ export default function AppearanceView({ user, setUser }) {
               <Palette size={20} strokeWidth={3} />
             </div>
             <div>
-               <h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Brand Identity</h2>
-               <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Pilih warna yang paling mencerminkan diri kamu</p>
+               <h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Visual Core</h2>
+               <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Pilih protokol warna untuk identitas brand kamu</p>
             </div>
           </div>
 
@@ -130,13 +133,15 @@ export default function AppearanceView({ user, setUser }) {
               
               <div className="text-center mb-10 relative z-10">
                  <Layout className="text-white/20 mx-auto mb-4" size={40} />
-                 <h3 className="text-xl font-black italic uppercase tracking-tighter mb-2">Live Preview</h3>
-                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Real-time visual check</p>
+                 <h3 className="text-xl font-black italic uppercase tracking-tighter mb-2">Cloud Preview</h3>
+                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Real-time cloud sync check</p>
               </div>
               
               {/* Mini Website Mockup */}
               <div className="w-full max-w-[220px] bg-white rounded-[2.5rem] p-5 shadow-2xl scale-110 relative z-10 border border-white/20">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 mx-auto mb-4 border border-slate-50 shadow-inner" />
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 mx-auto mb-4 border border-slate-50 shadow-inner overflow-hidden">
+                   <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
                 <div className="h-2 w-20 bg-slate-200 rounded-full mx-auto mb-2" />
                 <div className="h-1.5 w-12 bg-slate-100 rounded-full mx-auto mb-6" />
                 
@@ -156,7 +161,7 @@ export default function AppearanceView({ user, setUser }) {
                     >
                         <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
                         <span className="text-[10px] font-black text-violet-600 uppercase italic tracking-widest">
-                           Syncing with Cloud...
+                            Encrypting Theme to Cloud...
                         </span>
                     </motion.div>
                 )}

@@ -1,43 +1,79 @@
-import { Moon } from 'lucide-react'
+import { Moon, Settings, Sparkles } from 'lucide-react'
 import ProfileSettings from './ProfileSettings'
+import { motion } from 'framer-motion'
 
 export default function SettingsView({ user, setUser }) {
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-5xl">
-      <div className="mb-8 px-1">
-        <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">Settings</h1>
-        <p className="text-xs text-slate-400 font-medium italic uppercase tracking-tight">Atur profil publik dan preferensi aplikasi kamu</p>
+    // Animasi masuk yang halus agar terlihat premium
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }} 
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-5xl mx-auto pb-20 px-2 font-sans"
+    >
+      {/* --- HEADER --- */}
+      <div className="mb-10 px-1">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg">
+            <Settings size={18} strokeWidth={3} />
+          </div>
+          <h1 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">System Settings</h1>
+        </div>
+        <p className="text-[10px] text-slate-400 font-bold italic uppercase tracking-[0.2em] ml-1">
+          Konfigurasi identitas publik dan preferensi ekosistem Skuy
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* KOLOM KIRI: FORM PROFILE */}
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* KOLOM KIRI: CORE PROFILE FORM (TABEL STREAMERS) */}
+        <div className="lg:col-span-8">
           <ProfileSettings user={user} setUser={setUser} />
         </div>
 
-        {/* KOLOM KANAN: DARK MODE */}
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Preferences</h3>
-            
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-              <div className="flex items-center gap-3">
-                <Moon size={18} className="text-slate-400" />
-                <span className="text-sm font-bold text-slate-700">Dark Mode</span>
-              </div>
-              
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" />
-                <div className="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-violet-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-              </label>
+        {/* KOLOM KANAN: APP PREFERENCES */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
+          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden group">
+            {/* Visual Accent */}
+            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:rotate-12 transition-transform duration-700">
+               <Sparkles size={80} />
             </div>
+
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 px-1 italic">Dashboard UI</h3>
             
-            <p className="text-[9px] text-slate-400 font-bold italic mt-4 px-1 uppercase tracking-tight">
-              *Coming Soon: Full Dark Theme
-            </p>
+            <div className="space-y-4 relative z-10">
+              <div className="flex items-center justify-between p-5 bg-slate-50/80 border border-slate-100 rounded-[1.8rem] transition-all hover:bg-white hover:border-violet-100">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-white rounded-xl shadow-sm text-slate-400">
+                    <Moon size={18} />
+                  </div>
+                  <span className="text-[11px] font-black uppercase text-slate-700 tracking-tight">Night Protocol</span>
+                </div>
+                
+                <label className="relative inline-flex items-center cursor-not-allowed opacity-50">
+                  <input type="checkbox" disabled className="sr-only peer" />
+                  <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-violet-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                </label>
+              </div>
+
+              {/* Status Info */}
+              <div className="p-4 rounded-2xl bg-violet-50/50 border border-dashed border-violet-100">
+                <p className="text-[9px] text-violet-600 font-black italic uppercase text-center leading-relaxed tracking-widest">
+                  *Experimental Feature: <br/> Dark theme is being encrypted
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sesi Info Kartu Kecil */}
+          <div className="p-8 bg-slate-950 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+             <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-violet-600 blur-3xl opacity-40" />
+             <p className="text-[8px] font-black uppercase tracking-[0.4em] text-white/40 mb-2">Cloud Session</p>
+             <p className="text-[10px] font-bold italic text-white leading-relaxed">
+               User ID: <br/>
+               <span className="text-violet-400 break-all font-mono opacity-80">{user?.id}</span>
+             </p>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

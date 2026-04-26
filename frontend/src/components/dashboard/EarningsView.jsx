@@ -5,7 +5,8 @@ import {
   History, ArrowDownLeft, ChevronRight, Info, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import api from '../../api/axios'
+// --- PERBAIKAN: Gunakan Supabase Client ---
+import { supabase } from '../../supabaseClient'
 
 function EarningsView({ user, balance, showBalance, setShowBalance, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua')
@@ -15,17 +16,21 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // --- FETCH DATA DARI DATABASE ---
+  // --- FETCH HISTORY DARI SUPABASE (TABEL wallet_history) ---
   const fetchHistory = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/donations/${user.id}/wallet-history`);
-      if (res.data.success) {
-        setTransactions(res.data.data);
-      }
+      const { data, error } = await supabase
+        .from('wallet_history')
+        .select('*')
+        .eq('streamer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) setTransactions(data);
     } catch (err) {
-      console.error("Gagal load history:", err);
+      console.error("Gagal load history:", err.message);
     } finally {
       setLoading(false);
     }
@@ -35,45 +40,56 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     fetchHistory();
   }, [user?.id]);
 
-  // --- LOGIKA FILTER (FIXED) ---
+  // --- LOGIKA FILTER ---
   const filteredTransactions = transactions.filter(tx => {
     if (filter === 'Semua') return true;
-    
-    // Sesuaikan dengan data dari Backend (INCOME / OUTCOME)
-    if (filter === 'Donasi Masuk') return tx.type === 'INCOME';
-    if (filter === 'Penarikan Saldo') return tx.type === 'OUTCOME';
-    
-    // Filter status pending (Case Insensitive biar aman)
-    if (filter === 'Pending') return tx.status?.toUpperCase() === 'PENDING';
-    
+    if (filter === 'Donasi Masuk') return tx.type === 'IN';
+    if (filter === 'Penarikan Saldo') return tx.type === 'OUT';
     return true;
   });
 
+  // --- LOGIKA WITHDRAW (NATIVE SUPABASE) ---
   const handleWithdraw = async () => {
     if (!withdrawAmount || withdrawAmount < 10000) return alert("Minimal penarikan Rp 10.000");
     if (withdrawAmount > balance) return alert("Saldo tidak mencukupi!");
 
     try {
-      const res = await api.post('/donations/withdraw', {
-        streamer_id: user.id,
-        amount: withdrawAmount,
-        bank_info: `${bankData.bank_name} - ${bankData.account_number} (a.n ${bankData.account_name})`
-      });
+      // 1. Catat di tabel withdrawals
+      const { error: wdError } = await supabase
+        .from('withdrawals')
+        .insert([{
+          streamer_id: user.id,
+          amount: parseInt(withdrawAmount),
+          bank_name: bankData.bank_name,
+          account_number: bankData.account_number,
+          account_name: bankData.account_name,
+          status: 'PENDING'
+        }]);
 
-      if (res.data.success) {
-        alert("Permintaan tarik saldo berhasil dikirim! 🚀");
-        setIsWithdrawModalOpen(false);
-        setWithdrawAmount('');
-        fetchHistory(); 
-      }
+      if (wdError) throw wdError;
+
+      // 2. Tambahkan Log di wallet_history
+      await supabase
+        .from('wallet_history')
+        .insert([{
+          streamer_id: user.id,
+          type: 'OUT',
+          amount: parseInt(withdrawAmount),
+          description: `Penarikan ke ${bankData.bank_name}`
+        }]);
+
+      alert("Permintaan tarik saldo berhasil dikirim ke Cloud! 🚀");
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount('');
+      fetchHistory(); 
     } catch (err) {
-      alert(err.response?.data?.message || "Gagal tarik saldo ⚠️");
+      alert("Gagal memproses penarikan: " + err.message);
     }
   };
 
   const copyToClipboard = (text, message) => {
     navigator.clipboard.writeText(text);
-    alert(message || "Berhasil disalin! 🚀");
+    alert(message || "Link disalin ke clipboard! 🚀");
   };
 
   return (
@@ -101,7 +117,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* --- LEFT SIDE: SALDO & HISTORY --- */}
+        {/* --- LEFT SIDE --- */}
         <div className="lg:col-span-8 space-y-8">
           <div className="bg-gradient-to-br from-violet-600 via-violet-700 to-indigo-800 rounded-[3.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-violet-200 border border-white/10 group">
             <div className="absolute top-[-20%] right-[-10%] w-80 h-80 bg-white/10 rounded-full blur-[100px] group-hover:bg-white/20 transition-all duration-700" />
@@ -125,14 +141,13 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
             </div>
           </div>
 
-          {/* Transaction History Section */}
           <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
             <div className="p-8 md:p-10 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-slate-950 text-white rounded-2xl shadow-lg"><History size={20} /></div>
                 <div>
                   <h3 className="font-black text-slate-900 text-lg uppercase italic tracking-tighter leading-none mb-1">Transaction History</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Tracking your cash flow</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Tracking your cloud cash flow</p>
                 </div>
               </div>
 
@@ -149,7 +164,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                       className="absolute right-0 mt-3 w-full bg-white border border-slate-100 rounded-[2rem] shadow-2xl z-50 p-3"
                     >
-                      {['Semua', 'Donasi Masuk', 'Penarikan Saldo', 'Pending'].map((item) => (
+                      {['Semua', 'Donasi Masuk', 'Penarikan Saldo'].map((item) => (
                         <button
                           key={item}
                           onClick={() => { setFilter(item); setIsFilterOpen(false); }}
@@ -168,40 +183,36 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               {loading ? (
                 <div className="py-20 flex flex-col items-center gap-4 text-slate-300">
                   <RefreshCw size={32} className="animate-spin" />
-                  <p className="text-[10px] font-black uppercase tracking-widest italic">Syncing with server...</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest italic">Connecting to Cloud Base...</p>
                 </div>
               ) : filteredTransactions.length > 0 ? (
                 <div className="space-y-5">
                   {filteredTransactions.map((tx, idx) => (
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                      key={`${tx.type}-${tx.id}`} 
+                      key={tx.id} 
                       className="group flex flex-col md:flex-row md:items-center justify-between p-7 rounded-[2.5rem] bg-slate-50/50 border border-transparent hover:border-violet-100 hover:bg-white transition-all duration-300 hover:shadow-2xl hover:shadow-slate-200/50"
                     >
                       <div className="flex items-center gap-6">
-                        <div className={`p-4 rounded-[1.5rem] shadow-lg ${tx.type === 'INCOME' ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-rose-500 text-white shadow-rose-100'}`}>
-                          {tx.type === 'INCOME' ? <ArrowDownLeft size={20} strokeWidth={3} /> : <ArrowUpRight size={20} strokeWidth={3} />}
+                        <div className={`p-4 rounded-[1.5rem] shadow-lg ${tx.type === 'IN' ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-rose-500 text-white shadow-rose-100'}`}>
+                          {tx.type === 'IN' ? <ArrowDownLeft size={20} strokeWidth={3} /> : <ArrowUpRight size={20} strokeWidth={3} />}
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <p className="font-black text-slate-950 uppercase italic tracking-tighter text-sm">{tx.detail || 'No Detail'}</p>
-                            <span className={`text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
-                              tx.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 
-                              tx.status === 'PENDING' ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-slate-100 text-slate-400'
-                            }`}>
-                              {tx.status}
+                            <p className="font-black text-slate-950 uppercase italic tracking-tighter text-sm">{tx.description || 'System Entry'}</p>
+                            <span className="text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest bg-emerald-100 text-emerald-600 border border-emerald-200">
+                              AUTHORIZED
                             </span>
                           </div>
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-2">
                             <Clock size={10} /> 
-                            {/* FIXED: Menggunakan created_date agar tidak Invalid Date */}
-                            {tx.created_date ? new Date(tx.created_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No Date'} • {tx.type}
+                            {new Date(tx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </p>
                         </div>
                       </div>
                       <div className="mt-4 md:mt-0 text-right">
-                        <p className={`text-2xl font-black tracking-tighter leading-none ${tx.type === 'INCOME' ? 'text-emerald-600' : 'text-slate-950'}`}>
-                          {tx.type === 'INCOME' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
+                        <p className={`text-2xl font-black tracking-tighter leading-none ${tx.type === 'IN' ? 'text-emerald-600' : 'text-slate-950'}`}>
+                          {tx.type === 'IN' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
                         </p>
                       </div>
                     </motion.div>
@@ -212,7 +223,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center border-2 border-dashed border-slate-200">
                     <History size={32} className="text-slate-300" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.4em]">No Transactions Found</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em]">Empty Transmission Log</p>
                 </div>
               )}
             </div>
@@ -223,14 +234,14 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
         <div className="lg:col-span-4 space-y-8">
           <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/40 group">
             <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2 italic">
-              <LinkIcon size={14} className="text-violet-600" /> Public Page Link
+              <LinkIcon size={14} className="text-violet-600" /> Public Profile
             </h4>
             <div className="bg-slate-50 p-5 rounded-2xl mb-5 border border-slate-100 text-sm font-black text-slate-400 truncate tracking-tight">
               skuy.gg/<span className="text-violet-600">{user?.username}</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => copyToClipboard(`https://skuy.gg/${user?.username}`)} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
-              <a href={`/${user?.username}`} target="_blank" className="py-4 bg-slate-950 text-white rounded-2xl text-[9px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-lg shadow-slate-200 transition-all hover:bg-violet-600 italic tracking-widest">Open <ExternalLink size={12}/></a>
+              <button onClick={() => copyToClipboard(`https://skuy.vercel.app/${user?.username}`)} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
+              <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="py-4 bg-slate-950 text-white rounded-2xl text-[9px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-lg shadow-slate-200 transition-all hover:bg-violet-600 italic tracking-widest">Visit <ExternalLink size={12}/></a>
             </div>
           </div>
 
@@ -238,14 +249,14 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50 group-hover:opacity-100 transition-all" />
             <div className="flex justify-between items-start mb-8 relative z-10">
               <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 italic">
-                <Landmark size={14} className="text-violet-600" /> Payout Destination
+                <Landmark size={14} className="text-violet-600" /> Bank Account
               </h4>
               <button onClick={openEditModal} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-violet-600 hover:bg-violet-100 transition-all border border-slate-100 active:scale-90 shadow-sm"><Edit3 size={14} /></button>
             </div>
             <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-100 group-hover:bg-white group-hover:border-violet-200 transition-all duration-500 relative z-10">
               {bankData.bank_name !== 'Belum Diatur' ? (
                 <div className="text-center">
-                  <div className="mb-4 inline-block bg-emerald-500 text-white text-[7px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg shadow-emerald-100">Ready for Payout</div>
+                  <div className="mb-4 inline-block bg-emerald-500 text-white text-[7px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg shadow-emerald-100">Secure Destination</div>
                   <p className="text-[11px] font-black text-violet-600 uppercase mb-2 italic tracking-tighter">{bankData.bank_name}</p>
                   <p className="text-2xl font-black text-slate-950 tracking-tighter mb-2 leading-none">{bankData.account_number}</p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{bankData.account_name}</p>

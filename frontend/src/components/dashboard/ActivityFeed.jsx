@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import api from '../../api/axios'
+// --- PERBAIKAN: Gunakan Supabase Client ---
+import { supabase } from '../../supabaseClient'
 import { 
   MessageSquare, Clock, Heart, RefreshCcw, Zap, 
   TrendingUp, Crown, Sparkles, Share2, CheckCircle2 
@@ -16,22 +17,24 @@ function ActivityFeed({ userId }) {
     else setIsRefreshing(true);
 
     try {
-      // Endpoint: router.get('/:id/history', getPublicHistory)
-      const res = await api.get(`/donations/${userId}/history`);
+      // AMBIL DATA DARI TABEL DONATIONS SUPABASE
+      const { data, error } = await supabase
+        .from('donations')
+        .select('*')
+        .eq('streamer_id', userId)
+        .eq('status', 'SUCCESS') // Hanya tampilkan yang sukses bayar
+        .order('created_at', { ascending: false });
       
-      // FIX: Ambil res.data.data karena Backend membungkusnya dalam objek success
-      if (res.data && res.data.success) {
-        setHistory(res.data.data || []);
-      }
+      if (error) throw error;
+      if (data) setHistory(data);
     } catch (err) {
-      console.error("Gagal ambil history:", err);
+      console.error("Gagal ambil history dari Cloud:", err.message);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   }, [userId]);
 
-  // --- AUTO REFRESH SETIAP 30 DETIK ---
   useEffect(() => {
     if (userId) {
       fetchHistory();
@@ -69,7 +72,7 @@ function ActivityFeed({ userId }) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
             </span>
-            <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em] italic">Live Feed</span>
+            <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em] italic">Cloud Live Feed</span>
           </div>
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
             Recent Support
@@ -97,7 +100,7 @@ function ActivityFeed({ userId }) {
                 <div className="w-16 h-16 border-[6px] border-slate-100 rounded-full" />
                 <div className="absolute top-0 w-16 h-16 border-[6px] border-violet-600 border-t-transparent rounded-full animate-spin" />
              </div>
-             <p className="font-black italic uppercase tracking-[0.4em] text-[10px] text-slate-400 animate-pulse">Syncing Energy...</p>
+             <p className="font-black italic uppercase tracking-[0.4em] text-[10px] text-slate-400 animate-pulse">Scanning Cloud History...</p>
           </div>
         ) : history.length > 0 ? (
           <AnimatePresence mode='popLayout'>
@@ -107,15 +110,13 @@ function ActivityFeed({ userId }) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.08 }}
-                key={item.id || i} 
+                key={item.id} 
                 className="group relative bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 shadow-2xl shadow-slate-200/30 flex flex-col md:flex-row items-start md:items-center gap-8 hover:border-violet-200 hover:shadow-xl hover:shadow-violet-50 transition-all duration-500"
               >
-                {/* Visual Accent */}
                 <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity">
                    <Sparkles size={120} />
                 </div>
 
-                {/* Left Side: Avatar/Icon */}
                 <div className="relative shrink-0">
                   <div className={`w-20 h-20 rounded-[2.2rem] flex items-center justify-center transition-all duration-500 shadow-xl ${
                     item.amount >= 100000 
@@ -131,7 +132,6 @@ function ActivityFeed({ userId }) {
                   )}
                 </div>
                 
-                {/* Right Side: Info */}
                 <div className="flex-1 w-full min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
@@ -140,10 +140,10 @@ function ActivityFeed({ userId }) {
                       </h3>
                       <div className="flex items-center gap-3 text-slate-400 text-[9px] font-black uppercase tracking-widest">
                         <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl">
-                          <Clock size={12} strokeWidth={3} /> {formatRelativeTime(item.created_date)}
+                          <Clock size={12} strokeWidth={3} /> {formatRelativeTime(item.created_at)}
                         </span>
                         <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl">
-                          <CheckCircle2 size={12} strokeWidth={3} /> Success
+                          <CheckCircle2 size={12} strokeWidth={3} /> Authorized
                         </span>
                       </div>
                     </div>
@@ -157,7 +157,6 @@ function ActivityFeed({ userId }) {
                     </div>
                   </div>
 
-                  {/* Message Section */}
                   {item.message && (
                     <div className="relative pl-6 border-l-4 border-slate-100 group-hover:border-violet-200 transition-colors">
                       <p className="text-sm text-slate-500 italic font-bold leading-relaxed">
@@ -170,20 +169,22 @@ function ActivityFeed({ userId }) {
             ))}
           </AnimatePresence>
         ) : (
-          /* EMPTY STATE */
           <div className="bg-white rounded-[4rem] border-4 border-dashed border-slate-100 py-32 text-center flex flex-col items-center group transition-all duration-500 hover:border-violet-200">
             <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-violet-50 transition-all duration-500">
               <Zap size={40} className="text-slate-200 group-hover:text-violet-400 animate-pulse" />
             </div>
             <div className="space-y-4 px-6">
               <p className="text-slate-400 font-black italic uppercase tracking-[0.4em] text-xs leading-loose">
-                Belum ada energi masuk nih.
+                Belum ada sinyal energi masuk.
               </p>
               <button 
-                onClick={() => navigator.clipboard.writeText(`skuy.gg/surya`)}
+                onClick={() => {
+                   navigator.clipboard.writeText(`https://skuy.vercel.app/${localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data')).username : ''}`);
+                   alert('Link donasi disalin!');
+                }}
                 className="flex items-center gap-2 mx-auto bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-widest shadow-xl active:scale-95 transition-all"
               >
-                <Share2 size={14} /> Share Link Saweran
+                <Share2 size={14} /> Share Link Support
               </button>
             </div>
           </div>

@@ -2,14 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Play } from 'lucide-react';
-import { io } from 'socket.io-client';
-import api from '../api/axios';
-
-// PAKSA KE LOCALHOST 3000 AGAR TIDAK NYASAR KE RENDER
-const SOCKET_URL = 'http://localhost:3000';
+// --- PERBAIKAN: Gunakan Supabase Client, bukan Socket.io ---
+import { supabase } from '../supabaseClient'; 
 
 const WidgetClient = () => {
-  const { type, key } = useParams();
+  const { type, key } = useParams(); // 'key' di sini adalah ID Streamer (UUID)
   const [activeAlert, setActiveAlert] = useState(null);
   const [settings, setSettings] = useState({
     primary: '#6366f1',
@@ -19,56 +16,71 @@ const WidgetClient = () => {
     duration: 8
   });
 
-  // 1. FETCH SETTINGS (Warna & Durasi)
+  // 1. FETCH SETTINGS (DARI TABEL STREAMERS)
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await api.get(`/streamers/widgets/settings/${key}/${type}`);
-        if (res.data && res.data.success) {
-          const db = res.data.data;
-          setSettings({
-            primary: db.primary_color || '#6366f1',
-            accent: db.accent_color || '#fbbf24',
-            text: db.text_color || '#ffffff',
-            glow: db.glow_color || '#818cf8',
-            duration: parseInt(db.duration) || 8
-          });
+        const { data, error } = await supabase
+          .from('streamers')
+          .select('*')
+          .eq('id', key) // Mencari berdasarkan UUID di URL
+          .single();
+
+        if (data) {
+          setSettings(prev => ({
+            ...prev,
+            primary: data.theme_color === 'violet' ? '#6366f1' : data.theme_color || '#6366f1',
+            // Tambahkan logika mapping warna lainnya jika perlu
+          }));
         }
       } catch (err) {
-        console.warn("Menggunakan setting default.");
+        console.warn("Using default cloud settings.");
       }
     };
-    if (key && type) fetchSettings();
-  }, [type, key]);
+    if (key) fetchSettings();
+  }, [key]);
 
-  // 2. SOCKET.IO REAL-TIME
+  // 2. SUPABASE REALTIME (MENGGANTIKAN SOCKET.IO)
   useEffect(() => {
-    // Paksa transport websocket agar tidak diblokir CORS/Render
-    const socket = io(SOCKET_URL, { 
-      transports: ['websocket'],
-      upgrade: false 
-    });
+    if (!key) return;
 
-    socket.on('connect', () => {
-      console.log("✅ Terhubung ke SKUY Lokal Port 3000");
-      socket.emit('join-protocol', key);
-    });
+    // Mendengarkan perubahan data baru di tabel 'donations'
+    const channel = supabase
+      .channel('public:donations')
+      .on(
+        'postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'donations',
+          filter: `streamer_id=eq.${key}` // Hanya ambil donasi untuk streamer ini
+        }, 
+        (payload) => {
+          const newDonation = payload.new;
+          
+          // Trigger Alert jika statusnya SUCCESS
+          if (newDonation.status === 'SUCCESS') {
+            setActiveAlert({
+              sender: newDonation.donatur_name,
+              amount: newDonation.amount,
+              message: newDonation.message,
+              type: 'tip' // Di Supabase kita pakai 'tip'
+            });
 
-    socket.on('new-alert', (data) => {
-      if (data.type === type) {
-        setActiveAlert(data);
-        const timer = (settings.duration || 8) * 1000;
-        setTimeout(() => setActiveAlert(null), timer);
-      }
-    });
+            const timer = (settings.duration || 8) * 1000;
+            setTimeout(() => setActiveAlert(null), timer);
+          }
+        }
+      )
+      .subscribe();
 
-    // TESTER MANUAL (Tekan 'T' di keyboard)
+    // TESTER MANUAL (Tekan 'T' tetap kita pertahankan buat Ari demo)
     const handleKeyDown = (e) => {
       if (e.key.toLowerCase() === 't') {
         setActiveAlert({
-          sender: "SKUY_TESTER",
-          amount: 100000,
-          message: "Sistem sudah GACOR, Ari! 🔥",
+          sender: "SKUY_TEST_CLOUD",
+          amount: 125000,
+          message: "Sistem Cloud beneran GACOR, Ri! 🚀",
           type: type
         });
         setTimeout(() => setActiveAlert(null), 5000);
@@ -77,7 +89,7 @@ const WidgetClient = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      socket.disconnect();
+      supabase.removeChannel(channel);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [key, type, settings.duration]);
@@ -99,7 +111,7 @@ const WidgetClient = () => {
           <div style={{ backgroundColor: settings.glow }} className="absolute -inset-10 blur-[80px] opacity-40 rounded-full animate-pulse" />
           <div style={{ backgroundColor: settings.primary }} className="relative w-[450px] p-12 rounded-[50px] shadow-2xl border-t-4 border-white/20 overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><Zap size={140} fill="white" /></div>
-            <p style={{ color: settings.text }} className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60 mb-2 italic">Incoming Interaction</p>
+            <p style={{ color: settings.text }} className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60 mb-2 italic">Interaction Detected</p>
             <h2 style={{ color: settings.text }} className="text-4xl font-black italic tracking-tighter mb-6 leading-none uppercase">{activeAlert.sender}</h2>
             <div className="h-1 w-20 bg-white/20 rounded-full mb-6" />
             <p style={{ color: settings.text }} className="text-lg font-bold opacity-90 mb-8 leading-tight italic">"{activeAlert.message}"</p>
@@ -109,6 +121,7 @@ const WidgetClient = () => {
       );
     }
 
+    // UI Mediashare tetap dipertahankan
     if (type === 'mediashare') {
       return (
         <motion.div 
@@ -121,18 +134,18 @@ const WidgetClient = () => {
           <div className="bg-slate-950 rounded-[45px] p-3 shadow-2xl border-[12px] border-white relative overflow-hidden text-left">
             <div className="aspect-video bg-slate-900 rounded-[30px] flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent z-10" />
-              <div style={{ backgroundColor: settings.primary }} className="w-16 h-16 rounded-full flex items-center justify-center text-white z-20">
+              <div style={{ backgroundColor: settings.primary }} className="w-16 h-16 rounded-full flex items-center justify-center text-white z-20 shadow-2xl">
                 <Play size={24} fill="currentColor" className="ml-1" />
               </div>
               <div className="absolute bottom-6 left-8 right-8 z-30">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 italic">Media Protocol Active</p>
+                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 italic">Live Media Protocol</p>
                 </div>
                 <div className="h-1.5 w-full bg-white/10 rounded-full mb-4 overflow-hidden">
                    <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: settings.duration }} style={{ backgroundColor: settings.primary }} className="h-full" />
                 </div>
-                <p className="text-[11px] font-black text-white italic truncate uppercase tracking-tighter mb-1 leading-none">Media Request</p>
+                <p className="text-[11px] font-black text-white italic truncate uppercase tracking-tighter mb-1 leading-none">Cloud Request</p>
                 <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">By: <span style={{ color: settings.accent }}>{activeAlert.sender}</span></p>
               </div>
             </div>
@@ -143,11 +156,10 @@ const WidgetClient = () => {
     return null;
   }, [activeAlert, settings, type]);
 
-  // PAKSA TRANSPARAN DI ATAS SEMUANYA
   return (
     <div 
       className="w-screen h-screen flex items-center justify-center overflow-hidden font-sans"
-      style={{ background: 'transparent !important', backgroundColor: 'transparent' }} 
+      style={{ background: 'transparent' }} 
     >
       <AnimatePresence mode="wait">
         {AlertRender}

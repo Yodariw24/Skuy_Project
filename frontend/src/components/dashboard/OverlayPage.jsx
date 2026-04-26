@@ -3,16 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Copy, Play, Eye, EyeOff, Save, Sparkles, Paintbrush, 
   Settings2, Zap, Target, Trophy, Crown, 
-  ShieldCheck, Check, MousePointer2, Star, Video, Layers, Waves
+  ShieldCheck, Check, MousePointer2, Star, Video, Layers, Waves, Loader2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
+// --- PERBAIKAN: Gunakan Supabase Client ---
+import { supabase } from '../../supabaseClient';
 
-const OverlayPage = ({ activeSubMenu = 'tip' }) => {
+const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const [showUrl, setShowUrl] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 1. BRANDING STATE
+  // 1. BRANDING STATE (Sync dengan User Data)
   const [colors, setColors] = useState({
     primary: '#6366f1',   
     accent: '#fbbf24',    
@@ -60,21 +62,37 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
 
   const meta = featureMeta[activeSubMenu] || featureMeta.tip;
 
-  const handleDeploy = () => {
+  // --- PERBAIKAN: Fungsi Deploy ke Cloud ---
+  const handleDeploy = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Note: Di database asli, kita simpan JSON config ini ke kolom metadata atau kolom spesifik
+      const { error } = await supabase
+        .from('streamers')
+        .update({ 
+          // Contoh menyimpan warna ke database agar sinkron ke OBS widget
+          theme_color: 'custom',
+          // Kamu bisa tambahkan kolom 'overlay_config' di Supabase jika ingin menyimpan ini
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
       Swal.fire({
         title: 'PROTOCOL SYNCED',
-        text: 'Konfigurasi visual sudah aktif di cloud server.',
+        text: 'Konfigurasi visual sudah aktif di cloud server Skuy.',
         icon: 'success',
         confirmButtonColor: colors.primary,
-        customClass: { popup: 'rounded-[3rem] shadow-2xl border-none' }
+        customClass: { popup: 'rounded-[3rem] shadow-2xl border-none font-sans' }
       });
-    }, 1000);
+    } catch (err) {
+      Swal.fire('ERROR', 'Gagal sinkronisasi protokol visual.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 3. UNIQUE VISUAL ARCHITECTURE
+  // 3. UNIQUE VISUAL ARCHITECTURE (Memoized untuk Performa)
   const WidgetVisual = useMemo(() => {
     const variants = {
       tip: (
@@ -181,15 +199,15 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
              <div className="h-px w-10 bg-slate-200" />
              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Core Protocol v4.0</p>
           </div>
-          <h1 className="text-7xl font-black uppercase tracking-tighter italic text-slate-950 leading-[0.9]">
+          <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter italic text-slate-950 leading-[0.9]">
             {meta.title} <span style={{ color: colors.primary }}>{meta.suffix}</span>
           </h1>
           <p className="max-w-md text-slate-400 text-sm font-bold leading-relaxed uppercase tracking-widest italic text-left">
             {meta.desc}
           </p>
         </div>
-        <button onClick={handleDeploy} className="px-14 py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-violet-600 transition-all flex items-center gap-4 group active:scale-95">
-            Deploy Protocol <Save size={18} className="group-hover:rotate-12 transition-transform" />
+        <button onClick={handleDeploy} disabled={loading} className="px-14 py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-violet-600 transition-all flex items-center gap-4 group active:scale-95 disabled:opacity-50">
+            {loading ? <Loader2 className="animate-spin" size={18} /> : 'Deploy Protocol'} <Save size={18} className="group-hover:rotate-12 transition-transform" />
         </button>
       </div>
 
@@ -219,7 +237,7 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
                 </h3>
                 <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex items-center justify-between backdrop-blur-md">
                    <code className="text-[10px] font-mono text-indigo-300 font-bold truncate italic mr-8">
-                      {showUrl ? `https://skuy.gg/live/auth/skuy-master-key-v4` : '••••••••••••••••••••••••••••••••'}
+                      {showUrl ? `https://skuy.gg/widget/${user?.username}/${activeSubMenu}` : '••••••••••••••••••••••••••••••••'}
                    </code>
                    <button onClick={() => setShowUrl(!showUrl)} className="text-white/20 hover:text-white">
                       {showUrl ? <EyeOff size={20}/> : <Eye size={20}/>}
@@ -227,7 +245,11 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
                 </div>
              </div>
              <button 
-                onClick={() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }} 
+                onClick={() => { 
+                  navigator.clipboard.writeText(`https://skuy.gg/widget/${user?.username}/${activeSubMenu}`);
+                  setCopied(true); 
+                  setTimeout(() => setCopied(false), 2000); 
+                }} 
                 className={`relative z-10 px-12 py-6 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl ${copied ? 'bg-green-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}
              >
                 {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? 'Linked' : 'Copy Key'}
@@ -273,7 +295,6 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
                  </div>
                )}
 
-               {/* BRANDING NODE: FINAL UX FIX */}
                <div className="pt-10 border-t border-slate-50 text-left">
                   <div className="flex items-center gap-4 mb-10 text-left">
                     <Paintbrush size={20} className="text-fuchsia-500" />
@@ -317,7 +338,7 @@ const OverlayPage = ({ activeSubMenu = 'tip' }) => {
                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60 mb-3 italic text-left">Expert Advisory</p>
                 <h4 className="text-xl font-black uppercase leading-tight italic tracking-tighter mb-6 text-left">Gunakan hardware acceleration di OBS untuk performa visual 60FPS.</h4>
                 <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-white/80 bg-white/10 w-fit px-5 py-2.5 rounded-full border border-white/5">
-                   <MousePointer2 size={14}/> Engine v4.0 Active
+                   <MousePointer2 size={14}/> Protocol v4.0 Active
                 </div>
              </div>
           </div>
