@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion' 
-// --- PERBAIKAN: Ganti API Axios dengan Supabase ---
+// --- PERBAIKAN: Ganti api (axios) jadi supabase ---
 import { supabase } from '../supabaseClient'
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
@@ -44,67 +44,61 @@ function DashboardPage() {
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
   const [formDataBank, setFormDataBank] = useState({ bank_name: '', account_number: '', account_name: '' })
 
-  // --- PERBAIKAN LOGIKA FOTO PROFIL ---
   const getProcessedUser = (userData) => {
     if (!userData) return null;
     const pic = userData.profile_picture;
     let finalPic = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`;
     if (pic) {
-      // Jika pic adalah link eksternal (http), pakai langsung. Jika nama file, arahkan ke Supabase Storage
+      // Perbaikan path gambar agar tidak nyari ke localhost
       finalPic = pic.startsWith('http') ? pic : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${pic}`;
     }
     return { ...userData, profile_picture: finalPic };
   };
 
-  // --- LOGIKA AMBIL DATA DARI SUPABASE (MENGGANTIKAN AXIOS) ---
-  const fetchDashboardData = async (email) => {
+  // --- PERBAIKAN: Fungsi penarikan data menggunakan Supabase ---
+  const fetchDashboardData = async (userEmail) => {
     try {
-      // Ambil data detail dari tabel 'streamers' berdasarkan email login
-      const { data, error } = await supabase
+      const { data: streamer, error } = await supabase
         .from('streamers')
         .select('*')
-        .eq('email', email)
+        .eq('email', userEmail)
         .single();
 
       if (error) throw error;
 
-      if (data) {
-        setUser(data);
-        setBalance(data.total_saldo || 0);
-        setBankData({
-          bank_name: data.bank_name || 'Belum Diatur',
-          account_number: data.account_number || '-',
-          account_name: data.account_name || '-'
+      if (streamer) {
+        setBalance(streamer.total_saldo || 0);
+        setBankData({ 
+          bank_name: streamer.bank_name || 'Belum Diatur', 
+          account_number: streamer.account_number || '-', 
+          account_name: streamer.account_name || '-' 
         });
-        setFormDataBank({
-          bank_name: data.bank_name || '',
-          account_number: data.account_number || '',
-          account_name: data.account_name || ''
+        setFormDataBank({ 
+          bank_name: streamer.bank_name || '', 
+          account_number: streamer.account_number || '', 
+          account_name: streamer.account_name || '' 
         });
-        // Update localStorage agar data terbaru tersimpan
-        localStorage.setItem('user_data', JSON.stringify(data));
+        
+        // Simpan data streamer ke state user
+        setUser(streamer);
+        localStorage.setItem('user_data', JSON.stringify(streamer));
       }
     } catch (err) {
-      console.error("Gagal mengambil data dashboard:", err.message);
+      console.error("Gagal sinkronisasi data:", err.message);
     }
-  };
+  }
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        return navigate('/auth');
-      }
-
-      // Tarik data dari database berdasarkan email di session
-      fetchDashboardData(session.user.email);
-    };
-
-    checkUser();
+    const savedUser = localStorage.getItem('user_data');
+    if (!savedUser) return navigate('/auth');
+    
+    const userData = JSON.parse(savedUser);
+    // Kita tetap set data awal, tapi kita refresh dari Supabase biar balance-nya update
+    setUser(userData);
+    fetchDashboardData(userData.email);
   }, [navigate]);
 
-  // --- HANDLER SIMPAN BANK (NATIVE SUPABASE) ---
+  // --- PERBAIKAN: Update Bank via Supabase ---
   const handleSaveBank = async (e) => {
     e.preventDefault();
     try {
@@ -116,27 +110,21 @@ function DashboardPage() {
         .single();
 
       if (error) throw error;
-
-      if (data) {
-        setBankData(data);
-        setIsEditModalOpen(false);
-        setUser(data);
-        localStorage.setItem('user_data', JSON.stringify(data));
-        skuyAlert.fire({ title: 'SISTEM DIPERBARUI', text: 'Data perbankan berhasil dienkripsi.', icon: 'success' });
-      }
+      
+      setBankData(data);
+      setIsEditModalOpen(false);
+      setUser(data);
+      localStorage.setItem('user_data', JSON.stringify(data));
+      skuyAlert.fire({ title: 'DATA DIPERBARUI', icon: 'success' });
     } catch (err) { 
-      skuyAlert.fire('GAGAL', 'Otoritas database ditolak.', 'error'); 
+      skuyAlert.fire('KESALAHAN', 'Gagal update database.', 'error'); 
     }
   }
 
-  // --- HANDLER 2FA (SIMULASI UNTUK TUGAS) ---
-  const handleGenerateQR = () => {
-    setLoading2FA(true);
-    setTimeout(() => {
-      setQrCode('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SKUY-SECURITY-PRO');
-      setLoading2FA(false);
-    }, 1000);
-  };
+  // --- HANDLER LAINNYA (Simulasi agar tidak error saat presentasi) ---
+  const handleGenerateQR = () => { setQrCode('QR_SIMULATION'); skuyAlert.fire('READY', 'Kode QR Terenkripsi', 'info'); };
+  const handleVerify2FA = () => { skuyAlert.fire('BERHASIL', 'Security Aktif', 'success'); };
+  const handleDisable2FA = () => { skuyAlert.fire('DISABLED', 'Security Mati', 'warning'); };
 
   if (!user) return null;
   const displayUser = getProcessedUser(user);
@@ -156,13 +144,13 @@ function DashboardPage() {
         <header className="mb-10">
           <div className="flex flex-col">
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-violet-600 bg-violet-50 px-3 py-1 rounded-full italic w-fit">
-              {user.role === 'creator' ? 'Creator Workspace' : 'User Preferences'}
+              {user.role === 'streamer' || user.role === 'creator' ? 'Creator Workspace' : 'User Preferences'}
             </span>
             <h1 className="text-4xl font-black uppercase tracking-tighter text-slate-950 mt-3 leading-none italic">
                 Control <span className="text-violet-600">Center</span>
             </h1>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 italic">
-                Authorized Path: <span className="text-slate-900">/root/dashboard/{tab}</span>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">
+                Active Path: <span className="text-slate-900">/dashboard/{tab}</span>
             </p>
           </div>
         </header>
@@ -182,15 +170,13 @@ function DashboardPage() {
               />
             )}
             
-            {/* Note: Pastikan komponen di bawah ini juga sudah tidak pakai Axios internalnya */}
             {tab === 'activity' && <ActivityFeed userId={user.id} />}
             {overlayTabs.includes(tab) && <OverlayPage activeSubMenu={tab} user={displayUser} />}
             {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
             {tab === 'security' && (
               <SecurityView 
                 user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
-                onVerify={() => skuyAlert.fire('VERIFIED', '2FA Aktif', 'success')} 
-                onDisable={() => skuyAlert.fire('DISABLED', '2FA Mati', 'info')}
+                onVerify={handleVerify2FA} onDisable={handleDisable2FA}
                 otp={otp} setOtp={setOtp} loading={loading2FA} 
               />
             )}
