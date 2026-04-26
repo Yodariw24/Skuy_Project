@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion' 
 import api from '../api/axios'
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
@@ -11,7 +12,6 @@ import SecurityView from '../components/dashboard/SecurityView'
 import OverlayPage from '../components/dashboard/OverlayPage'
 import Swal from 'sweetalert2'
 
-// --- HELPER STYLE POP-UP SUPER GACOR (BRUTALIST STYLE) ---
 const skuyAlert = Swal.mixin({
   customClass: {
     popup: 'skuy-popup rounded-[2rem] p-10',
@@ -25,25 +25,23 @@ const skuyAlert = Swal.mixin({
 });
 
 function DashboardPage() {
-  const [activeMenu, setActiveMenu] = useState('wallet')
+  const { tab } = useParams();
+  const navigate = useNavigate();
+  const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
+  
+  const handleNavigate = (target) => {
+    navigate(`/dashboard/${target}`);
+  };
+
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
   const [showBalance, setShowBalance] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  
   const [qrCode, setQrCode] = useState('')
   const [otp, setOtp] = useState('')
   const [loading2FA, setLoading2FA] = useState(false)
-
-  const [bankData, setBankData] = useState({ 
-    bank_name: 'Belum Diatur', account_number: '-', account_name: '-' 
-  })
-  
-  const [formDataBank, setFormDataBank] = useState({ 
-    bank_name: '', account_number: '', account_name: '' 
-  })
-
-  const navigate = useNavigate()
+  const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
+  const [formDataBank, setFormDataBank] = useState({ bank_name: '', account_number: '', account_name: '' })
 
   const getProcessedUser = (userData) => {
     if (!userData) return null;
@@ -61,15 +59,8 @@ function DashboardPage() {
       const res = await api.post('/auth/setup-2fa', { userId: user.id }); 
       if (res.data.success) setQrCode(res.data.qrCode);
     } catch (err) {
-      skuyAlert.fire({
-        title: 'SISTEM ERROR',
-        text: 'Gagal memproses kunci enkripsi keamanan.',
-        icon: 'error',
-        confirmButtonText: 'KEMBALI'
-      });
-    } finally {
-      setLoading2FA(false);
-    }
+      skuyAlert.fire({ title: 'SISTEM ERROR', text: 'Gagal memproses kunci enkripsi.', icon: 'error' });
+    } finally { setLoading2FA(false); }
   };
 
   const handleVerify2FA = async () => {
@@ -77,61 +68,31 @@ function DashboardPage() {
     try {
       const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
       if (res.data.success) {
-        skuyAlert.fire({
-          title: 'VERIFIKASI BERHASIL',
-          text: 'Autentikasi dua langkah (2FA) telah aktif untuk akun Anda.',
-          icon: 'success',
-          confirmButtonText: 'LANJUTKAN'
-        });
+        skuyAlert.fire({ title: 'VERIFIKASI BERHASIL', icon: 'success' });
         const updatedUser = { ...user, is_two_fa_enabled: true };
         localStorage.setItem('user_data', JSON.stringify(updatedUser));
         setUser(updatedUser);
         setQrCode(''); setOtp('');
       }
     } catch (err) {
-      skuyAlert.fire({
-        title: 'KODE TIDAK VALID',
-        text: 'Kode verifikasi salah atau sudah kedaluwarsa.',
-        icon: 'error',
-        confirmButtonText: 'COBA LAGI'
-      });
-    } finally {
-      setLoading2FA(false);
-    }
+      skuyAlert.fire({ title: 'KODE TIDAK VALID', icon: 'error' });
+    } finally { setLoading2FA(false); }
   };
 
   const handleDisable2FA = async () => {
-    const result = await skuyAlert.fire({
-      title: 'NONAKTIFKAN 2FA?',
-      text: 'Tindakan ini akan menurunkan level keamanan akun Anda secara signifikan.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'YA, NONAKTIFKAN',
-      cancelButtonText: 'BATALKAN',
-      reverseButtons: true
-    });
-
+    const result = await skuyAlert.fire({ title: 'NONAKTIFKAN 2FA?', icon: 'warning', showCancelButton: true });
     if (result.isConfirmed) {
       setLoading2FA(true);
       try {
         const res = await api.post('/auth/disable-2fa', { userId: user.id });
         if (res.data.success) {
-          skuyAlert.fire({
-            title: 'PROTOKOL MATI',
-            text: 'Keamanan dua langkah telah dinonaktifkan dari sistem.',
-            icon: 'info',
-            confirmButtonText: 'MENGERTI'
-          });
+          skuyAlert.fire({ title: 'PROTOKOL MATI', icon: 'info' });
           const updatedUser = { ...user, is_two_fa_enabled: false };
           localStorage.setItem('user_data', JSON.stringify(updatedUser));
           setUser(updatedUser);
-          setQrCode('');
         }
-      } catch (err) {
-        skuyAlert.fire('GAGAL', 'Terjadi kesalahan pada server.', 'error');
-      } finally {
-        setLoading2FA(false);
-      }
+      } catch (err) { skuyAlert.fire('GAGAL', 'Error server', 'error'); } 
+      finally { setLoading2FA(false); }
     }
   };
 
@@ -140,7 +101,7 @@ function DashboardPage() {
     if (!savedUser) return navigate('/auth');
     const userData = JSON.parse(savedUser);
     setUser(userData);
-    if (userData.role !== 'creator') setActiveMenu('profile');
+    
     if (userData.bank_name) {
       setBankData({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
       setFormDataBank({ bank_name: userData.bank_name, account_number: userData.account_number, account_name: userData.account_name });
@@ -165,16 +126,9 @@ function DashboardPage() {
         const updatedUser = { ...user, ...res.data.data };
         localStorage.setItem('user_data', JSON.stringify(updatedUser));
         setUser(updatedUser);
-        skuyAlert.fire({
-          title: 'DATA DIPERBARUI',
-          text: 'Informasi rekening bank berhasil disimpan ke sistem.',
-          icon: 'success',
-          confirmButtonText: 'OKE'
-        });
+        skuyAlert.fire({ title: 'DATA DIPERBARUI', icon: 'success' });
       }
-    } catch (err) { 
-      skuyAlert.fire('KESALAHAN', 'Gagal memperbarui data perbankan.', 'error'); 
-    }
+    } catch (err) { skuyAlert.fire('KESALAHAN', 'Gagal update bank', 'error'); }
   }
 
   if (!user) return null;
@@ -182,45 +136,69 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={displayUser} navigate={navigate} />
+      <Sidebar 
+        activeMenu={overlayTabs.includes(tab) ? 'overlay' : tab} 
+        setActiveMenu={handleNavigate} 
+        activeSubMenu={tab}
+        setActiveSubMenu={handleNavigate}
+        user={displayUser} 
+        navigate={navigate} 
+      />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <header className="mb-8">
-          <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">
-            {user.role === 'creator' ? 'Creator Hub' : 'Member Area'}
-          </h1>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-            LOGGED IN AS: <span className="text-violet-600">{user.role}</span>
-          </p>
+      <main className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+        {/* HEADER: Dibuat statis agar tidak meloncat saat navigasi */}
+        <header className="mb-10">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-violet-600 bg-violet-50 px-3 py-1 rounded-full italic w-fit">
+              {user.role === 'creator' ? 'Creator Workspace' : 'User Preferences'}
+            </span>
+            <h1 className="text-4xl font-black uppercase tracking-tighter text-slate-950 mt-3 leading-none italic">
+                Control <span className="text-violet-600">Center</span>
+            </h1>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">
+                Active Path: <span className="text-slate-900">/dashboard/{tab}</span>
+            </p>
+          </div>
         </header>
 
-        {activeMenu === 'wallet' && (
-          user.role === 'creator' ? (
-            <EarningsView 
-              user={displayUser} balance={balance} showBalance={showBalance} 
-              setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
-            />
-          ) : (
-            <div className="bg-white p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
-              <h2 className="text-xl font-bold italic mb-2 text-slate-800 uppercase">Daftar Akun Kreator</h2>
-              <button className="bg-violet-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase italic">DAFTAR SEKARANG</button>
-            </div>
-          )
-        )}
-        
-        {activeMenu === 'activity' && <ActivityFeed userId={user.id} />}
-        {activeMenu === 'overlay' && <OverlayPage user={displayUser} />}
-        {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
-
-        {activeMenu === 'security' && (
-          <SecurityView 
-            user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
-            onVerify={handleVerify2FA} onDisable={handleDisable2FA}
-            otp={otp} setOtp={setOtp} loading={loading2FA} 
-          />
-        )}
-
-        {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
+        {/* --- WRAPPER ANIMASI: MURNI FADE (OPACITY) BIAR GAK GERAK ATAS BAWAH --- */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {tab === 'wallet' && (
+              user.role === 'creator' ? (
+                <EarningsView 
+                  user={displayUser} balance={balance} showBalance={showBalance} 
+                  setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} 
+                />
+              ) : (
+                <div className="bg-white p-12 rounded-[3rem] text-center border-2 border-dashed border-slate-200 shadow-sm">
+                  <h2 className="text-xl font-black italic mb-4 text-slate-900 uppercase">Ayo Mulai Karir Kreatormu!</h2>
+                  <button className="bg-violet-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase italic tracking-widest hover:bg-violet-700 transition-all shadow-xl shadow-violet-100">
+                    DAFTAR SEKARANG
+                  </button>
+                </div>
+              )
+            )}
+            
+            {tab === 'activity' && <ActivityFeed userId={user.id} />}
+            {overlayTabs.includes(tab) && <OverlayPage activeSubMenu={tab} user={displayUser} />}
+            {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
+            {tab === 'security' && (
+              <SecurityView 
+                user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
+                onVerify={handleVerify2FA} onDisable={handleDisable2FA}
+                otp={otp} setOtp={setOtp} loading={loading2FA} 
+              />
+            )}
+            {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       <EditBankModal 

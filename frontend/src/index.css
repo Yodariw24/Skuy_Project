@@ -4,10 +4,16 @@
 :root {
   font-family: "Plus Jakarta Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
+  background-color: transparent !important;
 }
 
+/* PERBAIKAN: Paksa Body Transparan */
 body {
-  @apply bg-white text-slate-900;
+  background-color: transparent !important;
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 /* --- SKUY ULTRA SLIM TOAST --- */

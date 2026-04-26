@@ -1,188 +1,327 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, ExternalLink, Bell, BarChart3, Users, PlayCircle, Settings2, Sparkles } from 'lucide-react';
+import { 
+  Copy, Play, Eye, EyeOff, Save, Sparkles, Paintbrush, 
+  Settings2, Zap, Target, Trophy, Crown, 
+  ShieldCheck, Check, MousePointer2, Star, Video, Layers, Waves
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 
-const OverlayPage = ({ user }) => {
-  const [activeTab, setActiveTab] = useState('alert');
-  
-  // State untuk Live Preview (Pembaruan)
-  const [minDonation, setMinDonation] = useState(5000);
-  const [goalTitle, setGoalTitle] = useState("Beli Mic Baru");
+const OverlayPage = ({ activeSubMenu = 'tip' }) => {
+  const [showUrl, setShowUrl] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const overlayUrl = `https://skuy.gg/widget/alert/${user?.id || 'id-rahasia'}`;
+  // 1. BRANDING STATE
+  const [colors, setColors] = useState({
+    primary: '#6366f1',   
+    accent: '#fbbf24',    
+    text: '#ffffff',      
+    glow: '#818cf8'       
+  });
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(overlayUrl);
-    Swal.fire({
-      title: 'URL COPIED!',
-      text: 'Tempel link ini di Browser Source OBS kamu.',
-      icon: 'success',
-      confirmButtonColor: '#7c3aed',
-      customClass: {
-        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_#0f172a]'
-      }
-    });
+  const [config, setConfig] = useState({ 
+    min_tip: 10000, 
+    duration: 8, 
+    goal_title: 'EVOLVE STREAM SETUP', 
+    goal_target: 15000000,
+    goal_current: 9450000
+  });
+
+  const formatR = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
+
+  // 2. DYNAMIC COPYWRITING PER FEATURE
+  const featureMeta = {
+    tip: {
+      tag: "Engagement System",
+      title: "Interaction",
+      suffix: "Alerts",
+      desc: "Ubah setiap apresiasi menjadi selebrasi visual yang memikat komunitas anda."
+    },
+    mediashare: {
+      tag: "Multimedia Protocol",
+      title: "Broadcast",
+      suffix: "Media",
+      desc: "Sinkronisasikan konten video pilihan donatur langsung ke dalam siaran anda dengan sistem antrean cerdas."
+    },
+    milestone: {
+      tag: "Growth Strategy",
+      title: "Stream",
+      suffix: "Objectives",
+      desc: "Visualisasikan target ambisius anda dan biarkan komunitas membantu mencapainya."
+    },
+    leaderboard: {
+      tag: "Loyalty Program",
+      title: "Elite",
+      suffix: "Supporters",
+      desc: "Berikan panggung eksklusif bagi pendukung setia yang paling berkontribusi."
+    }
   };
 
-  const tabs = [
-    { id: 'alert', label: 'Alert Box', icon: Bell, desc: 'Notifikasi donasi real-time' },
-    { id: 'milestone', label: 'Milestone', icon: BarChart3, desc: 'Target & Goal bar' },
-    { id: 'mediashare', label: 'Media Share', icon: PlayCircle, desc: 'Request video dari penonton' },
-    { id: 'leaderboard', label: 'Leaderboard', icon: Users, desc: 'Top supporter di layar' },
-  ];
+  const meta = featureMeta[activeSubMenu] || featureMeta.tip;
+
+  const handleDeploy = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      Swal.fire({
+        title: 'PROTOCOL SYNCED',
+        text: 'Konfigurasi visual sudah aktif di cloud server.',
+        icon: 'success',
+        confirmButtonColor: colors.primary,
+        customClass: { popup: 'rounded-[3rem] shadow-2xl border-none' }
+      });
+    }, 1000);
+  };
+
+  // 3. UNIQUE VISUAL ARCHITECTURE
+  const WidgetVisual = useMemo(() => {
+    const variants = {
+      tip: (
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative text-left">
+          <div style={{ backgroundColor: colors.glow }} className="absolute -inset-10 blur-[100px] opacity-20 animate-pulse rounded-full" />
+          <div style={{ backgroundColor: colors.primary }} className="relative w-85 p-12 rounded-[50px] shadow-2xl border-t-4 border-white/20 overflow-hidden text-left">
+            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><Zap size={140} fill="white" /></div>
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white opacity-60 mb-2 italic">Incoming Interaction</p>
+            <h2 className="text-3xl font-black italic tracking-tighter text-white mb-6 leading-none uppercase">Sultan_Gaming</h2>
+            <div className="h-1 w-16 bg-white/20 rounded-full mb-6" />
+            <p className="text-sm font-bold text-white/90 italic mb-8">"UI SKUY.GG emang paling gokil, terus berkembang ya!"</p>
+            <h1 style={{ color: colors.accent }} className="text-4xl font-black italic tracking-tighter drop-shadow-md text-left">Rp {formatR(75000)}</h1>
+          </div>
+        </motion.div>
+      ),
+      mediashare: (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
+          <div className="bg-slate-950 rounded-[45px] p-3 shadow-2xl border-[12px] border-white relative overflow-hidden">
+            <div className="aspect-video bg-slate-900 rounded-[30px] flex items-center justify-center relative group overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent z-10" />
+              <Video size={56} className="text-white/10" />
+              <div style={{ backgroundColor: colors.primary }} className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl z-20">
+                 <Play size={24} fill="currentColor" className="ml-1" />
+              </div>
+              <div className="absolute bottom-6 left-8 right-8 z-30 text-left">
+                 <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 italic">Live Media Protocol</p>
+                 </div>
+                 <div className="h-1.5 w-full bg-white/10 rounded-full mb-4 overflow-hidden backdrop-blur-md border border-white/5">
+                    <motion.div initial={{ width: 0 }} animate={{ width: '45%' }} transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }} style={{ backgroundColor: colors.primary }} className="h-full" />
+                 </div>
+                 <div className="flex justify-between items-end">
+                    <div className="text-left">
+                       <p className="text-[11px] font-black text-white italic truncate uppercase tracking-tighter w-48 leading-none mb-1">Renegades - ONE OK ROCK</p>
+                       <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mt-1">Requester: <span style={{ color: colors.accent }}>Supporter_#99</span></p>
+                    </div>
+                    <p className="text-[10px] font-mono text-white/60 leading-none mb-1">02:14 / 04:30</p>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ),
+      milestone: (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md bg-white p-12 rounded-[60px] shadow-2xl border border-slate-50 text-left">
+          <div className="flex justify-between items-end mb-8 px-2 text-left">
+            <div>
+              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic mb-2 leading-none">Mission Objective</p>
+              <h4 className="text-2xl font-black uppercase italic tracking-tighter text-slate-950 leading-none">{config.goal_title}</h4>
+            </div>
+            <span style={{ color: colors.primary }} className="text-3xl font-black italic">63%</span>
+          </div>
+          <div className="h-16 w-full bg-slate-50 rounded-[28px] p-2.5 border border-slate-100 mb-8 relative text-left">
+            <motion.div 
+               initial={{ width: 0 }} animate={{ width: '63%' }} 
+               style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.glow})` }} 
+               className="h-full rounded-[20px] shadow-xl" 
+            />
+          </div>
+          <div className="flex justify-between px-3 text-[10px] font-black uppercase italic text-slate-400">
+             <span>Current: Rp {formatR(config.goal_current)}</span>
+             <span className="text-slate-900 text-right">Target: Rp {formatR(config.goal_target)}</span>
+          </div>
+        </motion.div>
+      ),
+      leaderboard: (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-sm space-y-4">
+           <div className="flex justify-center items-end gap-4 mb-12">
+              <div className="w-20 h-24 bg-slate-50 rounded-[30px] border border-slate-100 flex flex-col items-center justify-center">
+                 <span className="text-[10px] font-black text-slate-300 mb-2 italic">#2</span>
+                 <div className="w-10 h-10 rounded-full bg-slate-200" />
+              </div>
+              <div style={{ backgroundColor: colors.primary }} className="w-24 h-32 rounded-[35px] flex flex-col items-center justify-center shadow-2xl relative translate-y-[-15px] border-t-4 border-white/20">
+                 <Crown size={20} className="absolute -top-4 text-amber-400 fill-amber-400" />
+                 <span className="text-[10px] font-black text-white/50 mb-2 italic">#1</span>
+                 <div className="w-12 h-12 rounded-full bg-white/20" />
+              </div>
+              <div className="w-20 h-20 bg-slate-50 rounded-[30px] border border-slate-100 flex flex-col items-center justify-center">
+                 <span className="text-[10px] font-black text-slate-300 mb-2 italic">#3</span>
+                 <div className="w-10 h-10 rounded-full bg-slate-200" />
+              </div>
+           </div>
+           <div className="p-6 bg-white border border-slate-100 rounded-[28px] flex justify-between items-center shadow-lg text-left">
+              <p className="text-xs font-black uppercase italic text-slate-900 tracking-widest leading-none">Supporter Elite</p>
+              <p style={{ color: colors.primary }} className="text-xs font-black italic tracking-tighter">Rp {formatR(2500000)}</p>
+           </div>
+        </motion.div>
+      )
+    };
+    return variants[activeSubMenu] || variants.tip;
+  }, [activeSubMenu, colors, config]);
 
   return (
-    <div className="p-6 md:p-10 bg-white min-h-screen">
+    <div className="max-w-7xl mx-auto space-y-16 pb-32 text-left selection:bg-indigo-100 font-sans">
+      
       {/* HEADER SECTION */}
-      <header className="mb-10 flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-violet-600 text-white rounded-lg shadow-[4px_4px_0px_#0f172a] border-2 border-slate-950">
-              <Settings2 size={20} />
-            </div>
-            <h1 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">
-              Overlay <span className="text-violet-600">Command Center</span>
-            </h1>
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 text-left">
+        <div className="space-y-6 text-left">
+          <div className="flex items-center gap-4 text-left">
+             <span className="px-5 py-2 bg-slate-950 text-white text-[9px] font-black uppercase tracking-[0.4em] rounded-full italic shadow-2xl">
+               {meta.tag}
+             </span>
+             <div className="h-px w-10 bg-slate-200" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Core Protocol v4.0</p>
           </div>
-          <p className="text-slate-500 font-bold text-sm max-w-2xl">
-            Atur elemen visual streaming kamu dalam satu pusat kendali.
+          <h1 className="text-7xl font-black uppercase tracking-tighter italic text-slate-950 leading-[0.9]">
+            {meta.title} <span style={{ color: colors.primary }}>{meta.suffix}</span>
+          </h1>
+          <p className="max-w-md text-slate-400 text-sm font-bold leading-relaxed uppercase tracking-widest italic text-left">
+            {meta.desc}
           </p>
         </div>
-        {/* Update: Indikator Koneksi */}
-        <div className="flex items-center gap-2 bg-slate-950 px-4 py-2 rounded-full border-2 border-slate-950 shadow-[4px_4px_0px_#7c3aed]">
-          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-[9px] font-black text-white uppercase italic tracking-widest">Socket Online</span>
-        </div>
-      </header>
+        <button onClick={handleDeploy} className="px-14 py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-violet-600 transition-all flex items-center gap-4 group active:scale-95">
+            Deploy Protocol <Save size={18} className="group-hover:rotate-12 transition-transform" />
+        </button>
+      </div>
 
-      {/* ALERT URL BOX */}
-      <section className="mb-12 bg-violet-50 border-4 border-slate-950 p-6 rounded-[2.5rem] shadow-[10px_10px_0px_#0f172a] relative overflow-hidden">
-        <div className="absolute top-[-20px] right-[-20px] opacity-10 rotate-12">
-          <Sparkles size={120} className="text-violet-600" />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
         
-        <div className="relative z-10">
-          <h3 className="text-sm font-black text-slate-950 uppercase italic mb-4 flex items-center gap-2">
-            <ExternalLink size={16} /> OBS Browser Source URL
-          </h3>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 bg-white border-2 border-slate-950 p-4 rounded-2xl font-mono text-xs text-slate-400 flex items-center justify-between overflow-hidden">
-              <span className="truncate mr-4 italic">******************************************</span>
-              <button onClick={copyToClipboard} className="bg-slate-950 text-white px-4 py-2 rounded-xl font-black text-[10px] hover:bg-violet-600 transition-colors flex items-center gap-2">
-                <Copy size={12} /> COPY LINK
-              </button>
-            </div>
-            <button className="bg-white border-2 border-slate-950 px-6 py-4 rounded-2xl font-black text-xs uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-[4px_4px_0px_#0f172a] active:translate-y-1 active:shadow-none">
-              Launch Preview
-            </button>
+        {/* SIMULATION HUB */}
+        <div className="lg:col-span-8 space-y-10">
+          <div className="relative bg-white border-[12px] border-white rounded-[80px] shadow-2xl overflow-hidden min-h-[600px] flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
+             <div className="absolute top-16 left-16 flex items-center gap-4 text-left">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
+                <div className="text-left">
+                   <p className="text-[11px] font-black uppercase tracking-[0.5em] text-slate-300 leading-none italic">Simulation Environment</p>
+                   <p className="text-[8px] font-black text-slate-200 uppercase tracking-widest mt-1">Status: Operational</p>
+                </div>
+             </div>
+             <AnimatePresence mode="wait">
+               <div key={activeSubMenu} className="w-full flex justify-center p-12 text-left">
+                  {WidgetVisual}
+               </div>
+             </AnimatePresence>
           </div>
-          <p className="mt-4 text-[10px] text-violet-700 font-bold italic">
-            * JANGAN PERNAH MEMBERIKAN LINK INI KEPADA SIAPAPUN.
-          </p>
+
+          <div className="bg-slate-950 rounded-[55px] p-12 shadow-3xl flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">
+             <div className="flex-1 w-full text-left relative z-10 text-left">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-5 flex items-center gap-3 italic">
+                   <ShieldCheck size={16} className="text-indigo-400" /> Secure Protocol Endpoint
+                </h3>
+                <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex items-center justify-between backdrop-blur-md">
+                   <code className="text-[10px] font-mono text-indigo-300 font-bold truncate italic mr-8">
+                      {showUrl ? `https://skuy.gg/live/auth/skuy-master-key-v4` : '••••••••••••••••••••••••••••••••'}
+                   </code>
+                   <button onClick={() => setShowUrl(!showUrl)} className="text-white/20 hover:text-white">
+                      {showUrl ? <EyeOff size={20}/> : <Eye size={20}/>}
+                   </button>
+                </div>
+             </div>
+             <button 
+                onClick={() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }} 
+                className={`relative z-10 px-12 py-6 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl ${copied ? 'bg-green-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}
+             >
+                {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? 'Linked' : 'Copy Key'}
+             </button>
+          </div>
         </div>
-      </section>
 
-      {/* MODULAR WIDGET TABS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <nav className="lg:col-span-4 space-y-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full text-left p-5 rounded-[1.8rem] border-4 transition-all flex items-center gap-4 ${
-                activeTab === tab.id 
-                ? 'bg-slate-950 border-slate-950 text-white shadow-[6px_6px_0px_#7c3aed] -translate-y-1' 
-                : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
-              }`}
-            >
-              <div className={`p-3 rounded-xl ${activeTab === tab.id ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
-                <tab.icon size={20} />
+        {/* SYSTEM COCKPIT */}
+        <div className="lg:col-span-4 space-y-10 text-left">
+          
+          <div className="bg-white rounded-[60px] p-12 border border-slate-50 shadow-2xl shadow-indigo-100/30">
+            <div className="flex items-center gap-5 mb-14 pb-8 border-b border-slate-50">
+              <div style={{ backgroundColor: colors.primary }} className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl">
+                 <Settings2 size={24}/>
               </div>
-              <div>
-                <h4 className="text-xs font-black uppercase italic leading-none mb-1">{tab.label}</h4>
-                <p className={`text-[9px] font-bold ${activeTab === tab.id ? 'text-violet-200' : 'text-slate-400'}`}>
-                  {tab.desc}
-                </p>
-              </div>
-            </button>
-          ))}
-        </nav>
+              <h3 className="text-[17px] font-black uppercase tracking-tighter italic text-slate-950">Engine Controls</h3>
+            </div>
 
-        {/* TAB CONTENT AREA */}
-        <main className="lg:col-span-8 bg-slate-50 border-4 border-slate-950 rounded-[2.5rem] p-8 flex flex-col xl:flex-row gap-8">
-          <div className="flex-1">
-            <AnimatePresence mode="wait">
-              <motion.div key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="h-full">
-                {activeTab === 'alert' && (
-                  <div className="space-y-6">
-                    <h2 className="text-xl font-black italic uppercase text-slate-950">Konfigurasi Alert Box</h2>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Minimal Donasi Alert (Rp)</label>
-                        <input 
-                          type="number" 
-                          value={minDonation}
-                          onChange={(e) => setMinDonation(e.target.value)}
-                          className="w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-violet-600 outline-none font-black text-sm" 
-                        />
-                      </div>
+            <div className="space-y-12 text-left">
+               {activeSubMenu === 'tip' && (
+                 <div className="group text-left">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-5 block px-1 tracking-[0.2em] italic text-left">Activation Threshold (IDR)</label>
+                    <div className="bg-slate-50 border-2 border-transparent group-focus-within:border-indigo-600 group-focus-within:bg-white rounded-[35px] p-8 transition-all text-left">
+                       <input type="number" value={config.min_tip} onChange={(e) => setConfig({...config, min_tip: e.target.value})} className="w-full bg-transparent font-black text-4xl outline-none tracking-tighter text-slate-950" />
+                       <div className="flex items-center gap-2 mt-5 text-left">
+                          <Zap size={12} className="text-indigo-500" />
+                          <p className="text-[11px] font-black text-indigo-500 italic tracking-widest text-left">Active: Rp {formatR(config.min_tip)}</p>
+                       </div>
                     </div>
-                  </div>
-                )}
+                 </div>
+               )}
 
-                {activeTab === 'milestone' && (
-                  <div className="space-y-6">
-                    <h2 className="text-xl font-black italic uppercase text-slate-950">Goal Bar Settings</h2>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Judul Target</label>
-                        <input 
-                          type="text" 
-                          value={goalTitle}
-                          onChange={(e) => setGoalTitle(e.target.value)}
-                          className="w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-violet-600 outline-none font-black text-sm" 
-                        />
-                      </div>
+               {activeSubMenu === 'milestone' && (
+                 <div className="space-y-10 text-left">
+                    <div className="group text-left">
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-4 block px-1 tracking-widest italic text-left">Operation Objective</label>
+                      <input type="text" value={config.goal_title} onChange={(e) => setConfig({...config, goal_title: e.target.value})} className="w-full bg-slate-50 rounded-3xl p-7 font-black text-sm outline-none border-2 border-transparent focus:border-indigo-600 focus:bg-white transition-all uppercase" />
                     </div>
-                  </div>
-                )}
+                    <div className="group text-left">
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-4 block px-1 tracking-widest italic text-left">Capital Target (Rp)</label>
+                      <input type="number" value={config.goal_target} onChange={(e) => setConfig({...config, goal_target: e.target.value})} className="w-full bg-slate-50 rounded-3xl p-7 font-black text-sm outline-none border-2 border-transparent focus:border-indigo-600 focus:bg-white transition-all" />
+                    </div>
+                 </div>
+               )}
 
-                {(activeTab === 'mediashare' || activeTab === 'leaderboard') && (
-                  <div className="flex flex-col items-center justify-center h-full text-center">
-                    <Sparkles size={40} className="text-slate-300 mb-4 animate-pulse" />
-                    <h3 className="text-lg font-black italic uppercase text-slate-400">Next Roadmap</h3>
+               {/* BRANDING NODE: FINAL UX FIX */}
+               <div className="pt-10 border-t border-slate-50 text-left">
+                  <div className="flex items-center gap-4 mb-10 text-left">
+                    <Paintbrush size={20} className="text-fuchsia-500" />
+                    <h4 className="text-[12px] font-black uppercase italic tracking-widest text-slate-950">Aesthetic Nodes</h4>
                   </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                  <div className="grid grid-cols-1 gap-5 text-left">
+                     {Object.keys(colors).map((key) => {
+                        const labels = {
+                          primary: { title: "Main Base", desc: "Warna utama card/widget" },
+                          accent: { title: "Accent Node", desc: "Warna nominal & highlight" },
+                          text: { title: "Typography", desc: "Warna informasi teks utama" },
+                          glow: { title: "Atmosphere", desc: "Warna pantulan cahaya (neon)" }
+                        };
+                        const item = labels[key];
+                        return (
+                          <div key={key} className="group relative bg-white border border-slate-100 p-5 rounded-[28px] hover:border-indigo-400 hover:shadow-xl transition-all cursor-pointer text-left">
+                            <div className="flex items-center justify-between gap-4 text-left">
+                              <div className="flex items-center gap-4 text-left">
+                                <div style={{ backgroundColor: colors[key] }} className="w-14 h-14 rounded-2xl border-2 border-white shadow-sm group-hover:rotate-6 transition-transform" />
+                                <div className="text-left">
+                                  <p className="text-[11px] font-black text-slate-900 uppercase leading-none mb-1 text-left">{item.title}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight italic text-left">{item.desc}</p>
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <span className="text-[10px] font-mono font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-lg">{colors[key].toUpperCase()}</span>
+                                <input type="color" value={colors[key]} onChange={(e) => setColors({...colors, [key]: e.target.value})} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                     })}
+                  </div>
+               </div>
+            </div>
           </div>
 
-          {/* Pembaruan: Mini Preview Side-by-Side */}
-          <div className="w-full xl:w-64 bg-white border-2 border-slate-950 rounded-[1.5rem] p-6 flex flex-col items-center justify-center shadow-[4px_4px_0px_#0f172a] relative overflow-hidden">
-            <span className="absolute top-2 left-3 text-[8px] font-black text-slate-300 italic uppercase">Preview</span>
-            
-            {activeTab === 'alert' && (
-              <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="text-center">
-                <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-3 border border-violet-200">
-                  <Sparkles size={20} className="text-violet-600" />
+          <div style={{ backgroundColor: colors.primary }} className="rounded-[65px] p-12 text-white shadow-2xl relative overflow-hidden group text-left">
+             <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000"><Waves size={150} /></div>
+             <div className="relative z-10 text-left">
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60 mb-3 italic text-left">Expert Advisory</p>
+                <h4 className="text-xl font-black uppercase leading-tight italic tracking-tighter mb-6 text-left">Gunakan hardware acceleration di OBS untuk performa visual 60FPS.</h4>
+                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-white/80 bg-white/10 w-fit px-5 py-2.5 rounded-full border border-white/5">
+                   <MousePointer2 size={14}/> Engine v4.0 Active
                 </div>
-                <p className="text-[10px] font-black italic uppercase leading-none">Dukungan Masuk</p>
-                <p className="text-xs font-black text-violet-600 mt-1">Rp {Number(minDonation).toLocaleString('id-ID')}</p>
-              </motion.div>
-            )}
-
-            {activeTab === 'milestone' && (
-              <div className="w-full text-center">
-                <p className="text-[10px] font-black italic uppercase mb-2 truncate px-2">{goalTitle}</p>
-                <div className="w-full h-3 bg-slate-100 border border-slate-950 rounded-full overflow-hidden">
-                  <div className="w-[60%] h-full bg-violet-600" />
-                </div>
-                <p className="text-[8px] font-black text-slate-400 mt-2 italic">60% COMPLETED</p>
-              </div>
-            )}
+             </div>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

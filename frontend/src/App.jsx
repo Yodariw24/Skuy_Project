@@ -1,20 +1,17 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-// IMPORT PROVIDER GOOGLE
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import HomePage from './pages/HomePage'
 import DonationPage from './pages/DonationPage'
 import AuthPage from './pages/AuthPage' 
 import DashboardPage from './pages/DashboardPage' 
 import PaymentPage from './pages/PaymentPage'
+import WidgetClient from './pages/WidgetClient' // Import komponen widget yang baru dibuat
 
-// --- PENTING: IMPORT ANIMASI DISINI AGAR POPUP SKUY GACOR ---
 import 'animate.css';
 
-// Komponen Pembatas (Hanya yang login bisa lewat)
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('user_token');
   if (!token) {
-    // Jika tidak ada token, tendang ke halaman login
     return <Navigate to="/auth" replace />;
   }
   return children;
@@ -22,28 +19,34 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    // BUNGKUS SEMUA DISINI BIAR GOOGLE LOGIN JALAN
     <GoogleOAuthProvider clientId="195922640796-u1uucrttadnkjshpvn009lredf9bqoro.apps.googleusercontent.com">
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white font-sans text-left"> {/* Ditambah text-left agar konsisten */}
         <Routes>
-          {/* 1. Route Statis */}
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
 
-          {/* 2. Route yang butuh ID Spesifik */}
           <Route path="/payment/:donationId" element={<PaymentPage />} />
 
-          {/* 3. Route Dashboard (Diproteksi) */}
+          {/* --- WIDGET ROUTE (PUBLIC) --- */}
+          {/* Taruh di atas :username agar tidak dianggap sebagai nama user */}
+          <Route path="/v4/widget/:type/:key" element={<WidgetClient />} />
+
+          {/* --- DASHBOARD ROUTING --- */}
           <Route 
-            path="/dashboard" 
+            path="/dashboard/:tab" 
             element={
               <ProtectedRoute>
                 <DashboardPage />
               </ProtectedRoute>
             } 
           />
+
+          <Route 
+            path="/dashboard" 
+            element={<Navigate to="/dashboard/wallet" replace />} 
+          />
           
-          {/* 4. Route Dinamis (Username Kreator) */}
+          {/* Rute dinamis untuk halaman donasi streamer */}
           <Route path="/:username" element={<DonationPage />} />
         </Routes>
       </div>
