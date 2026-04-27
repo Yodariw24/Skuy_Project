@@ -8,7 +8,7 @@ import SecurityView from '../components/dashboard/SecurityView'
 import EditBankModal from '../components/dashboard/EditBankModal'
 import Swal from 'sweetalert2'
 
-// --- PRODUCTION SECURITY ENGINE ---
+// --- ENGINE KEAMANAN PROFESIONAL ---
 import { Buffer } from 'buffer'
 import { authenticator } from 'otplib'
 
@@ -34,16 +34,27 @@ function DashboardPage() {
   const [formDataBank, setFormDataBank] = useState({ bank_name: '', account_number: '', account_name: '' })
 
   const navigate = useNavigate()
+  
+  // Mengambil URL API dari .env (Render)
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const fetchData = async (userId) => {
-    const [resProfile, resBal, resBank] = await Promise.all([
-      supabase.from('streamers').select('*').eq('id', userId).single(),
-      supabase.from('balance').select('total_saldo').eq('streamer_id', userId).single(),
-      supabase.from('payment_methods').select('*').eq('streamer_id', userId).single()
-    ]);
-    if (resProfile.data) setUser(resProfile.data);
-    if (resBal.data) setBalance(resBal.data.total_saldo || 0);
-    if (resBank.data) { setBankData(resBank.data); setFormDataBank(resBank.data); }
+    try {
+      const [resProfile, resBal, resBank] = await Promise.all([
+        supabase.from('streamers').select('*').eq('id', userId).single(),
+        supabase.from('balance').select('total_saldo').eq('streamer_id', userId).single(),
+        supabase.from('payment_methods').select('*').eq('streamer_id', userId).single()
+      ]);
+      
+      if (resProfile.data) setUser(resProfile.data);
+      if (resBal.data) setBalance(resBal.data.total_saldo || 0);
+      if (resBank.data) {
+        setBankData(resBank.data);
+        setFormDataBank(resBank.data);
+      }
+    } catch (err) {
+      console.error("Sync Error:", err);
+    }
   }
 
   useEffect(() => {
@@ -58,23 +69,24 @@ function DashboardPage() {
   const handleGenerateQR = async () => {
     setLoading2FA(true);
     try {
-      // 1. Generate Secret Unik Jika Belum Ada
       let secret = user.two_fa_secret;
+      
+      // Jika user belum punya secret unik di DB, buat baru
       if (!secret) {
         secret = authenticator.generateSecret();
         await supabase.from('streamers').update({ two_fa_secret: secret }).eq('id', user.id);
         setUser(prev => ({ ...prev, two_fa_secret: secret }));
       }
 
-      // 2. Buat URL Protocol
+      // Format URL untuk Google Authenticator
       const issuer = "SkuyGG";
-      const account = user.username;
+      const account = user.username.replace(/\s/g, "");
       const otpAuthUrl = authenticator.keyuri(account, issuer, secret);
       
       setQrCodeData(otpAuthUrl);
-      skuyAlert.fire({ title: 'QR SIAP', text: 'Scan dengan Google Authenticator', icon: 'info' });
+      skuyAlert.fire({ title: 'QR GENERATED', text: 'Scan di HP kamu sekarang!', icon: 'info' });
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal generate security key', 'error');
+      skuyAlert.fire('ERROR', 'Gagal membuat kunci keamanan', 'error');
     } finally {
       setLoading2FA(false);
     }
@@ -83,7 +95,7 @@ function DashboardPage() {
   const handleVerify2FA = async () => {
     if (!user.two_fa_secret) return;
 
-    // Toleransi waktu 1 window (30 detik)
+    // Toleransi waktu 30-60 detik (Standar Pro)
     authenticator.options = { window: 1 };
     const isValid = authenticator.check(otp, user.two_fa_secret);
 
@@ -92,12 +104,12 @@ function DashboardPage() {
       const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: true }).eq('id', user.id);
       if (!error) {
         setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-        skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif Selamanya!', icon: 'success' });
+        skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif! Akun Terlindungi.', icon: 'success' });
         setQrCodeData(''); setOtp('');
       }
       setLoading2FA(false);
     } else {
-      skuyAlert.fire({ title: 'FAILED', text: 'OTP tidak valid!', icon: 'error' });
+      skuyAlert.fire({ title: 'FAILED', text: 'OTP tidak cocok. Cek jam HP kamu!', icon: 'error' });
     }
   };
 
@@ -116,15 +128,28 @@ function DashboardPage() {
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={user} navigate={navigate} />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center text-left">
-          <h1 className="text-2xl font-black italic uppercase tracking-tighter">Skuy Control</h1>
+          <div>
+            <h1 className="text-2xl font-black italic uppercase tracking-tighter">Skuy Control</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+              Status: <span className="text-emerald-500">Cloud Synchronized</span>
+            </p>
+          </div>
         </header>
 
+        {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
+        {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
+        
         {activeMenu === 'security' && (
           <SecurityView 
-            key={user.is_two_fa_enabled ? 'a' : 'b'} 
-            user={user} qrCode={qrCodeData} onGenerateQR={handleGenerateQR} 
-            onVerify={handleVerify2FA} onDisable={handleDisable2FA} 
-            otp={otp} setOtp={setOtp} loading={loading2FA} 
+            key={user.is_two_fa_enabled ? 'secured' : 'unsecured'} 
+            user={user} 
+            qrCode={qrCodeData} 
+            onGenerateQR={handleGenerateQR} 
+            onVerify={handleVerify2FA} 
+            onDisable={handleDisable2FA} 
+            otp={otp} 
+            setOtp={setOtp} 
+            loading={loading2FA} 
           />
         )}
       </main>
