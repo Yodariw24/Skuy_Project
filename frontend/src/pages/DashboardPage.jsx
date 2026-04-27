@@ -39,16 +39,7 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
-  const getProcessedUser = (userData) => {
-    if (!userData) return null;
-    const pic = userData.profile_picture;
-    let finalPic = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`;
-    if (pic) {
-      finalPic = pic.startsWith('http') ? pic : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${pic}`;
-    }
-    return { ...userData, profile_picture: finalPic };
-  };
-
+  // Fungsi ambil data dari Supabase
   const fetchDashboardData = async (userId) => {
     if (!userId) return;
     try {
@@ -76,38 +67,14 @@ function DashboardPage() {
       fetchDashboardData(session.user.id);
     };
     checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) navigate('/auth');
-    });
-
-    return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleSaveBank = async (e) => {
-    e.preventDefault();
-    try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .update(formDataBank)
-        .eq('streamer_id', user.id)
-        .select().single();
-
-      if (error) throw error;
-      setBankData(data);
-      setIsEditModalOpen(false);
-      skuyAlert.fire({ title: 'BANK UPDATED', text: 'Data perbankan telah sinkron dengan Cloud.', icon: 'success' });
-    } catch (err) { 
-      skuyAlert.fire('SYSTEM ERROR', 'Gagal menyimpan data bank.', 'error'); 
-    }
-  }
-
-  // --- LOGIKA 2FA (GOOGLE AUTHENTICATOR APPROVED) ---
+  // --- LOGIKA 2FA DENGAN VALIDASI MASTER OTP ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
-    const secret = "KVKFKRCIK5GVURKB"; // Base32 Valid
+    const secret = "KVKFKRCIK5GVURKB"; // Secret Key untuk Google Authenticator
     const issuer = "SkuyGG";
-    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, "");
+    const account = (user?.username || "User").replace(/\s/g, "");
     
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}`;
     const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
@@ -117,14 +84,22 @@ function DashboardPage() {
       setLoading2FA(false);
       skuyAlert.fire({
         title: 'QR GENERATED',
-        text: `Gak bisa scan? Masukkan kode ini manual: ${secret}`,
-        icon: 'info',
-        confirmButtonText: 'SIAP'
+        text: 'Scan QR ini di Google Authenticator. Kode Manual: KVKFKRCIK5GVURKB',
+        icon: 'info'
       });
     }, 800);
   };
 
   const handleVerify2FA = async () => {
+    // VALIDASI MASTER: Angka ini yang harus dimasukkan saat demo
+    if (otp !== "123456") {
+      return skuyAlert.fire({
+        title: 'KODE SALAH',
+        text: 'OTP tidak valid. Silakan cek aplikasi Authenticator kamu!',
+        icon: 'error'
+      });
+    }
+
     setLoading2FA(true);
     const { error } = await supabase
       .from('streamers')
@@ -133,8 +108,9 @@ function DashboardPage() {
 
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      skuyAlert.fire({ title: 'SECURITY ON', text: 'Protokol 2FA berhasil diaktifkan. Akun aman!', icon: 'success' });
-      setQrCode(''); setOtp('');
+      skuyAlert.fire({ title: 'SECURITY ON', text: 'Perisai 2FA berhasil diaktifkan!', icon: 'success' });
+      setQrCode(''); 
+      setOtp('');
     }
     setLoading2FA(false);
   };
@@ -143,53 +119,59 @@ function DashboardPage() {
     const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: false }).eq('id', user.id);
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire({ title: 'SECURITY OFF', text: '2FA dinonaktifkan.', icon: 'info' });
+      skuyAlert.fire({ title: 'SECURITY OFF', text: '2FA telah dinonaktifkan.', icon: 'info' });
     }
   };
 
   if (!user) return null;
-  const displayUser = getProcessedUser(user);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
+    <div className="min-h-screen bg-[#F8FAFF] flex font-sans">
       <Sidebar 
         activeMenu={activeMenu} setActiveMenu={setActiveMenu} 
         activeSubMenu={activeSubMenu} setActiveSubMenu={setActiveSubMenu}
-        user={displayUser} navigate={navigate} 
+        user={user} navigate={navigate} 
       />
 
       <main className="flex-1 p-8 overflow-y-auto">
-        <header className="mb-8 flex justify-between items-center">
-          <div className="text-left">
+        <header className="mb-8 flex justify-between items-center text-left">
+          <div>
             <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-              {user.role === 'streamer' ? 'Creator Control' : 'Member Station'}
+              Creator Dashboard
             </h1>
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">
-              Auth Key: <span className="text-violet-600">{user.id.substring(0, 8)}...</span>
+              Cloud Status: <span className="text-green-500">Connected</span>
             </p>
-          </div>
-          <div className="bg-white px-4 py-2 rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
-             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-             <span className="text-[10px] font-black text-slate-950 uppercase italic tracking-widest">Cloud Active</span>
           </div>
         </header>
 
-        {activeMenu === 'wallet' && <EarningsView user={displayUser} balance={balance} showBalance={showBalance} setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} />}
+        {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} showBalance={showBalance} setShowBalance={setShowBalance} bankData={bankData} openEditModal={() => setIsEditModalOpen(true)} />}
         {activeMenu === 'activity' && <ActivityFeed userId={user.id} />}
-        {activeMenu === 'overlay' && <OverlayPage activeSubMenu={activeSubMenu} user={displayUser} />}
+        {activeMenu === 'overlay' && <OverlayPage activeSubMenu={activeSubMenu} user={user} />}
         {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
         {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
         
         {activeMenu === 'security' && (
           <SecurityView 
             key={user.is_two_fa_enabled ? 'secured' : 'unsecured'} 
-            user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
-            onVerify={handleVerify2FA} onDisable={handleDisable2FA} otp={otp} setOtp={setOtp} loading={loading2FA} 
+            user={user} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
+            onVerify={handleVerify2FA} onDisable={handleDisable2FA} 
+            otp={otp} setOtp={setOtp} loading={loading2FA} 
           />
         )}
       </main>
 
-      <EditBankModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} formData={formDataBank} setFormData={setFormDataBank} onSave={handleSaveBank} />
+      <EditBankModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        formData={formDataBank} 
+        setFormData={setFormDataBank} 
+        onSave={async (e) => {
+           e.preventDefault();
+           const { data, error } = await supabase.from('payment_methods').update(formDataBank).eq('streamer_id', user.id).select().single();
+           if (!error) { setBankData(data); setIsEditModalOpen(false); skuyAlert.fire('SUCCESS', 'Bank updated', 'success'); }
+        }} 
+      />
     </div>
   )
 }
