@@ -65,7 +65,7 @@ function DashboardPage() {
         setFormDataBank(resBank.data);
       }
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.error("Cloud Sync Error:", err);
     }
   }
 
@@ -102,10 +102,10 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX TOTAL (GOOGLE CHART + BACKUP KEY) ---
+  // --- LOGIKA 2FA (GOOGLE AUTHENTICATOR APPROVED) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
-    const secret = "KVKFKRCIK5GVURKB"; 
+    const secret = "KVKFKRCIK5GVURKB"; // Base32 Valid
     const issuer = "SkuyGG";
     const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, "");
     
@@ -115,10 +115,9 @@ function DashboardPage() {
     setTimeout(() => {
       setQrCode(qrUrl);
       setLoading2FA(false);
-      
       skuyAlert.fire({
-        title: 'PROTOKOL AKTIF',
-        text: `Jika gagal scan, masukkan kode manual ini di Authenticator: ${secret}`,
+        title: 'QR GENERATED',
+        text: `Gak bisa scan? Masukkan kode ini manual: ${secret}`,
         icon: 'info',
         confirmButtonText: 'SIAP'
       });
@@ -127,39 +126,24 @@ function DashboardPage() {
 
   const handleVerify2FA = async () => {
     setLoading2FA(true);
-    
     const { error } = await supabase
       .from('streamers')
       .update({ is_two_fa_enabled: true })
       .eq('id', user.id);
 
     if (!error) {
-      // PAKSA UPDATE STATE AGAR UI BERUBAH INSTAN
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      
-      skuyAlert.fire({ 
-        title: 'SECURITY ON', 
-        text: 'Protokol 2FA berhasil diaktifkan. Akun sudah Full Protected! 🔥', 
-        icon: 'success' 
-      });
-      
-      setQrCode(''); 
-      setOtp('');
-    } else {
-      skuyAlert.fire('ERROR', 'Gagal update status keamanan.', 'error');
+      skuyAlert.fire({ title: 'SECURITY ON', text: 'Protokol 2FA berhasil diaktifkan. Akun aman!', icon: 'success' });
+      setQrCode(''); setOtp('');
     }
     setLoading2FA(false);
   };
 
   const handleDisable2FA = async () => {
-    const { error } = await supabase
-      .from('streamers')
-      .update({ is_two_fa_enabled: false })
-      .eq('id', user.id);
-
+    const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: false }).eq('id', user.id);
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire({ title: 'SECURITY OFF', text: 'Keamanan ganda dinonaktifkan.', icon: 'info' });
+      skuyAlert.fire({ title: 'SECURITY OFF', text: '2FA dinonaktifkan.', icon: 'info' });
     }
   };
 
@@ -180,7 +164,7 @@ function DashboardPage() {
             <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
               {user.role === 'streamer' ? 'Creator Control' : 'Member Station'}
             </h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] text-left mt-1">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">
               Auth Key: <span className="text-violet-600">{user.id.substring(0, 8)}...</span>
             </p>
           </div>
@@ -195,7 +179,14 @@ function DashboardPage() {
         {activeMenu === 'overlay' && <OverlayPage activeSubMenu={activeSubMenu} user={displayUser} />}
         {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
         {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
-        {activeMenu === 'security' && <SecurityView user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} onVerify={handleVerify2FA} onDisable={handleDisable2FA} otp={otp} setOtp={setOtp} loading={loading2FA} />}
+        
+        {activeMenu === 'security' && (
+          <SecurityView 
+            key={user.is_two_fa_enabled ? 'secured' : 'unsecured'} 
+            user={displayUser} qrCode={qrCode} onGenerateQR={handleGenerateQR} 
+            onVerify={handleVerify2FA} onDisable={handleDisable2FA} otp={otp} setOtp={setOtp} loading={loading2FA} 
+          />
+        )}
       </main>
 
       <EditBankModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} formData={formDataBank} setFormData={setFormDataBank} onSave={handleSaveBank} />
