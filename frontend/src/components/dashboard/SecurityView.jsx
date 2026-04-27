@@ -5,7 +5,6 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-// --- SELESAI: Props onDisable sudah terhubung ke tombol ---
 function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, setOtp, loading }) {
   const isEnabled = user?.is_two_fa_enabled;
 
@@ -47,7 +46,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
             <div className="bg-violet-600 p-8 rounded-[2.5rem] text-white relative overflow-hidden shadow-xl shadow-violet-100 text-left">
               <Heart className="absolute right-[-10px] top-[-10px] text-white/10 rotate-12" size={140} />
               <div className="relative z-10">
-                <h3 className="text-xl font-black italic uppercase mb-2">Yuk, Pasang Kunci Ganda!</h3>
+                <h3 className="text-xl font-black italic uppercase mb-2 text-white">Yuk, Pasang Kunci Ganda!</h3>
                 <p className="text-violet-100 text-xs font-bold leading-relaxed opacity-90">
                   Password saja terkadang bisa ditebak. Dengan 2FA, cuma kamu yang punya akses masuk lewat kode rahasia di HP-mu. Saldo dan data Skuy kamu jadi jauh lebih aman!
                 </p>
@@ -92,7 +91,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
                     <div className="relative inline-block group">
                       <div className="absolute -inset-4 bg-violet-500 rounded-[3.5rem] blur-2xl opacity-10" />
                       <div className="relative p-5 bg-white border-2 border-slate-950 rounded-[2.8rem] shadow-2xl">
-                        <img src={qrCode} alt="Security QR" className="w-48 h-48 rounded-2xl" />
+                        {qrCode && <img src={qrCode} alt="Security QR" className="w-48 h-48 rounded-2xl" />}
                       </div>
                     </div>
                   </div>
@@ -101,9 +100,13 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
                     <div className="space-y-3 text-center">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em]">Masukkan 6 Angka Dari HP-mu</label>
                       <input 
-                        type="text" maxLength="6" placeholder="000 000"
+                        type="text" 
+                        maxLength="6" 
+                        inputMode="numeric"
+                        placeholder="000 000"
                         className="w-full bg-slate-50 border-2 border-slate-100 focus:border-violet-600 focus:bg-white p-5 rounded-2xl outline-none font-black text-3xl text-center tracking-[0.3em] transition-all"
-                        value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                        value={otp} 
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                       />
                     </div>
 
@@ -140,9 +143,10 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
             <div className="mt-10 pt-10 border-t border-slate-50">
               <button 
                 onClick={onDisable}
-                className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-300 hover:text-rose-500 transition-colors"
+                disabled={loading}
+                className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-50"
               >
-                Matikan Fitur Keamanan
+                {loading ? 'Processing...' : 'Matikan Fitur Keamanan'}
               </button>
             </div>
           </motion.div>
