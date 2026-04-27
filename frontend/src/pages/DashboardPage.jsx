@@ -102,23 +102,18 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX TOTAL (GOOGLE AUTHENTICATOR FULL COMPATIBLE) ---
+  // --- LOGIKA 2FA FIX TOTAL (GOOGLE AUTHENTICATOR APPROVED) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
     
-    // 1. Nama Platform & User (Hapus spasi & karakter aneh agar tidak error saat scan)
     const issuer = "SkuyGG"; 
-    const account = (user?.username || "User").replace(/[^a-zA-Z0-9]/g, ""); 
+    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, ""); 
+    const secret = "KVKFKRCIK5GVURKB"; // Secret Base32 Murni
     
-    // 2. SECRET KEY (WAJIB BASE32: Hanya A-Z dan angka 2-7)
-    // SANGAT PENTING: Dilarang pakai angka 0, 1, 8, atau 9!
-    const secret = "KVKFKRCIK5GVURKB"; // Secret statis yang valid untuk demo
+    const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}`;
     
-    // 3. Susun URL Protokol TOTP
-    const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}&digits=6&period=30`;
-    
-    // 4. Generate QR (Pakai QuickChart agar stabil)
-    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(otpAuthUrl)}&size=250&margin=1&ecLevel=M`;
+    // Gunakan Google Chart API sebagai generator utama
+    const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
