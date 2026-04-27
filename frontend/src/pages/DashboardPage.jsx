@@ -8,10 +8,11 @@ import SecurityView from '../components/dashboard/SecurityView'
 import EditBankModal from '../components/dashboard/EditBankModal'
 import Swal from 'sweetalert2'
 
-// --- VALIDASI REAL ENGINE ---
+// --- ENGINE VALIDASI REAL ---
 import { Buffer } from 'buffer'
 import { authenticator } from 'otplib'
 
+// Fix Buffer untuk Browser
 if (typeof window !== 'undefined') {
   window.Buffer = Buffer;
 }
@@ -39,7 +40,9 @@ function DashboardPage() {
   const [formDataBank, setFormDataBank] = useState({ bank_name: '', account_number: '', account_name: '' })
 
   const navigate = useNavigate()
-  const SECRET_KEY = "KVKFKRCIK5GVURKB"; // Kunci rahasia standar Skuy
+  
+  // Kunci Rahasia Statis agar sinkron terus
+  const SECRET_2FA = "KVKFKRCIK5GVURKB"; 
 
   const fetchData = async (userId) => {
     const [resProfile, resBal, resBank] = await Promise.all([
@@ -61,26 +64,37 @@ function DashboardPage() {
     init();
   }, [navigate]);
 
+  // --- GENERATE QR YANG PASTI BISA DI SCAN ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
-    const account = (user?.username || "User").replace(/\s/g, "");
-    const otpAuthUrl = authenticator.keyuri(account, "SkuyGG", SECRET_KEY);
-    const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
+    const issuer = "SkuyGG";
+    const account = (user?.username || "User").replace(/[^a-zA-Z0-9]/g, "");
+    
+    // URI Standar Google Authenticator
+    const otpAuthUrl = authenticator.keyuri(account, issuer, SECRET_2FA);
+    
+    // QR Server API dengan Margin lebar (Putih di pinggir) agar HP gampang baca
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(otpAuthUrl)}&size=300x300&ecc=M&margin=4`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
       setLoading2FA(false);
-      skuyAlert.fire({ title: 'QR READY', text: 'Scan di Google Authenticator!', icon: 'info' });
+      skuyAlert.fire({ title: 'QR SIAP!', text: 'Scan di Google Authenticator sekarang.', icon: 'info' });
     }, 800);
   };
 
+  // --- VERIFIKASI ASLI (DENGAN TOLERANSI WAKTU) ---
   const handleVerify2FA = async () => {
-    // Memberikan toleransi waktu 1 window (+/- 30 detik)
+    // Beri kelonggaran waktu +/- 30 detik (window: 1)
     authenticator.options = { window: 1 };
-    const isValid = authenticator.check(otp, SECRET_KEY);
+    const isValid = authenticator.check(otp, SECRET_2FA);
 
     if (!isValid) {
-      return skuyAlert.fire({ title: 'GAGAL', text: 'Kode OTP tidak cocok!', icon: 'error' });
+      return skuyAlert.fire({ 
+        title: 'GAGAL!', 
+        text: 'Kode OTP salah. Pastikan jam di HP dan Laptop kamu sama (Otomatis)!', 
+        icon: 'error' 
+      });
     }
 
     setLoading2FA(true);
@@ -88,7 +102,7 @@ function DashboardPage() {
 
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      skuyAlert.fire({ title: 'SECURED', text: '2FA Berhasil diaktifkan!', icon: 'success' });
+      skuyAlert.fire({ title: 'AKTIF!', text: 'Keamanan 2FA sudah valid & aktif.', icon: 'success' });
       setQrCode(''); setOtp('');
     }
     setLoading2FA(false);
@@ -98,20 +112,21 @@ function DashboardPage() {
     const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: false }).eq('id', user.id);
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire({ title: 'OFF', text: 'Keamanan dinonaktifkan.', icon: 'info' });
+      skuyAlert.fire({ title: 'OFF', text: 'Perisai dimatikan.', icon: 'info' });
     }
   };
 
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={user} navigate={navigate} />
-      <main className="flex-1 p-8">
+      
+      <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center text-left">
           <div>
-            <h1 className="text-2xl font-black italic uppercase tracking-tighter">Skuy Dashboard</h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Cloud Active</p>
+            <h1 className="text-2xl font-black italic uppercase tracking-tighter">Skuy Control</h1>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Cloud Status: Active</p>
           </div>
         </header>
 
