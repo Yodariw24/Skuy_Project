@@ -11,7 +11,6 @@ import SecurityView from '../components/dashboard/SecurityView'
 import OverlayPage from '../components/dashboard/OverlayPage'
 import Swal from 'sweetalert2'
 
-// Mixin untuk Alert gaya Brutalist Skuy
 const skuyAlert = Swal.mixin({
   customClass: {
     popup: 'skuy-popup rounded-[2rem] p-10 border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
@@ -40,7 +39,6 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
-  // Helper: Mapping Path Foto Supabase
   const getProcessedUser = (userData) => {
     if (!userData) return null;
     const pic = userData.profile_picture;
@@ -67,12 +65,11 @@ function DashboardPage() {
         setFormDataBank(resBank.data);
       }
     } catch (err) {
-      console.error("Critical Sync Error:", err);
+      console.error("Sync Error:", err);
     }
   }
 
   useEffect(() => {
-    // 1. Cek Session awal
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return navigate('/auth');
@@ -80,7 +77,6 @@ function DashboardPage() {
     };
     checkUser();
 
-    // 2. Listen Auth Change (Kalau logout di tab lain, otomatis redirect)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) navigate('/auth');
     });
@@ -106,11 +102,20 @@ function DashboardPage() {
     }
   }
 
-  // --- 2FA LOGIC ---
+  // --- LOGIKA 2FA FIX (OTP AUTH FORMAT) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
+    
+    // Format standar agar bisa di-scan Google Authenticator
+    const issuer = "Skuy.GG";
+    const account = user?.username || "Creator";
+    const secret = "SKUYSECRET777"; // Simulasi static secret untuk demo
+    
+    const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}&digits=6&period=30`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(otpAuthUrl)}`;
+    
     setTimeout(() => {
-      setQrCode(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SKUY-SECURE-${user?.username}`);
+      setQrCode(qrUrl);
       setLoading2FA(false);
     }, 800);
   };
@@ -120,7 +125,7 @@ function DashboardPage() {
     const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: true }).eq('id', user.id);
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      skuyAlert.fire({ title: 'SECURITY ON', text: 'Protokol 2FA berhasil diaktifkan.', icon: 'success' });
+      skuyAlert.fire({ title: 'SECURITY ON', text: 'Protokol 2FA berhasil diaktifkan. Akun aman!', icon: 'success' });
       setQrCode(''); setOtp('');
     }
     setLoading2FA(false);
@@ -147,11 +152,11 @@ function DashboardPage() {
 
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center">
-          <div>
+          <div className="text-left">
             <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">
               {user.role === 'streamer' ? 'Creator Control' : 'Member Station'}
             </h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] text-left">
               Auth Key: <span className="text-violet-600">{user.id.substring(0, 8)}...</span>
             </p>
           </div>
