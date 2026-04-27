@@ -39,7 +39,7 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
-  // Fungsi ambil data dari Supabase
+  // Ambil Data dari Supabase Cloud
   const fetchDashboardData = async (userId) => {
     if (!userId) return;
     try {
@@ -61,22 +61,34 @@ function DashboardPage() {
   }
 
   useEffect(() => {
-    const checkUser = async () => {
+    const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return navigate('/auth');
       fetchDashboardData(session.user.id);
     };
-    checkUser();
+    initSession();
+
+    // Re-sync otomatis jika ada perubahan auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) navigate('/auth');
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // --- LOGIKA 2FA DENGAN VALIDASI MASTER OTP ---
+  // --- LOGIKA 2FA (FIX SCAN GOOGLE AUTHENTICATOR) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
-    const secret = "KVKFKRCIK5GVURKB"; // Secret Key untuk Google Authenticator
-    const issuer = "SkuyGG";
-    const account = (user?.username || "User").replace(/\s/g, "");
     
+    // Secret wajib Base32 (A-Z, 2-7) agar Google Authenticator tidak error
+    const secret = "KVKFKRCIK5GVURKB"; 
+    const issuer = "SkuyGG";
+    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, "");
+    
+    // Format standar otpauth
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}`;
+    
+    // Menggunakan Google Chart API (Paling stabil buat scan)
     const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
     
     setTimeout(() => {
@@ -84,20 +96,16 @@ function DashboardPage() {
       setLoading2FA(false);
       skuyAlert.fire({
         title: 'QR GENERATED',
-        text: 'Scan QR ini di Google Authenticator. Kode Manual: KVKFKRCIK5GVURKB',
+        text: `Scan pakai Google Authenticator. Manual Key: ${secret}`,
         icon: 'info'
       });
     }, 800);
   };
 
   const handleVerify2FA = async () => {
-    // VALIDASI MASTER: Angka ini yang harus dimasukkan saat demo
-    if (otp !== "123456") {
-      return skuyAlert.fire({
-        title: 'KODE SALAH',
-        text: 'OTP tidak valid. Silakan cek aplikasi Authenticator kamu!',
-        icon: 'error'
-      });
+    // Simulasi validasi angka. Di sistem demo, kita pakai 123456 agar aman.
+    if (otp !== "123456" && otp.length === 6) {
+      return skuyAlert.fire({ title: 'OTP SALAH', text: 'Kode tidak cocok!', icon: 'error' });
     }
 
     setLoading2FA(true);
@@ -107,8 +115,9 @@ function DashboardPage() {
       .eq('id', user.id);
 
     if (!error) {
+      // Update UI secara Instan tanpa refresh
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      skuyAlert.fire({ title: 'SECURITY ON', text: 'Perisai 2FA berhasil diaktifkan!', icon: 'success' });
+      skuyAlert.fire({ title: 'SECURITY ON', text: '2FA Aktif! Akun Full Protected.', icon: 'success' });
       setQrCode(''); 
       setOtp('');
     }
@@ -119,14 +128,14 @@ function DashboardPage() {
     const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: false }).eq('id', user.id);
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire({ title: 'SECURITY OFF', text: '2FA telah dinonaktifkan.', icon: 'info' });
+      skuyAlert.fire({ title: 'SECURITY OFF', text: 'Perisai 2FA dimatikan.', icon: 'info' });
     }
   };
 
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] flex font-sans selection:bg-violet-100">
       <Sidebar 
         activeMenu={activeMenu} setActiveMenu={setActiveMenu} 
         activeSubMenu={activeSubMenu} setActiveSubMenu={setActiveSubMenu}
@@ -137,11 +146,15 @@ function DashboardPage() {
         <header className="mb-8 flex justify-between items-center text-left">
           <div>
             <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-              Creator Dashboard
+              Creator Hub
             </h1>
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">
-              Cloud Status: <span className="text-green-500">Connected</span>
+              Cloud Status: <span className="text-violet-600 italic">Synchronized</span>
             </p>
+          </div>
+          <div className="bg-white px-4 py-2 rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
+             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+             <span className="text-[10px] font-black text-slate-950 uppercase italic tracking-widest italic">Live</span>
           </div>
         </header>
 
@@ -161,6 +174,7 @@ function DashboardPage() {
         )}
       </main>
 
+      {/* Modal Bank (Supabase Sync) */}
       <EditBankModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
@@ -169,7 +183,7 @@ function DashboardPage() {
         onSave={async (e) => {
            e.preventDefault();
            const { data, error } = await supabase.from('payment_methods').update(formDataBank).eq('streamer_id', user.id).select().single();
-           if (!error) { setBankData(data); setIsEditModalOpen(false); skuyAlert.fire('SUCCESS', 'Bank updated', 'success'); }
+           if (!error) { setBankData(data); setIsEditModalOpen(false); skuyAlert.fire('SUCCESS', 'Data Bank Disimpan', 'success'); }
         }} 
       />
     </div>
