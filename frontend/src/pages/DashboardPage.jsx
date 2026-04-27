@@ -102,51 +102,64 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX TOTAL (GOOGLE CHART + MANUAL BACKUP) ---
+  // --- LOGIKA 2FA FIX TOTAL (GOOGLE CHART + BACKUP KEY) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
-    
-    // 1. Data Base32 murni (Pasti dikenal Google)
     const secret = "KVKFKRCIK5GVURKB"; 
     const issuer = "SkuyGG";
     const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, "");
     
-    // 2. URL Protokol Dasar
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}`;
-    
-    // 3. QR URL (Google Chart API)
     const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
       setLoading2FA(false);
       
-      // INFO BACKUP UNTUK MANUAL INPUT
       skuyAlert.fire({
         title: 'PROTOKOL AKTIF',
-        text: `Jika QR gagal scan, masukkan kode ini manual di Authenticator: ${secret}`,
+        text: `Jika gagal scan, masukkan kode manual ini di Authenticator: ${secret}`,
         icon: 'info',
-        confirmButtonText: 'PAHAM'
+        confirmButtonText: 'SIAP'
       });
     }, 800);
   };
 
   const handleVerify2FA = async () => {
     setLoading2FA(true);
-    const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: true }).eq('id', user.id);
+    
+    const { error } = await supabase
+      .from('streamers')
+      .update({ is_two_fa_enabled: true })
+      .eq('id', user.id);
+
     if (!error) {
+      // PAKSA UPDATE STATE AGAR UI BERUBAH INSTAN
       setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-      skuyAlert.fire({ title: 'SECURITY ON', text: 'Protokol 2FA berhasil diaktifkan. Akun aman!', icon: 'success' });
-      setQrCode(''); setOtp('');
+      
+      skuyAlert.fire({ 
+        title: 'SECURITY ON', 
+        text: 'Protokol 2FA berhasil diaktifkan. Akun sudah Full Protected! 🔥', 
+        icon: 'success' 
+      });
+      
+      setQrCode(''); 
+      setOtp('');
+    } else {
+      skuyAlert.fire('ERROR', 'Gagal update status keamanan.', 'error');
     }
     setLoading2FA(false);
   };
 
   const handleDisable2FA = async () => {
-    const { error } = await supabase.from('streamers').update({ is_two_fa_enabled: false }).eq('id', user.id);
+    const { error } = await supabase
+      .from('streamers')
+      .update({ is_two_fa_enabled: false })
+      .eq('id', user.id);
+
     if (!error) {
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire({ title: 'SECURITY OFF', text: 'Protokol 2FA dinonaktifkan.', icon: 'info' });
+      skuyAlert.fire({ title: 'SECURITY OFF', text: 'Keamanan ganda dinonaktifkan.', icon: 'info' });
     }
   };
 
