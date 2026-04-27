@@ -102,22 +102,32 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX TOTAL (GOOGLE AUTHENTICATOR APPROVED) ---
+  // --- LOGIKA 2FA FIX TOTAL (GOOGLE CHART + MANUAL BACKUP) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
     
-    const issuer = "SkuyGG"; 
-    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, ""); 
-    const secret = "KVKFKRCIK5GVURKB"; // Secret Base32 Murni
+    // 1. Data Base32 murni (Pasti dikenal Google)
+    const secret = "KVKFKRCIK5GVURKB"; 
+    const issuer = "SkuyGG";
+    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, "");
     
+    // 2. URL Protokol Dasar
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}`;
     
-    // Gunakan Google Chart API sebagai generator utama
+    // 3. QR URL (Google Chart API)
     const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
       setLoading2FA(false);
+      
+      // INFO BACKUP UNTUK MANUAL INPUT
+      skuyAlert.fire({
+        title: 'PROTOKOL AKTIF',
+        text: `Jika QR gagal scan, masukkan kode ini manual di Authenticator: ${secret}`,
+        icon: 'info',
+        confirmButtonText: 'PAHAM'
+      });
     }, 800);
   };
 
