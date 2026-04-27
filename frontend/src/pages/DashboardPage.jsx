@@ -102,22 +102,23 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX TOTAL (COMPATIBLE WITH GOOGLE AUTHENTICATOR) ---
+  // --- LOGIKA 2FA FIX TOTAL (GOOGLE AUTHENTICATOR FULL COMPATIBLE) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
     
-    // 1. Bersihkan data (Issuer & Account tidak boleh ada spasi/karakter aneh)
+    // 1. Nama Platform & User (Hapus spasi & karakter aneh agar tidak error saat scan)
     const issuer = "SkuyGG"; 
-    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, ""); 
+    const account = (user?.username || "User").replace(/[^a-zA-Z0-9]/g, ""); 
     
-    // 2. Secret harus Base32 (A-Z, 2-7). Kita pakai string static aman untuk demo.
-    const secret = "SKUYSECRET777XTRA"; 
+    // 2. SECRET KEY (WAJIB BASE32: Hanya A-Z dan angka 2-7)
+    // SANGAT PENTING: Dilarang pakai angka 0, 1, 8, atau 9!
+    const secret = "KVKFKRCIK5GVURKB"; // Secret statis yang valid untuk demo
     
-    // 3. Susun URL Protokol OTPAuth
+    // 3. Susun URL Protokol TOTP
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}&digits=6&period=30`;
     
-    // 4. Gunakan QuickChart API (Lebih stabil untuk string panjang)
-    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(otpAuthUrl)}&size=250&margin=1&ecLevel=H`;
+    // 4. Generate QR (Pakai QuickChart agar stabil)
+    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(otpAuthUrl)}&size=250&margin=1&ecLevel=M`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
@@ -158,10 +159,10 @@ function DashboardPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center">
           <div className="text-left">
-            <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">
+            <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
               {user.role === 'streamer' ? 'Creator Control' : 'Member Station'}
             </h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] text-left">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] text-left mt-1">
               Auth Key: <span className="text-violet-600">{user.id.substring(0, 8)}...</span>
             </p>
           </div>
