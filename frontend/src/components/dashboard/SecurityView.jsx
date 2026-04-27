@@ -4,6 +4,8 @@ import {
   CheckCircle2, Zap, Loader2, Lock, Heart
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+// --- IMPORT LIBRARY QR ---
+import { QRCodeSVG } from 'qrcode.react'
 
 function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, setOtp, loading }) {
   const isEnabled = user?.is_two_fa_enabled;
@@ -48,7 +50,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
               <div className="relative z-10">
                 <h3 className="text-xl font-black italic uppercase mb-2 text-white">Yuk, Pasang Kunci Ganda!</h3>
                 <p className="text-violet-100 text-xs font-bold leading-relaxed opacity-90">
-                  Password saja terkadang bisa ditebak. Dengan 2FA, cuma kamu yang punya akses masuk lewat kode rahasia di HP-mu. Saldo dan data Skuy kamu jadi jauh lebih aman!
+                  Password saja terkadang bisa ditebak. Dengan 2FA, cuma kamu yang punya akses masuk lewat kode rahasia di HP-mu.
                 </p>
               </div>
             </div>
@@ -67,15 +69,10 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
                   <motion.button 
                     onClick={onGenerateQR}
                     disabled={loading}
-                    whileHover={{ scale: 1.05, background: "#6d28d9", boxShadow: "0px 15px 30px rgba(109, 40, 217, 0.3)" }}
+                    whileHover={{ scale: 1.05, background: "#6d28d9" }}
                     whileTap={{ scale: 0.95 }}
-                    className="relative group bg-violet-600 text-white px-12 py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-[0.2em] overflow-hidden transition-all mx-auto block"
+                    className="relative group bg-violet-600 text-white px-12 py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-[0.2em] transition-all mx-auto block"
                   >
-                    <motion.div 
-                      initial={{ x: "-100%" }} animate={{ x: "100%" }}
-                      transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    />
                     <span className="relative z-10 flex items-center justify-center gap-2">
                       {loading ? <Loader2 className="animate-spin" size={16} /> : <>Buka Kunci Rahasia <Zap size={14} className="fill-white" /></>}
                     </span>
@@ -90,8 +87,15 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
                     <h4 className="text-[10px] font-black italic uppercase text-slate-400 tracking-[0.3em]">Scan QR Pakai Aplikasi Authenticator</h4>
                     <div className="relative inline-block group">
                       <div className="absolute -inset-4 bg-violet-500 rounded-[3.5rem] blur-2xl opacity-10" />
-                      <div className="relative p-5 bg-white border-2 border-slate-950 rounded-[2.8rem] shadow-2xl">
-                        {qrCode && <img src={qrCode} alt="Security QR" className="w-48 h-48 rounded-2xl" />}
+                      
+                      {/* --- RENDER QR DENGAN SVG (TAJAM & PASTI BISA SCAN) --- */}
+                      <div className="relative p-6 bg-white border-2 border-slate-950 rounded-[2.8rem] shadow-2xl inline-block">
+                        <QRCodeSVG 
+                          value={qrCode} 
+                          size={180} 
+                          level="H" 
+                          includeMargin={true} 
+                        />
                       </div>
                     </div>
                   </div>
@@ -115,7 +119,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
                       disabled={loading || otp.length < 6}
                       whileHover={{ scale: 1.02, background: "#6d28d9" }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-[0.2em] shadow-xl shadow-violet-100 disabled:opacity-30 disabled:grayscale transition-all flex items-center justify-center gap-3"
+                      className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-[0.2em] shadow-xl shadow-violet-100 disabled:opacity-30 transition-all flex items-center justify-center gap-3"
                     >
                       {loading ? <Loader2 className="animate-spin" size={18} /> : 'Aktifkan Perisai Sekarang'}
                     </motion.button>
@@ -137,7 +141,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
             
             <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-2 text-slate-900">Mantap! Akun Aman</h3>
             <p className="text-slate-400 text-xs font-bold max-w-sm mx-auto leading-relaxed uppercase tracking-widest text-center">
-              Identitas <span className="text-violet-600 font-black">@{user?.username}</span> sudah terlindungi ganda. Kamu bisa streaming dengan tenang!
+              Identitas <span className="text-violet-600 font-black">@{user?.username}</span> sudah terlindungi ganda.
             </p>
             
             <div className="mt-10 pt-10 border-t border-slate-50">
@@ -159,7 +163,7 @@ function SecurityView({ user, qrCode, onGenerateQR, onVerify, onDisable, otp, se
           <AlertTriangle className="text-amber-500" size={18} />
         </div>
         <p className="text-[9px] font-bold text-amber-800 uppercase tracking-widest leading-relaxed">
-          <span className="text-slate-900">Tips:</span> Kodenya gak masuk? Coba cek apakah pengaturan jam di HP kamu sudah disetel ke "Otomatis" ya.
+          <span className="text-slate-900">PENTING:</span> Jika QR sulit di-scan, pastikan tingkat kecerahan laptop kamu sudah cukup tinggi ya, Ri!
         </p>
       </div>
     </div>
