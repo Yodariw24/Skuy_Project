@@ -102,17 +102,22 @@ function DashboardPage() {
     }
   }
 
-  // --- LOGIKA 2FA FIX (OTP AUTH FORMAT) ---
+  // --- LOGIKA 2FA FIX TOTAL (COMPATIBLE WITH GOOGLE AUTHENTICATOR) ---
   const handleGenerateQR = () => {
     setLoading2FA(true);
     
-    // Format standar agar bisa di-scan Google Authenticator
-    const issuer = "Skuy.GG";
-    const account = user?.username || "Creator";
-    const secret = "SKUYSECRET777"; // Simulasi static secret untuk demo
+    // 1. Bersihkan data (Issuer & Account tidak boleh ada spasi/karakter aneh)
+    const issuer = "SkuyGG"; 
+    const account = (user?.username || "Creator").replace(/[^a-zA-Z0-9]/g, ""); 
     
+    // 2. Secret harus Base32 (A-Z, 2-7). Kita pakai string static aman untuk demo.
+    const secret = "SKUYSECRET777XTRA"; 
+    
+    // 3. Susun URL Protokol OTPAuth
     const otpAuthUrl = `otpauth://totp/${issuer}:${account}?issuer=${issuer}&secret=${secret}&digits=6&period=30`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(otpAuthUrl)}`;
+    
+    // 4. Gunakan QuickChart API (Lebih stabil untuk string panjang)
+    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(otpAuthUrl)}&size=250&margin=1&ecLevel=H`;
     
     setTimeout(() => {
       setQrCode(qrUrl);
