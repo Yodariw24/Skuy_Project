@@ -3,15 +3,35 @@ const cors = require('cors');
 const path = require('path'); 
 const http = require('http'); 
 const { Server } = require('socket.io'); 
+const { Pool } = require('pg'); // Library untuk koneksi PostgreSQL
 require('dotenv').config();
 
+// --- IMPORT ROUTES ---
 const streamerRoutes = require('./routes/streamerRoutes');
 const donationRoutes = require('./routes/donationRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
-// --- 1. SETUP SERVER HTTP & SOCKET.IO ---
+// --- 1. SETUP DATABASE (SUPABASE) ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false // Wajib true untuk koneksi cloud
+  }
+});
+
+// Cek Koneksi Database saat startup
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('❌ Gagal konek ke Supabase:', err.message);
+  } else {
+    console.log('✅ JEMBATAN DATABASE AMAN: Backend & Supabase Terhubung!');
+    release();
+  }
+});
+
+// --- 2. SETUP SERVER HTTP & SOCKET.IO ---
 const server = http.createServer(app); 
 const io = new Server(server, {
   cors: {
@@ -21,10 +41,9 @@ const io = new Server(server, {
   }
 });
 
-// Port disesuaikan ke 3000 agar sesuai dengan terminal kamu
 const PORT = process.env.PORT || 3000; 
 
-// --- 2. MIDDLEWARE ---
+// --- 3. MIDDLEWARE ---
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   credentials: true
@@ -32,7 +51,15 @@ app.use(cors({
 app.use(express.json()); 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 3. SOCKET.IO PROTOCOL ---
+// --- 4. GLOBAL INJECTION ---
+// Memasukkan pool (DB) dan io (Socket) ke dalam req agar bisa dipakai di Routes
+app.use((req, res, next) => {
+  req.db = pool;
+  req.io = io;
+  next();
+});
+
+// --- 5. SOCKET.IO PROTOCOL ---
 io.on('connection', (socket) => {
     console.log('📡 New Device Linked to Skuy System:', socket.id);
 
@@ -46,13 +73,12 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- 4. EXPOSE IO (Global Middleware) ---
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
+// --- 6. ROUTES ---
+app.use('/api/streamers', streamerRoutes);
+app.use('/api/donations', donationRoutes);
+app.use('/api/auth', authRoutes);
 
-// --- 5. ROUTE SIMULASI ALERT (UNTUK TEST DI OBS) ---
+// Route Test Alert untuk OBS
 app.post('/api/test-alert/:streamKey', (req, res) => {
     const { streamKey } = req.params;
     const { type } = req.body; 
@@ -68,16 +94,20 @@ app.post('/api/test-alert/:streamKey', (req, res) => {
     res.json({ message: `Simulasi alert ${type} dikirim ke room ${streamKey}` });
 });
 
-// --- 6. ROUTES UTAMA ---
-app.use('/api/streamers', streamerRoutes);
-app.use('/api/donations', donationRoutes);
-app.use('/api/auth', authRoutes);
-
 app.get('/', (req, res) => {
-    res.json({ message: "Skuy Engine Running Gacor! 🚀" });
+    res.json({ 
+      message: "Skuy Engine Running Gacor! 🚀",
+      database: "Connected" 
+    });
 });
 
 // --- 7. START SERVER ---
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Engine nyala di port ${PORT} | Mode: Real-time Protocol Active`);
+    console.log(`
+    =============================================
+    🚀 ENGINE NYALA DI PORT ${PORT}
+    📡 MODE: REAL-TIME PROTOCOL ACTIVE
+    🛡️  DATABASE: SUPABASE CLOUD CONNECTED
+    =============================================
+    `);
 });

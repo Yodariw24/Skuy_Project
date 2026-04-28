@@ -1,54 +1,50 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GoogleLogin } from '@react-oauth/google'
+import axios from 'axios' // Pakai axios untuk tembak ke Node.js
 import { supabase } from '../supabaseClient' 
 import { skuyAlert } from '../utils/alerts'
-import { authenticator } from 'otplib' // Pastikan sudah npm install otplib
-import { 
-  User, Mail, Lock, ArrowRight, 
-  Sparkles, ShieldCheck, Eye, EyeOff, Zap, Loader2 
-} from 'lucide-react'
+import { Loader2, ShieldCheck } from 'lucide-react'
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  
-  // --- STATE 2FA ---
   const [show2FA, setShow2FA] = useState(false);
   const [otp, setOtp] = useState('');
-  const [tempUser, setTempUser] = useState(null);
+  const [tempUserId, setTempUserId] = useState(null); // Hanya simpan ID, bukan secret!
 
   const [formData, setFormData] = useState({
-    identifier: '', // Bisa Email atau Username
-    email: '', 
+    identifier: '', 
     password: '', 
+    email: '', 
     full_name: '',
     username: ''
   });
 
   const navigate = useNavigate();
 
-  // --- LOGIKA VERIFIKASI 2FA SAAT LOGIN ---
+  // --- 1. VERIFIKASI 2FA LEWAT BACKEND (LEBIH AMAN) ---
   const handleVerify2FALogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Ambil secret dari tempUser yang kita simpan saat login step 1
-      const secret = tempUser.two_fa_secret;
-      authenticator.options = { window: 1 };
-      const isValid = authenticator.check(otp, secret);
+      // Kita tembak ke endpoint Node.js yang tadi dibuat
+      const res = await axios.post('http://localhost:3000/api/auth/verify-2fa', {
+        userId: tempUserId,
+        token: otp
+      });
 
-      if (isValid) {
-        skuyAlert("AKSES DIBERIKAN", "Selamat datang kembali!", 'success');
+      if (res.data.success) {
+        // Simpan token JWT dari backend ke localStorage
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.data));
+        
+        skuyAlert("AKSES DIBERIKAN", "Selamat datang kembali di SkuyGG!", 'success');
         navigate('/dashboard/wallet');
-      } else {
-        skuyAlert("KODE SALAH", "OTP tidak valid atau kadaluarsa.", "error");
       }
     } catch (err) {
-      skuyAlert("ERROR", "Gagal memverifikasi kode.", "error");
+      skuyAlert("KODE SALAH", err.response?.data?.message || "OTP tidak valid.", "error");
     } finally {
       setLoading(false);
     }
@@ -60,75 +56,52 @@ function AuthPage() {
 
     try {
       if (isLogin) {
-        let finalEmail = formData.identifier;
-
-        // 1. CEK: Jika input bukan email, cari email berdasarkan username di DB
-        if (!formData.identifier.includes('@')) {
-          const { data: userData, error: userError } = await supabase
-            .from('streamers')
-            .select('email')
-            .eq('username', formData.identifier)
-            .single();
-
-          if (userError || !userData) throw new Error('Username tidak ditemukan!');
-          finalEmail = userData.email;
-        }
-
-        // 2. PROSES LOGIN AUTH
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: finalEmail,
-          password: formData.password,
+        // LOGIN STEP 1: Cek Username/Email & Password ke Backend
+        const res = await axios.post('http://localhost:3000/api/auth/login', {
+          identifier: formData.identifier,
+          password: formData.password
         });
 
-        if (error) throw error;
-
-        if (data.user) {
-          // 3. CEK STATUS 2FA DI TABEL STREAMERS
-          const { data: profile } = await supabase
-            .from('streamers')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          if (profile?.is_two_fa_enabled) {
-            setTempUser(profile);
-            setShow2FA(true); // Tampilkan input OTP
-          } else {
-            skuyAlert("BERHASIL", "Membuka Dashboard...", "success");
-            navigate('/dashboard/wallet');
-          }
+        if (res.data.requires2FA) {
+          // Jika user aktifkan 2FA, arahkan ke input OTP
+          setTempUserId(res.data.userId);
+          setShow2FA(true);
+          skuyAlert("SECURITY CHECK", "Masukkan kode OTP kamu", "info");
+        } else {
+          // Login biasa tanpa 2FA
+          localStorage.setItem('token', res.data.token);
+          localStorage.setItem('user', JSON.stringify(res.data.data));
+          skuyAlert("BERHASIL", "Membuka Dashboard...", "success");
+          navigate('/dashboard/wallet');
         }
       } else {
-        // --- PROSES REGISTER ---
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: { username: formData.username, full_name: formData.full_name }
-          }
-        });
-
-        if (error) throw error;
-        if (data.user) {
+        // REGISTER: Tetap lewat Supabase atau Backend (Saran: Backend agar seragam)
+        const res = await axios.post('http://localhost:3000/api/auth/register', formData); // Jika ada route register
+        if (res.data.success) {
           setIsLogin(true);
           skuyAlert("SUKSES", "Akun dibuat! Silakan login.", "success");
         }
       }
     } catch (err) {
-      skuyAlert("GAGAL", err.message, "error");
+      skuyAlert("GAGAL", err.response?.data?.message || "Cek kembali data kamu", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans">
       <motion.div 
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-[450px] bg-white rounded-[3rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden"
       >
-        <div className="bg-violet-600 p-10 text-white text-center border-b-4 border-slate-950">
-          <h2 className="text-3xl font-black italic uppercase tracking-tighter">
+        <div className="bg-violet-600 p-10 text-white text-center border-b-4 border-slate-950 relative overflow-hidden">
+          {/* Ornamen Startup Vibe */}
+          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+            <div className="absolute top-2 left-2 rotate-12"><ShieldCheck size={100}/></div>
+          </div>
+          
+          <h2 className="text-3xl font-black italic uppercase tracking-tighter relative z-10">
             {show2FA ? 'Security' : (isLogin ? 'Login' : 'Join')}
           </h2>
         </div>
@@ -136,61 +109,60 @@ function AuthPage() {
         <div className="p-10">
           <AnimatePresence mode="wait">
             {show2FA ? (
-              <motion.form key="2fa" onSubmit={handleVerify2FALogin} className="space-y-6">
-                <div className="text-center space-y-2">
-                  <p className="text-[10px] font-black uppercase text-slate-400">Input 6-Digit OTP</p>
-                  <input 
-                    type="text" maxLength="6" placeholder="000000" required
-                    className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-widest"
-                    value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  />
+              <motion.form 
+                key="2fa" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
+                onSubmit={handleVerify2FALogin} className="space-y-6"
+              >
+                <div className="text-center space-y-4">
+                  <div className="bg-violet-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto text-violet-600 border-2 border-violet-200">
+                    <ShieldCheck size={32} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase text-slate-400">Authenticator Code</p>
+                    <input 
+                      type="text" maxLength="6" placeholder="000000" required autoFocus
+                      className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.75rem] outline-none focus:bg-white transition-all"
+                      value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
                 </div>
-                <button type="submit" className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest">
-                  {loading ? 'Checking...' : 'Unlock Account'}
+                <button type="submit" disabled={loading} className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                  {loading ? <Loader2 className="animate-spin" /> : 'UNSEAL ACCOUNT'}
                 </button>
               </motion.form>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {isLogin ? (
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username / Email</label>
-                    <input 
-                      type="text" placeholder="Ari atau ari@mail.com" required 
-                      className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold"
-                      value={formData.identifier} onChange={(e) => setFormData({...formData, identifier: e.target.value})}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <input 
-                      type="text" placeholder="Username" required 
-                      className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold"
-                      value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})}
-                    />
-                    <input 
-                      type="email" placeholder="Email" required 
-                      className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold"
-                      value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    />
-                  </>
-                )}
-
-                <div className="relative">
+              <motion.form 
+                key="auth" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }}
+                onSubmit={handleSubmit} className="space-y-5"
+              >
+                {/* Email / Username Input */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account ID</label>
                   <input 
-                    type={showPassword ? "text" : "password"} placeholder="Password" required 
-                    className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold"
+                    type="text" placeholder="Username or Email" required 
+                    className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
+                    value={formData.identifier} onChange={(e) => setFormData({...formData, identifier: e.target.value})}
+                  />
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                  <input 
+                    type="password" placeholder="••••••••" required 
+                    className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
                     value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})}
                   />
                 </div>
 
-                <button type="submit" className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest shadow-xl shadow-violet-100">
-                  {loading ? 'Processing...' : (isLogin ? 'Enter' : 'Register')}
+                <button type="submit" disabled={loading} className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2">
+                  {loading ? <Loader2 className="animate-spin" /> : (isLogin ? 'Enter System' : 'Create Account')}
                 </button>
 
-                <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full text-center text-xs font-bold text-slate-400">
-                  {isLogin ? "Bikin akun baru?" : "Sudah punya akun?"}
+                <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full text-center text-xs font-black text-slate-400 uppercase tracking-tighter hover:text-violet-600 transition-all">
+                  {isLogin ? "Need a new identity? Sign Up" : "Already verified? Log In"}
                 </button>
-              </form>
+              </motion.form>
             )}
           </AnimatePresence>
         </div>
