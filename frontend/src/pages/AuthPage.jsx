@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import axios from 'axios' // Pakai axios untuk tembak ke Node.js
-import { supabase } from '../supabaseClient' 
+import axios from 'axios'
 import { skuyAlert } from '../utils/alerts'
 import { Loader2, ShieldCheck } from 'lucide-react'
+
+// Konfigurasi API URL (Otomatis deteksi Railway atau Localhost)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
   const [otp, setOtp] = useState('');
-  const [tempUserId, setTempUserId] = useState(null); // Hanya simpan ID, bukan secret!
+  const [tempUserId, setTempUserId] = useState(null);
 
   const [formData, setFormData] = useState({
     identifier: '', 
@@ -23,20 +25,19 @@ function AuthPage() {
 
   const navigate = useNavigate();
 
-  // --- 1. VERIFIKASI 2FA LEWAT BACKEND (LEBIH AMAN) ---
+  // --- 1. VERIFIKASI 2FA LEWAT BACKEND ---
   const handleVerify2FALogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Kita tembak ke endpoint Node.js yang tadi dibuat
-      const res = await axios.post('http://localhost:3000/api/auth/verify-2fa', {
+      const res = await axios.post(`${API_URL}/api/auth/verify-2fa`, {
         userId: tempUserId,
         token: otp
       });
 
       if (res.data.success) {
-        // Simpan token JWT dari backend ke localStorage
+        // Simpan data login ke storage
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.data));
         
@@ -50,33 +51,37 @@ function AuthPage() {
     }
   };
 
+  // --- 2. HANDLE LOGIN / REGISTER ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (isLogin) {
-        // LOGIN STEP 1: Cek Username/Email & Password ke Backend
-        const res = await axios.post('http://localhost:3000/api/auth/login', {
+        // Login Step 1
+        const res = await axios.post(`${API_URL}/api/auth/login`, {
           identifier: formData.identifier,
           password: formData.password
         });
 
         if (res.data.requires2FA) {
-          // Jika user aktifkan 2FA, arahkan ke input OTP
           setTempUserId(res.data.userId);
           setShow2FA(true);
           skuyAlert("SECURITY CHECK", "Masukkan kode OTP kamu", "info");
         } else {
-          // Login biasa tanpa 2FA
           localStorage.setItem('token', res.data.token);
           localStorage.setItem('user', JSON.stringify(res.data.data));
           skuyAlert("BERHASIL", "Membuka Dashboard...", "success");
           navigate('/dashboard/wallet');
         }
       } else {
-        // REGISTER: Tetap lewat Supabase atau Backend (Saran: Backend agar seragam)
-        const res = await axios.post('http://localhost:3000/api/auth/register', formData); // Jika ada route register
+        // Register (Diseragamkan ke Backend Railway)
+        const res = await axios.post(`${API_URL}/api/auth/register`, {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password
+        });
+        
         if (res.data.success) {
           setIsLogin(true);
           skuyAlert("SUKSES", "Akun dibuat! Silakan login.", "success");
@@ -90,13 +95,12 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans text-slate-900">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-[450px] bg-white rounded-[3rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden"
       >
         <div className="bg-violet-600 p-10 text-white text-center border-b-4 border-slate-950 relative overflow-hidden">
-          {/* Ornamen Startup Vibe */}
           <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
             <div className="absolute top-2 left-2 rotate-12"><ShieldCheck size={100}/></div>
           </div>
@@ -118,7 +122,7 @@ function AuthPage() {
                     <ShieldCheck size={32} />
                   </div>
                   <div>
-                    <p className="text-xs font-black uppercase text-slate-400">Authenticator Code</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Input OTP</p>
                     <input 
                       type="text" maxLength="6" placeholder="000000" required autoFocus
                       className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.75rem] outline-none focus:bg-white transition-all"
@@ -126,7 +130,7 @@ function AuthPage() {
                     />
                   </div>
                 </div>
-                <button type="submit" disabled={loading} className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                <button type="submit" disabled={loading} className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-slate-800 active:translate-y-1 transition-all flex items-center justify-center gap-2">
                   {loading ? <Loader2 className="animate-spin" /> : 'UNSEAL ACCOUNT'}
                 </button>
               </motion.form>
@@ -135,17 +139,30 @@ function AuthPage() {
                 key="auth" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }}
                 onSubmit={handleSubmit} className="space-y-5"
               >
-                {/* Email / Username Input */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account ID</label>
-                  <input 
-                    type="text" placeholder="Username or Email" required 
-                    className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
-                    value={formData.identifier} onChange={(e) => setFormData({...formData, identifier: e.target.value})}
-                  />
-                </div>
+                {isLogin ? (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account ID</label>
+                    <input 
+                      type="text" placeholder="Username or Email" required 
+                      className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
+                      value={formData.identifier} onChange={(e) => setFormData({...formData, identifier: e.target.value})}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <input 
+                      type="text" placeholder="Username" required 
+                      className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
+                      value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})}
+                    />
+                    <input 
+                      type="email" placeholder="Email" required 
+                      className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl font-bold focus:border-violet-600 outline-none transition-all"
+                      value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
+                  </>
+                )}
 
-                {/* Password Input */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
                   <input 
