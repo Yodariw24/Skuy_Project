@@ -24,8 +24,6 @@ const generateToken = (user) => {
  */
 router.post('/google', async (req, res) => {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ success: false, message: "Token Google diperlukan" });
-
     try {
         const ticket = await client.verifyIdToken({
             idToken: token,
@@ -52,7 +50,6 @@ router.post('/google', async (req, res) => {
 
         res.json({ success: true, token: generateToken(streamer), data: streamer });
     } catch (err) {
-        console.error("Google Auth Error:", err);
         res.status(401).json({ success: false, message: "Verifikasi Google Gagal!" });
     }
 });
@@ -62,54 +59,37 @@ router.post('/google', async (req, res) => {
  */
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: "User ID diperlukan" });
-
     try {
         const { rows } = await pool.query("SELECT email, username FROM streamers WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ success: false, message: "User tidak ditemukan" });
-
         const streamer = rows[0];
-        const label = streamer.username || streamer.email;
-
-        // Generate secret yang lebih kompatibel
+        
+        const cleanLabel = (streamer.username || streamer.email || 'User').replace(/\s+/g, '_');
         const secret = speakeasy.generateSecret({ 
-            length: 20,
-            name: `SkuyGG:${label}`,
+            length: 20, 
+            name: `SkuyGG:${cleanLabel}`, 
             issuer: 'SkuyGG' 
         });
 
         await pool.query("UPDATE streamers SET two_fa_secret = $1 WHERE id = $2", [secret.base32, userId]);
-        
-        // Pastikan otpauth_url ada sebelum generate QR
-        if (!secret.otpauth_url) throw new Error("Gagal generate OTP Auth URL");
-
-        const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
 
         res.json({ 
             success: true, 
-            qrCode: qrCodeUrl, 
-            secret: secret.base32 // Kirim secret untuk backup manual input
+            qrData: secret.otpauth_url, 
+            secret: secret.base32      
         });
     } catch (err) {
-        console.error("Setup 2FA Error:", err);
-        res.status(500).json({ success: false, message: "Gagal generate QR Code" });
+        res.status(500).json({ success: false, message: "Gagal memproses security" });
     }
 });
 
 /**
- * 3. VERIFIKASI 2FA
+ * 3. VERIFY 2FA
  */
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ success: false, message: "Data tidak lengkap" });
-
     try {
         const { rows } = await pool.query("SELECT * FROM streamers WHERE id = $1", [userId]);
         const streamer = rows[0];
-
-        if (!streamer?.two_fa_secret) {
-            return res.status(400).json({ success: false, message: "2FA belum di-setup!" });
-        }
 
         const verified = speakeasy.totp.verify({
             secret: streamer.two_fa_secret,
@@ -122,7 +102,6 @@ router.post('/verify-2fa', async (req, res) => {
             await pool.query("UPDATE streamers SET is_two_fa_enabled = true WHERE id = $1", [userId]);
             res.json({ 
                 success: true, 
-                message: "2FA Verified!", 
                 token: generateToken(streamer), 
                 data: streamer 
             });
@@ -130,7 +109,6 @@ router.post('/verify-2fa', async (req, res) => {
             res.status(400).json({ success: false, message: "Kode OTP Salah!" });
         }
     } catch (err) {
-        console.error("Verify 2FA Error:", err);
         res.status(500).json({ success: false, message: "Gagal verifikasi" });
     }
 });
@@ -140,8 +118,6 @@ router.post('/verify-2fa', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
     const { identifier, password } = req.body;
-    if (!identifier || !password) return res.status(400).json({ success: false, message: "Input tidak lengkap" });
-
     try {
         const { rows } = await pool.query(
             "SELECT * FROM streamers WHERE (username = $1 OR email = $1) AND password = $2", 
@@ -158,22 +134,6 @@ router.post('/login', async (req, res) => {
         res.json({ success: true, token: generateToken(streamer), data: streamer });
     } catch (err) {
         res.status(500).json({ success: false, message: "Server Login Error" });
-    }
-});
-
-/**
- * 5. DISABLE 2FA
- */
-router.post('/disable-2fa', async (req, res) => {
-    const { userId } = req.body;
-    try {
-        await pool.query(
-            "UPDATE streamers SET two_fa_secret = NULL, is_two_fa_enabled = false WHERE id = $1", 
-            [userId]
-        );
-        res.json({ success: true, message: "2FA dimatikan." });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal mematikan 2FA" });
     }
 });
 
