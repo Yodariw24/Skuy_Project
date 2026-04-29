@@ -9,12 +9,12 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 router.use(express.json());
 
-// --- SETUP NODEMAILER (PENGIRIM EMAIL) ---
+// --- SETUP NODEMAILER ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // Isi email Gmail kamu di Railway
-        pass: process.env.EMAIL_PASS  // Isi App Password 16 digit di Railway
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS 
     }
 });
 
@@ -67,7 +67,6 @@ router.post('/google', async (req, res) => {
  */
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    // Generate 6 digit angka acak untuk OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     try {
@@ -75,11 +74,8 @@ router.post('/setup-2fa', async (req, res) => {
         if (rows.length === 0) return res.status(404).json({ success: false, message: "User tidak ditemukan" });
         
         const userEmail = rows[0].email;
-
-        // Simpan OTP sementara di database
         await pool.query("UPDATE streamers SET two_fa_secret = $1 WHERE id = $2", [otp, userId]);
 
-        // KIRIM EMAIL KE USER
         await transporter.sendMail({
             from: '"SkuyGG Security" <noreply@skuy.gg>',
             to: userEmail,
@@ -91,20 +87,18 @@ router.post('/setup-2fa', async (req, res) => {
                     <div style="background: #7c3aed; color: #fff; padding: 20px; font-size: 40px; font-weight: bold; letter-spacing: 10px; border-radius: 10px; margin: 20px 0;">
                         ${otp}
                     </div>
-                    <p style="font-size: 10px; color: #999;">Jangan berikan kode ini kepada siapapun.</p>
                 </div>
             `
         });
 
-        res.json({ success: true, message: "Kode OTP telah dikirim ke email kamu!" });
+        res.json({ success: true, message: "Kode OTP telah dikirim!" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: "Gagal mengirim email OTP" });
+        res.status(500).json({ success: false, message: "Gagal mengirim email" });
     }
 });
 
 /**
- * 3. VERIFY 2FA (VERIFIKASI OTP EMAIL)
+ * 3. VERIFY 2FA
  */
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
@@ -112,7 +106,6 @@ router.post('/verify-2fa', async (req, res) => {
         const { rows } = await pool.query("SELECT * FROM streamers WHERE id = $1", [userId]);
         const streamer = rows[0];
 
-        // Cek apakah token input sama dengan OTP di database
         if (streamer && streamer.two_fa_secret === token) {
             await pool.query("UPDATE streamers SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
             res.json({ 
@@ -144,7 +137,6 @@ router.post('/login', async (req, res) => {
         if (!streamer) return res.status(401).json({ success: false, message: "Username/Password salah!" });
 
         if (streamer.is_two_fa_enabled) {
-            // Jika login dan 2FA aktif, trigger kirim OTP baru ke email
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
             await pool.query("UPDATE streamers SET two_fa_secret = $1 WHERE id = $2", [otp, streamer.id]);
             
@@ -160,7 +152,7 @@ router.post('/login', async (req, res) => {
 
         res.json({ success: true, token: generateToken(streamer), data: streamer });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Server Login Error" });
+        res.status(500).json({ success: false, message: "Server Error" });
     }
 });
 
