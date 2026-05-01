@@ -1,5 +1,5 @@
 // 1. Update Setting (Deploy Protocol dari Dashboard)
-exports.updateSettings = async (req, res) => {
+export const updateSettings = async (req, res) => {
     // Destructuring dengan default value agar aman
     const { userId, widgetType, colors = {}, config = {} } = req.body;
 
@@ -43,12 +43,14 @@ exports.updateSettings = async (req, res) => {
         
         const result = await req.db.query(query, values);
 
-        // KIRIM SINYAL UPDATE KE WIDGET YANG SEDANG LIVE DI OBS
-        // Ini biar streamer nggak usah refresh Browser Source di OBS tiap kali ganti warna
-        req.io.to(`streamer_${userId}`).emit('widget-update', {
-            type: widgetType,
-            settings: result.rows[0]
-        });
+        // KIRIM SINYAL UPDATE KE WIDGET (Real-time via Socket.io)
+        // Cek apakah req.io sudah di-inject dari server.js
+        if (req.io) {
+            req.io.to(`streamer_${userId}`).emit('widget-update', {
+                type: widgetType,
+                settings: result.rows[0]
+            });
+        }
 
         res.status(200).json({ 
             success: true, 
@@ -62,18 +64,18 @@ exports.updateSettings = async (req, res) => {
 };
 
 // 2. Get Setting (Dipanggil oleh Browser Source OBS)
-exports.getSettings = async (req, res) => {
+export const getSettings = async (req, res) => {
     const { streamKey, widgetType } = req.params;
     
     try {
-        // FIX: Sesuaikan nama tabel ke 'streamers'
+        // Menggunakan ILIKE agar pencarian username tidak sensitif huruf besar/kecil
         const query = `
             SELECT ws.* 
             FROM widget_settings ws
             JOIN streamers s ON s.id = ws.user_id
-            WHERE s.username = $1 AND ws.widget_type = $2;
+            WHERE s.username ILIKE $1 AND ws.widget_type = $2;
         `;
-        // Catatan: Jika lo pake stream_key (UUID), ganti s.username jadi s.stream_key
+        
         const result = await req.db.query(query, [streamKey, widgetType]);
         
         // DATA DEFAULT: Biar OBS nggak blank pas pertama pasang
@@ -98,5 +100,5 @@ exports.getSettings = async (req, res) => {
     } catch (err) {
         console.error("🔥 Error getSettings:", err.message);
         res.status(500).json({ success: false, message: "Error fetching Skuy Engine settings" });
-    }
+      }
 };
