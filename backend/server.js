@@ -32,41 +32,51 @@ pool.connect((err, client, release) => {
   release();
 });
 
-// --- 2. MIDDLEWARE & SECURITY (FIXED CORS) ---
-// Membersihkan trailing slash dari environment variable secara otomatis
-const rawUrl = process.env.FRONTEND_URL || "";
-const cleanUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
-
+// --- 2. MIDDLEWARE & SECURITY (ULTIMATE CORS FIX) ---
 const allowedOrigins = [
   "http://localhost:5173",
   "https://skuy-project.vercel.app", 
-  "https://skuy-gg.vercel.app", 
-  cleanUrl
-].filter(Boolean);
+  "https://skuy-gg.vercel.app"
+];
+
+// Otomatis hapus slash di akhir FRONTEND_URL dari environment
+const envUrl = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : "";
+if (envUrl) allowedOrigins.push(envUrl);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Jika origin tidak ada (seperti request server-to-server) atau ada di daftar, izinkan
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Izinkan jika tanpa origin (seperti Postman) atau jika ada di daftar allowed
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
       callback(null, true);
     } else {
-      callback(new Error('Domain diblokir CORS oleh SkuyGG Engine!'));
+      console.log("CORS Terblokir untuk origin:", origin);
+      callback(new Error('Domain diblokir CORS SkuyGG!'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 204
 };
 
-// Pasang CORS Middleware
 app.use(cors(corsOptions));
-// WAJIB: Handle preflight untuk semua rute
-app.options('*', cors(corsOptions)); 
+
+// PAKSA respon Preflight (OPTIONS) agar tidak ditimpa header internal Railway
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin?.replace(/\/$/, ""))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  return res.sendStatus(204);
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Header Security untuk Google Auth
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -87,6 +97,7 @@ io.on('connection', (socket) => {
   }
 });
 
+// Inject DB & IO ke Request
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
