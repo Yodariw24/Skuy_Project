@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* --- TAILWIND V3 DIRECTIVES --- */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- FONTS --- */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..1100;1,200..1100&display=swap');
 
 :root {
@@ -6,7 +11,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* --- FIX: BODY & SCROLL SYSTEM --- */
+/* --- BODY & SCROLL SYSTEM --- */
 html, body {
   margin: 0;
   padding: 0;
@@ -21,7 +26,7 @@ html, body {
   scroll-behavior: smooth;
 }
 
-/* Memastikan container utama (Vite biasanya pakai #root) tidak mengunci layar */
+/* Container utama Vite */
 #root {
   width: 100%;
   height: auto !important;
@@ -71,7 +76,7 @@ html, body {
   margin: 0 6px 0 0 !important; 
 }
 
-/* Custom Scrollbar biar estetik (Skuy Style) */
+/* --- CUSTOM SCROLLBAR (SKUY STYLE) --- */
 ::-webkit-scrollbar {
   width: 6px;
 }
