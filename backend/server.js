@@ -1,15 +1,21 @@
-const express = require('express');
-const cors = require('cors');
-const http = require('http'); 
-const path = require('path');
-const { Server } = require('socket.io'); 
-const { Pool } = require('pg'); 
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import http from 'http'; 
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Server } from 'socket.io'; 
+import pkg from 'pg';
+const { Pool } = pkg;
+import 'dotenv/config';
 
-// Import Routes
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes'); // Nanti kita buat ini
-const walletRoutes = require('./routes/walletRoutes'); // Nanti kita buat ini
+// Import Routes - WAJIB pakai akhiran .js karena type: module
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js'; 
+import walletRoutes from './routes/walletRoutes.js'; 
+
+// Fix untuk __dirname di ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -38,6 +44,7 @@ pool.connect((err, client, release) => {
 // --- 2. MIDDLEWARE & SECURITY ---
 const allowedOrigins = [
   "http://localhost:5173",
+  "https://skuy-project.vercel.app", // URL Vercel lo
   "https://skuy-gg.vercel.app", 
   process.env.FRONTEND_URL
 ].filter(Boolean);
@@ -113,16 +120,12 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 ENGINE NYALA DI PORT ${PORT}`);
-  console.log(`🌍 Health Check: http://localhost:${PORT}/`);
 });
 
 // Graceful Shutdown
 process.on('SIGTERM', () => {
-  console.info('SIGTERM signal received. Closing server...');
   server.close(() => {
-    console.log('Http server closed.');
     pool.end(() => {
-      console.log('Database pool has ended.');
       process.exit(0);
     });
   });
