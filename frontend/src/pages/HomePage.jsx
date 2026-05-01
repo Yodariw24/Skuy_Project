@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
-import axios from 'axios' // GANTI: Pakai axios buat nembak ke Railway
+// ✅ GANTI: Gunakan instance api yang sudah sentralisasi link Railway
+import api from '../api/axios' 
 import { 
-  Sun, Moon, Play, ChevronRight, Sparkles, 
-  Heart, ArrowRight, Star, Trophy, Target, Zap, 
-  HelpCircle, ChevronDown, UserCircle2, Video, Activity, AlertCircle
+  Sun, Moon, Play, Sparkles, 
+  Heart, ArrowRight, Trophy, Target, Zap, 
+  HelpCircle, ChevronDown, Activity, AlertCircle
 } from 'lucide-react'
 
-// --- COMPONENT: SAKURA PETAL (TETAP SAMA) ---
+// --- COMPONENT: SAKURA PETAL ---
 const SakuraPetal = ({ delay }) => {
   const size = Math.random() * 10 + 5;
   return (
@@ -22,7 +23,7 @@ const SakuraPetal = ({ delay }) => {
   );
 };
 
-// --- COMPONENT: FAQ ACCORDION (TETAP SAMA) ---
+// --- COMPONENT: FAQ ACCORDION ---
 const FAQItem = ({ question, answer, darkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -48,16 +49,15 @@ function HomePage() {
   const { scrollY } = useScroll();
   const navBg = useTransform(scrollY, [0, 50], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(10, 10, 12, 0.9)" : "rgba(255, 255, 255, 0.9)"]);
 
-  // --- LOGIKA FETCHING BARU (RAILWAY READY) ---
+  // --- LOGIKA FETCHING DINAMIS (SINKRON RAILWAY) ---
   useEffect(() => {
     const fetchStreamers = async () => {
       try {
-        // GANTI: Nanti URL ini pakai domain backend Railway lo
-        const res = await axios.get('https://backend-lo.railway.app/api/streamers');
+        // ✅ Cukup panggil endpointnya saja, baseURL sudah diatur di axios.js
+        const res = await api.get('/streamers');
         if (res.data) setStreamers(res.data);
       } catch (err) {
-        console.warn("Backend belum konek, pakai data dummy dulu.");
-        // Data cadangan biar UI lo gak kosong pas Vercel build
+        console.warn("Backend Railway belum respon, nampilin data cadangan...");
         setStreamers([
           { id: 1, username: 'AriWirayuda', full_name: 'Ari Wirayuda', bio: 'Informatics Engineering Student' },
           { id: 2, username: 'SkuySquad', full_name: 'Elite Creator', bio: 'Legend Creator Gacor' }
@@ -109,7 +109,7 @@ function HomePage() {
         <Link to="/auth" className="bg-violet-600 text-white font-black px-14 py-6 rounded-[2.5rem] shadow-[0_20px_50px_-10px_rgba(109,40,217,0.6)] hover:shadow-violet-600/80 transition-all text-xl uppercase italic">Gabung Squad Kuy</Link>
       </section>
 
-      {/* --- BENTO TOOLS SQUAD (TETAP SAMA) --- */}
+      {/* --- TOOLS SECTION --- */}
       <section className="max-w-7xl mx-auto px-6 py-24 relative z-10">
         <div className="flex flex-col items-center mb-24 text-center">
           <span className="text-violet-600 font-black text-[10px] uppercase tracking-[0.5em] mb-4">Elite Ecosystem</span>
@@ -147,7 +147,8 @@ function HomePage() {
               <p className="text-white/60 text-xs font-bold italic">Meme atau musik pilihan fans langsung gas di layar streaming.</p>
             </div>
           </motion.div>
-          {/* Milestone & Leaderboard Section tetap sama kodenya */}
+
+          {/* Milestone Section */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-5 p-12 rounded-[4rem] border flex flex-col justify-between transition-all ${darkMode ? 'bg-[#0f0f12] border-white/5 shadow-inner' : 'bg-white border-slate-100 shadow-xl'}`}>
             <div className="relative">
               <div className="flex items-center justify-between mb-8">
@@ -168,6 +169,7 @@ function HomePage() {
             </div>
           </motion.div>
 
+          {/* Leaderboard Section */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-7 rounded-[4rem] border overflow-hidden flex flex-col transition-all ${darkMode ? 'bg-[#0f0f12] border-white/5 shadow-2xl' : 'bg-white border-slate-100 shadow-xl'}`}>
             <div className="bg-violet-600 p-6 flex justify-between items-center text-white">
               <div className="flex items-center gap-3"><Trophy size={22} className="text-yellow-300" /><span className="text-[11px] font-black uppercase tracking-[0.4em]">Elite Ranking Squad</span></div>
@@ -192,12 +194,12 @@ function HomePage() {
         </div>
       </section>
 
-      {/* --- EXPLORE CREATORS --- */}
+      {/* --- EXPLORE CREATORS (SINKRON RAILWAY) --- */}
       <section className="max-w-7xl mx-auto px-6 py-20 relative z-10 text-center">
         <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-4">ELITE <span className="text-violet-600">CREATORS</span></h2>
         <div className="flex items-center justify-center gap-2 text-slate-400 mb-20 animate-pulse">
           <AlertCircle size={14} className="text-amber-500" />
-          <p className="text-[10px] font-bold uppercase tracking-widest italic">Data secure from Railway Cloud system</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest italic">Data live from Railway Cloud system</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 text-left">
@@ -219,17 +221,17 @@ function HomePage() {
         </div>
       </section>
 
-      {/* --- FAQ SQUAD (TETAP SAMA) --- */}
+      {/* --- FAQ SECTION --- */}
       <section className="max-w-4xl mx-auto px-6 py-24 relative z-10 text-left">
         <div className="flex items-center gap-6 mb-16"><div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-violet-600/30"><HelpCircle size={24}/></div><h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter">FAQ <span className="text-violet-600">SQUAD</span></h2></div>
         <div className="space-y-2">
           <FAQItem darkMode={darkMode} question="Apa itu Skuy?" answer="Skuy adalah platform yang bisa bantu kamu dapetin dukungan finansial langsung dari fans." />
           <FAQItem darkMode={darkMode} question="Siapa aja yang bisa pakai Skuy?" answer="Siapa aja! Mau kamu baru mulai ngonten atau udah punya banyak fans, semua bisa pakai Skuy." />
-          <FAQItem darkMode={darkMode} question="Gimana cara bikin akun Skuy?" answer="Sekarang kita lagi buka Beta Testing! Kalau kamu mau jadi salah satu Kreator pertama yang nyobain Skuy, tinggal gabung Squad yaa." />
+          <FAQItem darkMode={darkMode} question="Gimana cara bikin akun Skuy?" answer="Cukup daftar Squad, lengkapi profil, dan kamu siap terima dukungan gacor dari fansmu!" />
         </div>
       </section>
 
-      {/* --- FOOTER (TETAP SAMA) --- */}
+      {/* --- FOOTER --- */}
       <footer className="mt-32 relative bg-violet-600 text-white overflow-hidden py-32 selection:bg-white selection:text-violet-700">
         <div className="absolute top-1/2 left-0 -translate-y-1/2 flex whitespace-nowrap opacity-10 pointer-events-none select-none">
           <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="text-[200px] font-black italic uppercase px-4">SKUY.GG SKUY.GG SKUY.GG SKUY.GG SKUY.GG</motion.div>
@@ -247,7 +249,7 @@ function HomePage() {
         </div>
       </footer>
 
-      {/* --- CSS STYLE (TETAP SAMA) --- */}
+      {/* --- GLOBAL STYLES --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
         html, body { 

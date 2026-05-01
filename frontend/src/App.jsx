@@ -9,13 +9,13 @@ import WidgetClient from './pages/WidgetClient'
 
 import 'animate.css';
 
-// --- PERBAIKAN: Logic Protected Route (Railway Sync) ---
+// --- 1. LOGIC PROTECTED ROUTE (SINKRON DENGAN AXIOS.JS & AUTHPAGE) ---
 const ProtectedRoute = ({ children }) => {
-  // Kita sesuaikan dengan key 'token' yang kita pakai di AuthPage.jsx
-  const token = localStorage.getItem('token'); 
+  // ✅ GANTI: Sesuaikan key dengan 'user_token' agar sinkron
+  const token = localStorage.getItem('user_token'); 
   
   if (!token) {
-    // Kalo user coba akses dashboard tanpa token, tendang ke /auth
+    // Kalo user coba akses dashboard tanpa user_token, tendang ke /auth
     return <Navigate to="/auth" replace />;
   }
   return children;

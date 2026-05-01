@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
+// ✅ GANTI: Gunakan instance api yang sudah kita buat
+import api from '../api/axios' 
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
 import ProfileSettings from '../components/dashboard/ProfileSettings' 
@@ -27,14 +28,11 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
-  // --- AMBIL DATA VIA BACKEND RAILWAY ---
+  // --- 1. AMBIL DATA VIA BACKEND RAILWAY ---
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // GANTI: URL ini nanti sesuai domain backend Railway lo
-      const res = await axios.get('https://backend-lo.railway.app/api/user/dashboard-sync', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ Tidak perlu manual header, sudah diurus axios.js
+      const res = await api.get('/user/dashboard-sync');
       
       if (res.data) {
         setUser(res.data.profile);
@@ -42,26 +40,25 @@ function DashboardPage() {
         setBankData(res.data.bank || { bank_name: 'Belum Diatur', account_number: '-', account_name: '-' });
       }
     } catch (err) {
-      console.warn("Backend belum siap, pake data dummy dulu Ri.");
-      // DATA DUMMY BIAR VERCEL GAK KOSONG PAS BUILD
+      console.warn("Koneksi gagal, cek log Railway lo Ri.");
+      // Fallback data dummy jika server down
       setUser({ id: '1', username: 'ariwirayuda', full_name: 'Ari Wirayuda', is_two_fa_enabled: false });
     }
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // ✅ Gunakan key 'user_token' sesuai AuthPage & axios.js
+    const token = localStorage.getItem('user_token');
     if (!token) return navigate('/auth');
     fetchData();
   }, [navigate]);
 
-  // --- LOGIKA 2FA SEKARANG KIRIM KE BACKEND ---
+  // --- 2. LOGIKA 2FA (SINKRON DENGAN BACKEND) ---
   const handleGenerateQR = async () => {
     setLoading2FA(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('https://backend-lo.railway.app/api/auth/2fa/generate', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ Panggil endpoint /auth/2fa/generate
+      const res = await api.post('/auth/2fa/generate');
       
       if (res.data.qrCode) {
         setQrCodeData(res.data.qrCode);
@@ -77,10 +74,7 @@ function DashboardPage() {
   const handleVerify2FA = async () => {
     setLoading2FA(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('https://backend-lo.railway.app/api/auth/2fa/verify', { token: otp }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.post('/auth/2fa/verify', { token: otp });
 
       if (res.data.success) {
         setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
@@ -96,10 +90,7 @@ function DashboardPage() {
 
   const handleDisable2FA = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('https://backend-lo.railway.app/api/auth/2fa/disable', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/auth/2fa/disable');
       setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
       skuyAlert.fire('OFF', 'Keamanan dimatikan.', 'info');
     } catch (err) {
@@ -110,7 +101,7 @@ function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={user} navigate={navigate} />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center text-left border-b border-slate-100 pb-5">

@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import axios from 'axios'
-import { Loader2, ShieldCheck, Mail, Lock, User, RefreshCw } from 'lucide-react'
+// ✅ Pastikan path import ini benar mengarah ke file axios.js lo
+import api from '../api/axios' 
+import { Loader2, ShieldCheck, Mail, Lock, User } from 'lucide-react'
 import Swal from 'sweetalert2'
 
-// Menggunakan URL Railway lo
-const API_URL = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
-
-// Config SweetAlert biar estetikanya nyambung sama desain lo
+// Config SweetAlert biar estetikanya nyambung sama desain TipFlow
 const skuyAlert = (title, text, icon) => {
   Swal.fire({
     title: title.toUpperCase(),
@@ -40,20 +38,22 @@ function AuthPage() {
 
   const navigate = useNavigate();
 
-  // --- 1. VERIFIKASI OTP ---
+  // --- 1. VERIFIKASI OTP (FINAL GATEWAY) ---
   const handleVerify2FALogin = async (e) => {
     if (e) e.preventDefault();
     if (otp.length < 6) return;
     setLoading(true);
 
     try {
-      const res = await axios.post(`${API_URL}/api/auth/verify-2fa`, {
+      // ✅ Menggunakan endpoint /auth/... karena baseURL di axios.js sudah ada /api
+      const res = await api.post('/auth/verify-2fa', {
         userId: tempUserId,
         token: otp
       });
 
       if (res.data.success) {
-        localStorage.setItem('token', res.data.token);
+        // ✅ Simpan token dengan key 'user_token' agar dibaca oleh interceptor
+        localStorage.setItem('user_token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         
         skuyAlert("AKSES DIBERIKAN", "Selamat datang di Cloud System, Sultan!", 'success');
@@ -73,7 +73,8 @@ function AuthPage() {
 
     try {
       if (isLogin) {
-        const res = await axios.post(`${API_URL}/api/auth/login`, {
+        // Login request
+        const res = await api.post('/auth/login', {
           email: formData.identifier,
           password: formData.password
         });
@@ -81,17 +82,20 @@ function AuthPage() {
         if (res.data.requiresTwoFA) {
           setTempUserId(res.data.userId);
           setShow2FA(true);
-          // Setup 2FA (Kirim OTP ke email via Railway)
-          await axios.post(`${API_URL}/api/auth/setup-2fa`, { userId: res.data.userId });
+          
+          // Trigger pengiriman email OTP dari backend
+          await api.post('/auth/setup-2fa', { userId: res.data.userId });
           skuyAlert("SECURITY CHECK", "Cek inbox/spam email lo buat ambil kode!", "info");
         } else {
-          localStorage.setItem('token', res.data.token);
+          // Login sukses tanpa 2FA
+          localStorage.setItem('user_token', res.data.token);
           localStorage.setItem('user', JSON.stringify(res.data.user));
           skuyAlert("BERHASIL", "Sistem Sinkron. Membuka Dashboard...", "success");
           navigate('/dashboard/wallet');
         }
       } else {
-        const res = await axios.post(`${API_URL}/api/auth/register`, {
+        // Register request
+        const res = await api.post('/auth/register', {
           username: formData.username,
           email: formData.email,
           password: formData.password,
@@ -104,7 +108,7 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      skuyAlert("SYSTEM ERROR", err.response?.data?.message || "Ada kendala teknis di Railway, Ri!", "error");
+      skuyAlert("SYSTEM ERROR", err.response?.data?.message || "Gagal menghubungi server Railway, Ri!", "error");
     } finally {
       setLoading(false);
     }
