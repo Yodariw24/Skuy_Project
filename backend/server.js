@@ -1,56 +1,59 @@
 import express from 'express';
 import cors from 'cors';
-import http from 'http'; 
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Server } from 'socket.io'; 
+import { Server } from 'socket.io';
 import pkg from 'pg';
-const { Pool } = pkg;
 import 'dotenv/config';
 
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
-import userRoutes from './routes/userRoutes.js'; 
+import userRoutes from './routes/userRoutes.js';
 import donationRoutes from './routes/donationRoutes.js';
 
+const { Pool } = pkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// --- 1. CONFIG DATABASE (PostgreSQL Railway) ---
+// --- 1. DATABASE CONFIGURATION ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-pool.connect((err, client, release) => {
-  if (err) {
-    return console.error('❌ DATABASE CONNECTION ERROR:', err.stack);
-  }
-  console.log('✅ KONEKSI KE POSTGRESQL RAILWAY BERHASIL!');
-  release();
+pool.on('error', (err) => {
+  console.error('🔥 PostgreSQL Pool Error:', err.message);
 });
 
-// --- 2. MIDDLEWARE & SECURITY (ULTIMATE CORS FIX) ---
+// --- 2. CORS & SECURITY CONFIGURATION ---
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://skuy-project.vercel.app", 
+  "https://skuy-project.vercel.app",
   "https://skuy-gg.vercel.app"
 ];
 
-// Otomatis hapus slash di akhir FRONTEND_URL dari environment
-const envUrl = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : "";
-if (envUrl) allowedOrigins.push(envUrl);
+// Menambahkan FRONTEND_URL dari environment secara dinamis
+if (process.env.FRONTEND_URL) {
+  const cleanEnvUrl = process.env.FRONTEND_URL.replace(/\/$/, "");
+  if (!allowedOrigins.includes(cleanEnvUrl)) {
+    allowedOrigins.push(cleanEnvUrl);
+  }
+}
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Izinkan jika tanpa origin (seperti Postman) atau jika ada di daftar allowed
-    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+  origin: (origin, callback) => {
+    // Izinkan request tanpa origin (seperti Postman atau mobile)
+    if (!origin) return callback(null, true);
+    
+    const cleanOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes(cleanOrigin)) {
       callback(null, true);
     } else {
-      console.log("CORS Terblokir untuk origin:", origin);
-      callback(new Error('Domain diblokir CORS SkuyGG!'));
+      console.warn(`⚠️ CORS Blocked for: ${origin}`);
+      callback(new Error('Domain tidak diizinkan oleh kebijakan CORS SkuyGG!'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -59,75 +62,75 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+// Middleware Global
 app.use(cors(corsOptions));
-
-// PAKSA respon Preflight (OPTIONS) agar tidak ditimpa header internal Railway
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin?.replace(/\/$/, ""))) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  return res.sendStatus(204);
-});
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Header Security untuk Google Auth
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-  next();
-});
-
-// --- 3. SOCKET.IO SETUP ---
-const server = http.createServer(app); 
-const io = new Server(server, {
-  cors: corsOptions
-});
-
-io.on('connection', (socket) => {
-  const streamerId = socket.handshake.query.streamerId;
-  if (streamerId) {
-    socket.join(`streamer_${streamerId}`);
-    console.log(`📡 Widget Connected: Streamer ${streamerId}`);
-  }
-});
-
-// Inject DB & IO ke Request
-app.use((req, res, next) => {
+// Custom Middleware untuk Inject Database & Socket.io
+const injectContext = (req, res, next) => {
   req.db = pool;
   req.io = io;
   next();
+};
+
+// --- 3. SOCKET.IO SETUP ---
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: corsOptions,
+  transports: ['websocket', 'polling']
 });
 
-// --- 4. ROUTES ---
-app.get('/', (req, res) => {
-  res.json({ 
-    status: "online", 
-    message: "SkuyGG Engine v4.0 is Gacor! 🚀",
-    database: "Connected"
+io.on('connection', (socket) => {
+  const { streamerId } = socket.handshake.query;
+  if (streamerId) {
+    socket.join(`streamer_${streamerId}`);
+    console.log(`📡 Widget Connected: Streamer ID ${streamerId}`);
+  }
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket Disconnected');
   });
 });
 
-app.use('/api/auth', authRoutes); 
+// --- 4. API ROUTES ---
+app.use(injectContext); // Gunakan injection sebelum routes
+
+app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/donations', donationRoutes);
 
-// --- 5. ERROR HANDLING ---
-app.use((err, req, res, next) => {
-  console.error('🔥 SERVER ERROR:', err.stack);
-  res.status(err.status || 500).json({ 
-    success: false,
-    message: 'Ada masalah di server Railway, Ri!' 
+// Health Check & Sync Endpoint
+app.get('/api/user/dashboard-sync', (req, res) => {
+  res.status(200).json({ success: true, message: "Backend Synced Successfully!" });
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: "online", 
+    project: "TipFlow Engine",
+    version: "4.0.0",
+    db_status: "Connected"
   });
 });
 
-// --- 6. LISTEN SERVER ---
-const PORT = process.env.PORT || 3000;
+// --- 5. GLOBAL ERROR HANDLING ---
+app.use((err, req, res, next) => {
+  const statusCode = err.status || 500;
+  console.error(`🔥 [ERROR ${statusCode}]:`, err.message);
+  
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Terjadi kesalahan pada internal server Railway.',
+    error_code: statusCode
+  });
+});
+
+// --- 6. SERVER START ---
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 ENGINE NYALA DI PORT ${PORT}`);
+  console.log('-----------------------------------------');
+  console.log(`🚀 TIPFLOW ENGINE IS RUNNING ON PORT ${PORT}`);
+  console.log(`📡 DATABASE: ${process.env.DATABASE_URL ? 'CONNECTED' : 'DISCONNECTED'}`);
+  console.log('-----------------------------------------');
 });
