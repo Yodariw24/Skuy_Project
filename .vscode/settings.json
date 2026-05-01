@@ -1,0 +1,12 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "name": "Database-SkuyGG",
+            "connectString": "postgresql://postgres:AebjKaVwIyTwEVCFhPegeLBRZFnEMsKc@switchyard.proxy.rlwy.net:45325/railway"
+        }
+    ]
+}
