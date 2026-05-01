@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  const isCreator = user?.role === 'creator' || user?.role === 'streamer';
+  // ✅ PERBAIKAN: Gunakan toLowerCase() agar 'CREATOR' atau 'creator' tetap lolos
+  const isCreator = user?.role?.toLowerCase() === 'creator' || user?.role?.toLowerCase() === 'streamer';
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
@@ -30,7 +31,6 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     });
   };
 
-  // --- PERBAIKAN: Logout Bersih & Sinkron ---
   const logout = async () => {
     const result = await Swal.fire({
       title: 'KELUAR SESI?',
@@ -49,11 +49,9 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     });
 
     if (result.isConfirmed) {
-      // ✅ GANTI: Hapus key 'user_token' agar sinkron dengan file lainnya
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       localStorage.clear(); 
-      
       navigate('/auth');
     }
   };
@@ -119,6 +117,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Revenue Control</p>
           <nav className="space-y-1">
+            {/* ✅ Menu ini sekarang akan terbuka jika role lo 'creator' */}
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Masuk" onClickCustom={handleShowTips} />
           </nav>
