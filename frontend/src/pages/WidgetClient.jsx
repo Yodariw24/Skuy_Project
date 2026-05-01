@@ -2,11 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Play } from 'lucide-react';
-// --- PERBAIKAN: Gunakan Supabase Client, bukan Socket.io ---
-import { supabase } from '../supabaseClient'; 
+import { io } from 'socket.io-client'; // GANTI: Pakai Socket.io untuk Realtime Alert
+import axios from 'axios'; // Buat ambil settingan awal
 
 const WidgetClient = () => {
-  const { type, key } = useParams(); // 'key' di sini adalah ID Streamer (UUID)
+  const { type, key } = useParams(); // 'key' adalah ID Streamer
   const [activeAlert, setActiveAlert] = useState(null);
   const [settings, setSettings] = useState({
     primary: '#6366f1',
@@ -16,72 +16,57 @@ const WidgetClient = () => {
     duration: 8
   });
 
-  // 1. FETCH SETTINGS (DARI TABEL STREAMERS)
+  // 1. FETCH SETTINGS VIA BACKEND RAILWAY
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data, error } = await supabase
-          .from('streamers')
-          .select('*')
-          .eq('id', key) // Mencari berdasarkan UUID di URL
-          .single();
-
-        if (data) {
+        const res = await axios.get(`https://backend-lo.railway.app/api/streamers/settings/${key}`);
+        if (res.data) {
+          const data = res.data;
           setSettings(prev => ({
             ...prev,
             primary: data.theme_color === 'violet' ? '#6366f1' : data.theme_color || '#6366f1',
-            // Tambahkan logika mapping warna lainnya jika perlu
+            glow: data.theme_color === 'violet' ? '#818cf8' : data.theme_color || '#818cf8',
           }));
         }
       } catch (err) {
-        console.warn("Using default cloud settings.");
+        console.warn("Using default local settings.");
       }
     };
     if (key) fetchSettings();
   }, [key]);
 
-  // 2. SUPABASE REALTIME (MENGGANTIKAN SOCKET.IO)
+  // 2. SOCKET.IO REALTIME PROTOCOL (GANTI SUPABASE CHANNEL)
   useEffect(() => {
     if (!key) return;
 
-    // Mendengarkan perubahan data baru di tabel 'donations'
-    const channel = supabase
-      .channel('public:donations')
-      .on(
-        'postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'donations',
-          filter: `streamer_id=eq.${key}` // Hanya ambil donasi untuk streamer ini
-        }, 
-        (payload) => {
-          const newDonation = payload.new;
-          
-          // Trigger Alert jika statusnya SUCCESS
-          if (newDonation.status === 'SUCCESS') {
-            setActiveAlert({
-              sender: newDonation.donatur_name,
-              amount: newDonation.amount,
-              message: newDonation.message,
-              type: 'tip' // Di Supabase kita pakai 'tip'
-            });
+    // Hubungkan ke Backend Railway lo
+    const socket = io('https://backend-lo.railway.app', {
+      query: { streamerId: key }
+    });
 
-            const timer = (settings.duration || 8) * 1000;
-            setTimeout(() => setActiveAlert(null), timer);
-          }
-        }
-      )
-      .subscribe();
+    // Dengarkan event 'new-donation' dari backend
+    socket.on('new-donation', (data) => {
+      // Trigger Alert
+      setActiveAlert({
+        sender: data.donatur_name,
+        amount: data.amount,
+        message: data.message,
+        type: 'tip'
+      });
 
-    // TESTER MANUAL (Tekan 'T' tetap kita pertahankan buat Ari demo)
+      const timer = (settings.duration || 8) * 1000;
+      setTimeout(() => setActiveAlert(null), timer);
+    });
+
+    // TESTER MANUAL (Tetap ada buat Ari testing di OBS)
     const handleKeyDown = (e) => {
       if (e.key.toLowerCase() === 't') {
         setActiveAlert({
-          sender: "SKUY_TEST_CLOUD",
-          amount: 125000,
-          message: "Sistem Cloud beneran GACOR, Ri! 🚀",
-          type: type
+          sender: "SKUY_TEST_STABLE",
+          amount: 150000,
+          message: "Widget udah konek Railway, Ri! Gacor! 🚀",
+          type: type || 'tip'
         });
         setTimeout(() => setActiveAlert(null), 5000);
       }
@@ -89,7 +74,7 @@ const WidgetClient = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      supabase.removeChannel(channel);
+      socket.disconnect();
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [key, type, settings.duration]);
@@ -99,7 +84,7 @@ const WidgetClient = () => {
   const AlertRender = useMemo(() => {
     if (!activeAlert) return null;
 
-    if (type === 'tip') {
+    if (activeAlert.type === 'tip' || type === 'tip') {
       return (
         <motion.div 
           key="tip-alert"
@@ -121,7 +106,6 @@ const WidgetClient = () => {
       );
     }
 
-    // UI Mediashare tetap dipertahankan
     if (type === 'mediashare') {
       return (
         <motion.div 
@@ -143,7 +127,7 @@ const WidgetClient = () => {
                   <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 italic">Live Media Protocol</p>
                 </div>
                 <div className="h-1.5 w-full bg-white/10 rounded-full mb-4 overflow-hidden">
-                   <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: settings.duration }} style={{ backgroundColor: settings.primary }} className="h-full" />
+                    <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: settings.duration }} style={{ backgroundColor: settings.primary }} className="h-full" />
                 </div>
                 <p className="text-[11px] font-black text-white italic truncate uppercase tracking-tighter mb-1 leading-none">Cloud Request</p>
                 <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">By: <span style={{ color: settings.accent }}>{activeAlert.sender}</span></p>

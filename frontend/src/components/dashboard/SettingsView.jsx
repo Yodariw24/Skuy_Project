@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 
 export default function SettingsView({ user, setUser }) {
   return (
-    // Animasi masuk yang halus agar terlihat premium
+    // Animasi masuk tetap halus agar terlihat premium
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }}
@@ -24,7 +24,7 @@ export default function SettingsView({ user, setUser }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* KOLOM KIRI: CORE PROFILE FORM (TABEL STREAMERS) */}
+        {/* KOLOM KIRI: CORE PROFILE FORM (Koneksi ke Backend Railway via ProfileSettings) */}
         <div className="lg:col-span-8">
           <ProfileSettings user={user} setUser={setUser} />
         </div>
@@ -34,7 +34,7 @@ export default function SettingsView({ user, setUser }) {
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden group">
             {/* Visual Accent */}
             <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-               <Sparkles size={80} />
+                <Sparkles size={80} />
             </div>
 
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 px-1 italic">Dashboard UI</h3>
@@ -63,13 +63,13 @@ export default function SettingsView({ user, setUser }) {
             </div>
           </div>
 
-          {/* Sesi Info Kartu Kecil */}
+          {/* Sesi Info Kartu Kecil - Railway Connection Info */}
           <div className="p-8 bg-slate-950 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-violet-600 blur-3xl opacity-40" />
-             <p className="text-[8px] font-black uppercase tracking-[0.4em] text-white/40 mb-2">Cloud Session</p>
+             <p className="text-[8px] font-black uppercase tracking-[0.4em] text-white/40 mb-2">Railway Session</p>
              <p className="text-[10px] font-bold italic text-white leading-relaxed">
-               User ID: <br/>
-               <span className="text-violet-400 break-all font-mono opacity-80">{user?.id}</span>
+               Active User ID: <br/>
+               <span className="text-violet-400 break-all font-mono opacity-80">{user?.id || 'NO_SESSION'}</span>
              </p>
           </div>
         </div>

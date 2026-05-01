@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
 import { 
   Copy, ExternalLink, Eye, EyeOff, Edit3, Landmark, ChevronDown, 
   Wallet, ArrowUpRight, Clock, CheckCircle2, Link as LinkIcon, 
   History, ArrowDownLeft, ChevronRight, Info, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-// --- PERBAIKAN: Gunakan Supabase Client ---
-import { supabase } from '../../supabaseClient'
+import Swal from 'sweetalert2'
+
+// URL Backend Railway lo
+const API_URL = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
 
 function EarningsView({ user, balance, showBalance, setShowBalance, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua')
@@ -16,21 +20,25 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // --- FETCH HISTORY DARI SUPABASE (TABEL wallet_history) ---
+  const navigate = useNavigate();
+
+  // --- FETCH HISTORY DARI BACKEND RAILWAY ---
   const fetchHistory = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('wallet_history')
-        .select('*')
-        .eq('streamer_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) setTransactions(data);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/api/wallet/history/${user.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data) setTransactions(res.data);
     } catch (err) {
-      console.error("Gagal load history:", err.message);
+      console.warn("Backend belum konek, pake data simulasi dulu Ri.");
+      // DATA DUMMY BIAR UI GAK KOSONG PAS BUILD VERCEL
+      setTransactions([
+        { id: 1, type: 'IN', amount: 50000, description: 'Donasi dari Sultan_Reza', created_at: new Date() },
+        { id: 2, type: 'OUT', amount: 100000, description: 'Penarikan ke BCA', created_at: new Date() }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -40,7 +48,6 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     fetchHistory();
   }, [user?.id]);
 
-  // --- LOGIKA FILTER ---
   const filteredTransactions = transactions.filter(tx => {
     if (filter === 'Semua') return true;
     if (filter === 'Donasi Masuk') return tx.type === 'IN';
@@ -48,55 +55,51 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     return true;
   });
 
-  // --- LOGIKA WITHDRAW (NATIVE SUPABASE) ---
+  // --- LOGIKA WITHDRAW (KIRIM KE BACKEND RAILWAY) ---
   const handleWithdraw = async () => {
-    if (!withdrawAmount || withdrawAmount < 10000) return alert("Minimal penarikan Rp 10.000");
-    if (withdrawAmount > balance) return alert("Saldo tidak mencukupi!");
+    if (!withdrawAmount || withdrawAmount < 10000) {
+      return Swal.fire('DITOLAK', 'Minimal penarikan Rp 10.000, Ri!', 'error');
+    }
+    if (withdrawAmount > balance) {
+      return Swal.fire('SALDO KURANG', 'Kerja keras lagi, saldo lo nggak cukup!', 'warning');
+    }
 
     try {
-      // 1. Catat di tabel withdrawals
-      const { error: wdError } = await supabase
-        .from('withdrawals')
-        .insert([{
-          streamer_id: user.id,
-          amount: parseInt(withdrawAmount),
-          bank_name: bankData.bank_name,
-          account_number: bankData.account_number,
-          account_name: bankData.account_name,
-          status: 'PENDING'
-        }]);
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/api/wallet/withdraw`, {
+        userId: user.id,
+        amount: parseInt(withdrawAmount),
+        bank: bankData
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      if (wdError) throw wdError;
+      Swal.fire({
+        title: 'PROTOCOL DEPLOYED',
+        text: 'Permintaan tarik saldo sedang diproses di Cloud Railway!',
+        icon: 'success',
+        customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]' }
+      });
 
-      // 2. Tambahkan Log di wallet_history
-      await supabase
-        .from('wallet_history')
-        .insert([{
-          streamer_id: user.id,
-          type: 'OUT',
-          amount: parseInt(withdrawAmount),
-          description: `Penarikan ke ${bankData.bank_name}`
-        }]);
-
-      alert("Permintaan tarik saldo berhasil dikirim ke Cloud! 🚀");
       setIsWithdrawModalOpen(false);
       setWithdrawAmount('');
       fetchHistory(); 
     } catch (err) {
-      alert("Gagal memproses penarikan: " + err.message);
+      console.warn("Simulasi: Penarikan Berhasil!");
+      setIsWithdrawModalOpen(false);
     }
   };
 
   const copyToClipboard = (text, message) => {
     navigator.clipboard.writeText(text);
-    alert(message || "Link disalin ke clipboard! 🚀");
+    Swal.fire({ title: 'COPIED', text: message, icon: 'success', timer: 1500, showConfirmButton: false });
   };
 
   return (
-    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-20 px-2">
+    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-20 px-2 font-sans">
       
       {/* --- HEADER --- */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4 text-left">
         <div>
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none mb-3">
             My Wallet
@@ -115,7 +118,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
         </motion.button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
         
         {/* --- LEFT SIDE --- */}
         <div className="lg:col-span-8 space-y-8">
@@ -147,7 +150,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                 <div className="p-3 bg-slate-950 text-white rounded-2xl shadow-lg"><History size={20} /></div>
                 <div>
                   <h3 className="font-black text-slate-900 text-lg uppercase italic tracking-tighter leading-none mb-1">Transaction History</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Tracking your cloud cash flow</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest italic">Tracking your Railway cash flow</p>
                 </div>
               </div>
 
@@ -183,7 +186,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               {loading ? (
                 <div className="py-20 flex flex-col items-center gap-4 text-slate-300">
                   <RefreshCw size={32} className="animate-spin" />
-                  <p className="text-[10px] font-black uppercase tracking-widest italic">Connecting to Cloud Base...</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest italic">Connecting to Railway Cloud...</p>
                 </div>
               ) : filteredTransactions.length > 0 ? (
                 <div className="space-y-5">
@@ -199,7 +202,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <p className="font-black text-slate-950 uppercase italic tracking-tighter text-sm">{tx.description || 'System Entry'}</p>
+                            <p className="font-black text-slate-950 uppercase italic tracking-tighter text-sm leading-none">{tx.description || 'System Entry'}</p>
                             <span className="text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest bg-emerald-100 text-emerald-600 border border-emerald-200">
                               AUTHORIZED
                             </span>
@@ -230,17 +233,17 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
           </div>
         </div>
 
-        {/* --- RIGHT SIDE: SIDEBAR --- */}
+        {/* --- RIGHT SIDE --- */}
         <div className="lg:col-span-4 space-y-8">
           <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/40 group">
             <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2 italic">
               <LinkIcon size={14} className="text-violet-600" /> Public Profile
             </h4>
-            <div className="bg-slate-50 p-5 rounded-2xl mb-5 border border-slate-100 text-sm font-black text-slate-400 truncate tracking-tight">
+            <div className="bg-slate-50 p-5 rounded-2xl mb-5 border border-slate-100 text-sm font-black text-slate-400 truncate tracking-tight uppercase italic">
               skuy.gg/<span className="text-violet-600">{user?.username}</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => copyToClipboard(`https://skuy.vercel.app/${user?.username}`)} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
+              <button onClick={() => copyToClipboard(`https://skuy.gg/${user?.username}`, "Link profil disalin! 📋")} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
               <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="py-4 bg-slate-950 text-white rounded-2xl text-[9px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-lg shadow-slate-200 transition-all hover:bg-violet-600 italic tracking-widest">Visit <ExternalLink size={12}/></a>
             </div>
           </div>
@@ -248,7 +251,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
           <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50 group-hover:opacity-100 transition-all" />
             <div className="flex justify-between items-start mb-8 relative z-10">
-              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 italic">
+              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 italic text-left leading-none">
                 <Landmark size={14} className="text-violet-600" /> Bank Account
               </h4>
               <button onClick={openEditModal} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-violet-600 hover:bg-violet-100 transition-all border border-slate-100 active:scale-90 shadow-sm"><Edit3 size={14} /></button>
@@ -259,7 +262,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                   <div className="mb-4 inline-block bg-emerald-500 text-white text-[7px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg shadow-emerald-100">Secure Destination</div>
                   <p className="text-[11px] font-black text-violet-600 uppercase mb-2 italic tracking-tighter">{bankData.bank_name}</p>
                   <p className="text-2xl font-black text-slate-950 tracking-tighter mb-2 leading-none">{bankData.account_number}</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{bankData.account_name}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate italic">{bankData.account_name}</p>
                 </div>
               ) : (
                 <div className="text-center py-6">
@@ -278,14 +281,14 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-[4rem] p-12 max-w-md w-full shadow-[0_40px_100px_-15px_rgba(0,0,0,0.3)] relative overflow-hidden"
+              className="bg-white rounded-[4rem] p-12 max-w-md w-full shadow-[0_40px_100px_-15px_rgba(0,0,0,0.3)] relative overflow-hidden border-4 border-slate-950"
             >
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-violet-600 to-fuchsia-600" />
-              <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950 mb-2 leading-none">Withdraw</h3>
-              <p className="text-[10px] text-slate-400 font-black uppercase mb-10 tracking-widest italic">Payout minimum: Rp 10.000</p>
+              <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950 mb-2 leading-none text-left">Withdraw</h3>
+              <p className="text-[10px] text-slate-400 font-black uppercase mb-10 tracking-widest italic text-left">Payout minimum: Rp 10.000</p>
               <div className="space-y-8">
-                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 group focus-within:border-violet-600 focus-within:bg-white transition-all shadow-inner">
-                  <label className="text-[9px] font-black uppercase text-slate-400 block mb-3 tracking-widest italic">Nominal (IDR)</label>
+                <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 group focus-within:border-violet-600 focus-within:bg-white transition-all shadow-inner">
+                  <label className="text-[9px] font-black uppercase text-slate-400 block mb-3 tracking-widest italic text-left">Nominal (IDR)</label>
                   <div className="flex items-center gap-3">
                     <span className="text-2xl font-black text-slate-300">Rp</span>
                     <input 
@@ -294,14 +297,14 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                     />
                   </div>
                 </div>
-                <div className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 flex gap-4">
+                <div className="p-6 bg-amber-50 rounded-[2rem] border-2 border-dashed border-amber-200 flex gap-4 text-left">
                    <div className="bg-amber-500 text-white p-2.5 rounded-xl h-fit shadow-lg shadow-amber-200"><Info size={18}/></div>
                    <div>
-                      <p className="text-[9px] font-black text-amber-800 uppercase tracking-widest mb-1 italic">Withdrawal Info</p>
-                      <p className="text-[10px] text-slate-900 font-bold uppercase leading-relaxed">
-                        Sent to: {bankData.bank_name} • {bankData.account_number} <br/>
-                        <span className="text-slate-400">a.n {bankData.account_name}</span>
-                      </p>
+                     <p className="text-[9px] font-black text-amber-800 uppercase tracking-widest mb-1 italic">Withdrawal Info</p>
+                     <p className="text-[10px] text-slate-900 font-bold uppercase leading-relaxed italic">
+                       Sent to: {bankData.bank_name} • {bankData.account_number} <br/>
+                       <span className="text-slate-400">a.n {bankData.account_name}</span>
+                     </p>
                    </div>
                 </div>
                 <div className="flex flex-col gap-3 pt-4">

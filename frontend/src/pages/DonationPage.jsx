@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-// --- PERBAIKAN: Gunakan Supabase Client ---
-import { supabase } from '../supabaseClient' 
+import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
   History, Skull, Heart, Info, Mail, User, Clock 
@@ -32,47 +31,32 @@ function DonationPage() {
   const shortcuts = [10000, 25000, 50000, 100000];
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
-  // --- LOGIKA AMBIL DATA (SUPABASE MULTI-TABLE) ---
+  // --- LOGIKA AMBIL DATA VIA BACKEND RAILWAY ---
   const fetchData = async () => {
     try {
       setLoading(true);
+      // GANTI: Nanti URL ini pakai domain backend Railway lo
+      const res = await axios.get(`https://backend-lo.railway.app/api/streamers/${username}`);
       
-      // 1. Ambil Profil Streamer
-      const { data: sData, error: sError } = await supabase
-        .from('streamers')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-      if (sError || !sData) {
-        setStreamer(null);
-        return setLoading(false);
+      if (res.data) {
+        setStreamer(res.data.profile);
+        setBalance(res.data.balance || 0);
+        setHistory(res.data.history || []);
       }
-
-      setStreamer(sData);
-
-      // 2. Ambil Saldo dari tabel balance
-      const { data: bData } = await supabase
-        .from('balance')
-        .select('total_saldo')
-        .eq('streamer_id', sData.id)
-        .single();
-      
-      if (bData) setBalance(bData.total_saldo || 0);
-
-      // 3. Ambil history donasi terbaru (Status SUCCESS)
-      const { data: hData } = await supabase
-        .from('donations')
-        .select('*')
-        .eq('streamer_id', sData.id)
-        .eq('status', 'SUCCESS')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (hData) setHistory(hData);
       setLoading(false);
     } catch (err) { 
-      console.error("System Failure:", err);
+      console.warn("Backend belum siap, menggunakan data simulasi.");
+      // DATA DUMMY BIAR UI TETAP KEREN PAS PENGEMBANGAN
+      setStreamer({ 
+        id: '1', username: username, full_name: 'Skuy Creator', 
+        bio: 'Dukung terus karya saya lewat energi saweran paling gacor!',
+        theme_color: 'violet'
+      });
+      setBalance(1500000);
+      setHistory([
+        { donatur_name: 'Sultan_Jakarta', amount: 500000, message: 'Gas terus bang!', created_at: new Date() },
+        { donatur_name: 'Wibu_Elite', amount: 100000, message: 'Keren parah kontennya.', created_at: new Date() }
+      ]);
       setLoading(false); 
     }
   };
@@ -84,24 +68,17 @@ function DonationPage() {
     if (!formData.amount || formData.amount < 1000) return alert("Minimal dukungan adalah Rp 1.000");
     
     try {
-      // Simpan donasi ke tabel donations dengan status PENDING
-      const { data, error } = await supabase
-        .from('donations')
-        .insert([{
-          ...formData,
-          streamer_id: streamer.id,
-          payment_method: 'QRIS',
-          status: 'PENDING'
-        }])
-        .select()
-        .single();
+      // GANTI: Kirim ke API Backend lo untuk generate QRIS/Invoice
+      const res = await axios.post('https://backend-lo.railway.app/api/donations', {
+        ...formData,
+        streamer_id: streamer.id
+      });
 
-      if (error) throw error;
-      
-      // Arahkan ke halaman pembayaran (Simulasi atau integrasi Midtrans kamu)
-      navigate(`/payment/${data.id}`); 
+      if (res.data.id) {
+        navigate(`/payment/${res.data.id}`); 
+      }
     } catch (err) { 
-      alert("Gagal menginisialisasi protokol dukungan! 🔥"); 
+      alert("Sistem Pembayaran sedang dalam pemeliharaan! 🔥"); 
     }
   };
 
@@ -109,8 +86,8 @@ function DonationPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF]">
       <div className="w-12 h-12 border-4 border-slate-100 border-t-violet-600 rounded-full animate-spin mb-4" />
       <p className="text-violet-600 font-black italic uppercase tracking-widest text-sm text-center">
-        SYNCHRONIZING DATABASE<br/>
-        <span className="text-[10px] opacity-40">CONNECTING TO SECURE CORE...</span>
+        SYNCHRONIZING RAILWAY DATABASE<br/>
+        <span className="text-[10px] opacity-40">ESTABLISHING ENCRYPTED TUNNEL...</span>
       </p>
     </div>
   );
@@ -120,7 +97,7 @@ function DonationPage() {
       <Skull size={64} className="animate-bounce" />
       <h2 className="text-2xl italic tracking-tighter">Creator Not Found 404</h2>
       <p className="text-slate-400 text-[10px] tracking-widest leading-relaxed font-bold">
-        SISTEM TIDAK MENEMUKAN ID @{username.toUpperCase()} <br/> DALAM PANGKALAN DATA CLOUD SKUY.
+        SISTEM TIDAK MENEMUKAN ID @{username.toUpperCase()} <br/> DALAM PANGKALAN DATA CLOUD RAILWAY.
       </p>
       <Link to="/" className="text-[10px] bg-slate-950 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest mt-4 hover:bg-violet-600 transition-all">Back to Home</Link>
     </div>

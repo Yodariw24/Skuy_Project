@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-// --- PERBAIKAN: Gunakan Supabase Client ---
-import { supabase } from '../../supabaseClient'
+import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
 import * as Icon from 'lucide-react' 
+
+// URL Backend Railway lo
+const API_URL = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
 
 const FormInput = ({ label, iconName, helpText, textArea, ...props }) => {
   const IconComp = Icon[iconName] || Icon.HelpCircle;
@@ -50,80 +52,88 @@ export default function ProfileSettings({ user, setUser }) {
 
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
-    // Jika link eksternal (http), tampilkan langsung.
     if (photoPath.startsWith('http')) return photoPath;
-    // Jika nama file, arahkan ke Supabase Storage (HKC... adalah ID project kamu)
-    return `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${photoPath}`;
+    // GANTI: Arahkan ke folder static/uploads di backend Railway lo
+    return `${API_URL}/uploads/${photoPath}`;
   };
 
-  // --- PERBAIKAN: Simulasi Upload (Untuk Demo Tugas) ---
+  // --- LOGIKA UPLOAD VIA BACKEND RAILWAY ---
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    setLoading(true);
-    setStatus({ type: 'success', message: 'Mempersiapkan enkripsi foto...' });
+    const uploadFormData = new FormData();
+    uploadFormData.append('image', file);
+    uploadFormData.append('userId', user.id);
 
-    // Note: Untuk demo di Vercel, cara termudah adalah menggunakan link gambar publik.
-    // Tapi kodingan ini tetap saya siapkan untuk handle data di state.
-    setTimeout(() => {
-      setLoading(false);
-      setStatus({ type: 'success', message: 'Protokol Cloud Storage Aktif! ✨' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-    }, 1500);
-  }
-
-  const handleDeletePhoto = async () => {
-    if (!window.confirm("Hapus foto dan gunakan avatar default?")) return;
     setLoading(true);
+    setStatus({ type: 'success', message: 'Mengirim data ke Railway Cloud...' });
+
     try {
-      const { error } = await supabase
-        .from('streamers')
-        .update({ profile_picture: null })
-        .eq('id', user.id);
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/api/user/upload-avatar`, uploadFormData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-      if (error) throw error;
-
-      const updatedUser = { ...user, profile_picture: null };
-      localStorage.setItem('user_data', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setStatus({ type: 'success', message: 'Kembali ke avatar default! ✌🏼' });
+      if (res.data.success) {
+        const updatedUser = { ...user, profile_picture: res.data.filename };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setStatus({ type: 'success', message: 'Avatar Berhasil Diperbarui! ✨' });
+      }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Gagal reset foto.' });
+      setStatus({ type: 'error', message: 'Gagal upload ke Railway.' });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     }
   }
 
-  // --- PERBAIKAN: Update Profil Native Supabase ---
+  const handleDeletePhoto = async () => {
+    if (!window.confirm("Hapus foto dan gunakan avatar default?")) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/api/user/delete-avatar`, { userId: user.id }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const updatedUser = { ...user, profile_picture: null };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setStatus({ type: 'success', message: 'Kembali ke avatar default! ✌🏼' });
+    } catch (err) {
+      setStatus({ type: 'error', message: 'Gagal reset foto profil.' });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    }
+  }
+
+  // --- UPDATE PROFIL VIA BACKEND RAILWAY ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('streamers')
-        .update({
-          display_name: formData.display_name,
-          bio: formData.bio,
-          instagram: formData.instagram,
-          tiktok: formData.tiktok,
-          youtube: formData.youtube
-        })
-        .eq('id', user.id)
-        .select()
-        .single();
+      const token = localStorage.getItem('token');
+      const res = await axios.put(`${API_URL}/api/user/update-profile`, {
+        userId: user.id,
+        ...formData
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      if (error) throw error;
-
-      if (data) {
-        const updatedUser = { ...user, ...data };
-        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+      if (res.data.success) {
+        const updatedUser = { ...user, ...res.data.user };
         setUser(updatedUser);
-        setStatus({ type: 'success', message: 'Profil Cloud Berhasil Diperbarui! ✨' });
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setStatus({ type: 'success', message: 'Profil Railway Berhasil Diperbarui! ✨' });
       }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Otoritas database ditolak: ' + err.message });
+      setStatus({ type: 'error', message: 'Otoritas API ditolak: ' + (err.response?.data?.message || err.message) });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
@@ -145,7 +155,7 @@ export default function ProfileSettings({ user, setUser }) {
           <div className="flex items-center gap-4">
             <div className="p-3 bg-gradient-to-tr from-violet-600 to-fuchsia-500 text-white rounded-2xl shadow-lg shadow-violet-200"><Icon.Link size={20} strokeWidth={3} /></div>
             <div>
-              <h1 className="text-[11px] font-black uppercase text-slate-900 tracking-wider mb-0.5">Cloud Donation Link</h1>
+              <h1 className="text-[11px] font-black uppercase text-slate-900 tracking-wider mb-0.5">Railway Donation Link</h1>
               <p className="text-[10px] text-violet-600 font-bold uppercase italic tracking-tighter bg-violet-50 px-2 py-0.5 rounded-md inline-block border border-violet-100">{currentUrl}/{user.username}</p>
             </div>
           </div>

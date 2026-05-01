@@ -9,14 +9,13 @@ import WidgetClient from './pages/WidgetClient'
 
 import 'animate.css';
 
-// --- PERBAIKAN 1: Logic Protected Route ---
+// --- PERBAIKAN: Logic Protected Route (Railway Sync) ---
 const ProtectedRoute = ({ children }) => {
-  // Pastikan key-nya sama dengan yang kamu simpan saat login di AuthPage.jsx
-  // Biasanya Supabase menyimpan session di localStorage dengan format tertentu
-  const token = localStorage.getItem('user_token'); 
+  // Kita sesuaikan dengan key 'token' yang kita pakai di AuthPage.jsx
+  const token = localStorage.getItem('token'); 
   
   if (!token) {
-    // Kalau tidak ada token, lempar ke login
+    // Kalo user coba akses dashboard tanpa token, tendang ke /auth
     return <Navigate to="/auth" replace />;
   }
   return children;
@@ -24,24 +23,20 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    // Pastikan Client ID Google ini sudah didaftarkan juga URL Vercel-nya di Google Console
     <GoogleOAuthProvider clientId="195922640796-u1uucrttadnkjshpvn009lredf9bqoro.apps.googleusercontent.com">
       
-      {/* PERBAIKAN 2: 
-          Tambahkan min-h-screen kembali tapi tanpa overflow hidden 
-          agar background warna tidak terpotong saat konten sedikit.
-      */}
+      {/* Container utama tanpa overflow hidden agar scrolling tetap smooth */}
       <div className="w-full min-h-screen font-sans antialiased">
         <Routes>
+          {/* 1. PUBLIC ROUTES */}
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
-
           <Route path="/payment/:donationId" element={<PaymentPage />} />
 
-          {/* --- WIDGET ROUTE (PUBLIC) --- */}
+          {/* 2. WIDGET ROUTE (Untuk OBS/Streaming) */}
           <Route path="/v4/widget/:type/:key" element={<WidgetClient />} />
 
-          {/* --- DASHBOARD ROUTING --- */}
+          {/* 3. DASHBOARD ROUTES (PROTECTED) */}
           <Route 
             path="/dashboard/:tab" 
             element={
@@ -56,11 +51,11 @@ function App() {
             element={<Navigate to="/dashboard/wallet" replace />} 
           />
           
-          {/* PERBAIKAN 3: Rute dinamis 
-              Hati-hati rute ini (/:username) bisa "memakan" rute lain.
-              Pastikan rute ini ditaruh paling bawah.
-          */}
+          {/* 4. DYNAMIC CREATOR PROFILE (Ditaruh paling bawah agar tidak bentrok) */}
           <Route path="/:username" element={<DonationPage />} />
+          
+          {/* Fallback kalau user nyasar */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </GoogleOAuthProvider>

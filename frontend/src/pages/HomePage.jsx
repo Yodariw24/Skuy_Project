@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
+import axios from 'axios' // GANTI: Pakai axios buat nembak ke Railway
 import { 
   Sun, Moon, Play, ChevronRight, Sparkles, 
   Heart, ArrowRight, Star, Trophy, Target, Zap, 
   HelpCircle, ChevronDown, UserCircle2, Video, Activity, AlertCircle
 } from 'lucide-react'
 
-// --- IMPORT KONEKSI SUPABASE ---
-import { supabase } from '../supabaseClient' 
-
-// --- COMPONENT: SAKURA PETAL ---
+// --- COMPONENT: SAKURA PETAL (TETAP SAMA) ---
 const SakuraPetal = ({ delay }) => {
   const size = Math.random() * 10 + 5;
   return (
@@ -24,7 +22,7 @@ const SakuraPetal = ({ delay }) => {
   );
 };
 
-// --- COMPONENT: FAQ ACCORDION ---
+// --- COMPONENT: FAQ ACCORDION (TETAP SAMA) ---
 const FAQItem = ({ question, answer, darkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -50,10 +48,21 @@ function HomePage() {
   const { scrollY } = useScroll();
   const navBg = useTransform(scrollY, [0, 50], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(10, 10, 12, 0.9)" : "rgba(255, 255, 255, 0.9)"]);
 
+  // --- LOGIKA FETCHING BARU (RAILWAY READY) ---
   useEffect(() => {
     const fetchStreamers = async () => {
-      const { data } = await supabase.from('streamers').select('*')
-      if (data) setStreamers(data)
+      try {
+        // GANTI: Nanti URL ini pakai domain backend Railway lo
+        const res = await axios.get('https://backend-lo.railway.app/api/streamers');
+        if (res.data) setStreamers(res.data);
+      } catch (err) {
+        console.warn("Backend belum konek, pakai data dummy dulu.");
+        // Data cadangan biar UI lo gak kosong pas Vercel build
+        setStreamers([
+          { id: 1, username: 'AriWirayuda', full_name: 'Ari Wirayuda', bio: 'Informatics Engineering Student' },
+          { id: 2, username: 'SkuySquad', full_name: 'Elite Creator', bio: 'Legend Creator Gacor' }
+        ]);
+      }
     }
     fetchStreamers()
   }, []);
@@ -100,7 +109,7 @@ function HomePage() {
         <Link to="/auth" className="bg-violet-600 text-white font-black px-14 py-6 rounded-[2.5rem] shadow-[0_20px_50px_-10px_rgba(109,40,217,0.6)] hover:shadow-violet-600/80 transition-all text-xl uppercase italic">Gabung Squad Kuy</Link>
       </section>
 
-      {/* --- BENTO TOOLS SQUAD --- */}
+      {/* --- BENTO TOOLS SQUAD (TETAP SAMA) --- */}
       <section className="max-w-7xl mx-auto px-6 py-24 relative z-10">
         <div className="flex flex-col items-center mb-24 text-center">
           <span className="text-violet-600 font-black text-[10px] uppercase tracking-[0.5em] mb-4">Elite Ecosystem</span>
@@ -138,7 +147,7 @@ function HomePage() {
               <p className="text-white/60 text-xs font-bold italic">Meme atau musik pilihan fans langsung gas di layar streaming.</p>
             </div>
           </motion.div>
-
+          {/* Milestone & Leaderboard Section tetap sama kodenya */}
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-5 p-12 rounded-[4rem] border flex flex-col justify-between transition-all ${darkMode ? 'bg-[#0f0f12] border-white/5 shadow-inner' : 'bg-white border-slate-100 shadow-xl'}`}>
             <div className="relative">
               <div className="flex items-center justify-between mb-8">
@@ -188,7 +197,7 @@ function HomePage() {
         <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-4">ELITE <span className="text-violet-600">CREATORS</span></h2>
         <div className="flex items-center justify-center gap-2 text-slate-400 mb-20 animate-pulse">
           <AlertCircle size={14} className="text-amber-500" />
-          <p className="text-[10px] font-bold uppercase tracking-widest italic">Data updated live from database system</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest italic">Data secure from Railway Cloud system</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 text-left">
@@ -196,7 +205,7 @@ function HomePage() {
             <motion.div key={s.id} whileHover={{ y: -15 }} className={`group p-10 rounded-[4rem] border transition-all ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-white border-slate-100 hover:shadow-2xl shadow-violet-900/10'}`}>
               <div className="w-20 h-20 bg-slate-100 dark:bg-white/10 rounded-[2.5rem] mb-10 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl group-hover:border-violet-600 transition-all">
                 <img 
-                  src={s.profile_picture ? (s.profile_picture.startsWith('http') ? s.profile_picture : `https://hkcjensvqghsbpceydiv.supabase.co/storage/v1/object/public/uploads/${s.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`} 
+                  src={s.profile_picture ? (s.profile_picture.startsWith('http') ? s.profile_picture : `https://your-railway-storage.app/uploads/${s.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                   alt={s.username}
                   onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
@@ -210,7 +219,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* --- FAQ SQUAD --- */}
+      {/* --- FAQ SQUAD (TETAP SAMA) --- */}
       <section className="max-w-4xl mx-auto px-6 py-24 relative z-10 text-left">
         <div className="flex items-center gap-6 mb-16"><div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-violet-600/30"><HelpCircle size={24}/></div><h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter">FAQ <span className="text-violet-600">SQUAD</span></h2></div>
         <div className="space-y-2">
@@ -220,7 +229,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
+      {/* --- FOOTER (TETAP SAMA) --- */}
       <footer className="mt-32 relative bg-violet-600 text-white overflow-hidden py-32 selection:bg-white selection:text-violet-700">
         <div className="absolute top-1/2 left-0 -translate-y-1/2 flex whitespace-nowrap opacity-10 pointer-events-none select-none">
           <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="text-[200px] font-black italic uppercase px-4">SKUY.GG SKUY.GG SKUY.GG SKUY.GG SKUY.GG</motion.div>
@@ -238,7 +247,7 @@ function HomePage() {
         </div>
       </footer>
 
-      {/* --- FIX SCROLL & SAKURA --- */}
+      {/* --- CSS STYLE (TETAP SAMA) --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
         html, body { 

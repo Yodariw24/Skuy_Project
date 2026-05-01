@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import { Wallet, LogIn, Activity, Tv, LogOut, User, Moon, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
-import { skuyAlert } from '../../utils/alerts';
-// --- PERBAIKAN: Import supabase untuk logout yang bersih ---
-import { supabase } from '../../supabaseClient';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
   const isCreator = user?.role === 'creator' || user?.role === 'streamer';
@@ -20,29 +17,44 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       "🏦 <b>Withdrawal:</b> Pencairan dana 1-3 hari kerja."
     ];
     const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
-    skuyAlert('SKUY TIPS 💡', randomTip, 'info');
+    
+    // Pakai Swal langsung biar konsisten pro
+    Swal.fire({
+      title: 'SKUY TIPS 💡',
+      html: `<div className="text-left font-bold italic text-slate-600">${randomTip}</div>`,
+      icon: 'info',
+      customClass: {
+        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+        confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black uppercase italic'
+      },
+      buttonsStyling: false
+    });
   };
 
-  // --- PERBAIKAN: Logout Native Supabase ---
+  // --- PERBAIKAN: Logout Bersih Tanpa Supabase ---
   const logout = async () => {
     const result = await Swal.fire({
       title: 'KELUAR SESI?',
+      text: "Sesi koding dan dashboard akan ditutup, Ri.",
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Keluar',
-      cancelButtonText: 'Batal',
+      confirmButtonText: 'KELUAR',
+      cancelButtonText: 'BATAL',
       buttonsStyling: false,
       customClass: {
-        popup: 'rounded-[24px] p-6 border border-slate-100',
-        title: 'text-xs font-black uppercase tracking-widest',
-        confirmButton: 'bg-slate-950 text-white text-[9px] font-black px-5 py-2 rounded-lg mx-1',
-        cancelButton: 'bg-slate-100 text-slate-400 text-[9px] font-black px-5 py-2 rounded-lg mx-1'
+        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+        title: 'text-xl font-black italic uppercase tracking-tighter',
+        confirmButton: 'bg-red-500 text-white text-[10px] font-black px-8 py-3 rounded-xl mx-2 uppercase italic',
+        cancelButton: 'bg-slate-100 text-slate-400 text-[10px] font-black px-8 py-3 rounded-xl mx-2 uppercase italic'
       }
     });
 
     if (result.isConfirmed) {
-      await supabase.auth.signOut(); // Logout dari Cloud
-      localStorage.clear(); // Bersihkan sisa data
+      // Bersihkan semua jejak login dari Railway
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.clear(); 
+      
       navigate('/auth');
     }
   };
@@ -155,7 +167,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         </div>
       </div>
 
-      <div className="p-6 mt-auto border-t border-slate-50 bg-slate-50/30">
+      <div className="p-6 mt-auto border-t border-slate-100 bg-slate-50/30">
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm mb-4 group cursor-pointer hover:border-violet-200 transition-all" onClick={() => setActiveMenu('profile')}>
           <div className="w-10 h-10 rounded-xl bg-violet-50 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
              <img 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-// HAPUS IMPORT SUPABASE & OTPLIB BIAR VERCEL GAK ERROR
+import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
 import ProfileSettings from '../components/dashboard/ProfileSettings' 
@@ -27,29 +27,85 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
-  // --- LOGIKA AMBIL DATA VIA BACKEND RAILWAY (GANTI SUPABASE) ---
+  // --- AMBIL DATA VIA BACKEND RAILWAY ---
   const fetchData = async () => {
     try {
-      // Dummy data sementara biar Vercel Build Berhasil
-      // Nanti tinggal lo sambungin ke axios.get lo Ri
-      setUser({ username: 'Ari Wirayuda', id: '1' });
-      setBalance(0);
+      const token = localStorage.getItem('token');
+      // GANTI: URL ini nanti sesuai domain backend Railway lo
+      const res = await axios.get('https://backend-lo.railway.app/api/user/dashboard-sync', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data) {
+        setUser(res.data.profile);
+        setBalance(res.data.balance || 0);
+        setBankData(res.data.bank || { bank_name: 'Belum Diatur', account_number: '-', account_name: '-' });
+      }
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.warn("Backend belum siap, pake data dummy dulu Ri.");
+      // DATA DUMMY BIAR VERCEL GAK KOSONG PAS BUILD
+      setUser({ id: '1', username: 'ariwirayuda', full_name: 'Ari Wirayuda', is_two_fa_enabled: false });
     }
   }
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return navigate('/auth');
     fetchData();
-  }, []);
+  }, [navigate]);
 
-  // Fungsi 2FA dikosongkan dulu biar gak crash karena library otplib belum terpasang sempurna
-  const handleGenerateQR = () => {
-    skuyAlert.fire({ title: 'MAINTENANCE', text: 'Fitur 2FA sedang sinkronisasi ke Railway', icon: 'info' });
+  // --- LOGIKA 2FA SEKARANG KIRIM KE BACKEND ---
+  const handleGenerateQR = async () => {
+    setLoading2FA(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('https://backend-lo.railway.app/api/auth/2fa/generate', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.qrCode) {
+        setQrCodeData(res.data.qrCode);
+        skuyAlert.fire({ title: 'QR SIAP', text: 'Scan pakai Google Authenticator!', icon: 'info' });
+      }
+    } catch (err) {
+      skuyAlert.fire('ERROR', 'Gagal generate security protocol', 'error');
+    } finally {
+      setLoading2FA(false);
+    }
   };
 
-  const handleVerify2FA = () => {};
-  const handleDisable2FA = () => {};
+  const handleVerify2FA = async () => {
+    setLoading2FA(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('https://backend-lo.railway.app/api/auth/2fa/verify', { token: otp }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
+        skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif di Railway Cloud!', icon: 'success' });
+        setQrCodeData(''); setOtp('');
+      }
+    } catch (err) {
+      skuyAlert.fire({ title: 'FAILED', text: 'OTP salah atau expired!', icon: 'error' });
+    } finally {
+      setLoading2FA(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('https://backend-lo.railway.app/api/auth/2fa/disable', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
+      skuyAlert.fire('OFF', 'Keamanan dimatikan.', 'info');
+    } catch (err) {
+      skuyAlert.fire('ERROR', 'Gagal mematikan protokol', 'error');
+    }
+  };
 
   if (!user) return null;
 
@@ -71,6 +127,7 @@ function DashboardPage() {
         
         {activeMenu === 'security' && (
           <SecurityView 
+            key={user.is_two_fa_enabled ? 'secured' : 'unsecured'} 
             user={user} 
             qrCode={qrCodeData} 
             onGenerateQR={handleGenerateQR} 
