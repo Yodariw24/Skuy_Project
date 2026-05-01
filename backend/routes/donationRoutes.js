@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-// req.db sudah di-inject di server.js, jadi kita gak butuh require pool lagi di sini kalau mau konsisten
-const { 
+
+// WAJIB pakai akhiran .js agar terbaca oleh Node.js ESM
+import { 
   createDonation, 
   getDonationsByStreamer, 
   updateDonationStatus, 
@@ -9,15 +10,14 @@ const {
   getPublicHistory,
   getWalletHistory,
   withdrawBalance
-} = require('../controllers/donationController');
+} from '../controllers/donationController.js';
 
-const { validateDonation } = require('../middleware/validator');
+import { validateDonation } from '../middleware/validator.js';
 
 // --- 1. PROFIL PROTOCOL (Dinamis via Username) ---
 router.get('/profile/:username', async (req, res) => {
   const { username } = req.params;
   try {
-    // ILIKE biar case-insensitive (Ari atau ari sama aja)
     const result = await req.db.query(
       "SELECT id, username, display_name, full_name, bio, theme_color, profile_picture FROM streamers WHERE username ILIKE $1",
       [username]
@@ -34,18 +34,17 @@ router.get('/profile/:username', async (req, res) => {
   }
 });
 
-// --- 2. TRANSACTIONAL ROUTES (Urutan Statis di Atas) ---
-// Catatan: Pastikan endpoint withdraw ini diproteksi middleware auth nantinya
+// --- 2. TRANSACTIONAL ROUTES ---
 router.post('/withdraw', withdrawBalance); 
 
 // --- 3. STREAMER SPECIFIC DATA (Via ID) ---
 router.get('/:id/balance', getStreamerBalance);
 router.get('/:id/wallet-history', getWalletHistory); 
-router.get('/:id/history', getPublicHistory); // History publik untuk halaman donasi
+router.get('/:id/history', getPublicHistory); 
 router.get('/:id', getDonationsByStreamer);
 
 // --- 4. DONATION ACTION ---
 router.post('/', validateDonation, createDonation); 
-router.put('/:id/status', updateDonationStatus); // ID di sini adalah donationId
+router.put('/:id/status', updateDonationStatus); 
 
-module.exports = router;
+export default router; // Ganti module.exports jadi export default

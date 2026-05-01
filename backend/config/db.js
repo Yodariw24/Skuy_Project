@@ -1,18 +1,19 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+import pkg from 'pg';
+const { Pool } = pkg;
+import 'dotenv/config';
 
 const pool = new Pool({
-  // MODE 1: Jika ada DATABASE_URL (untuk Render/Cloud)
+  // MODE 1: Untuk Cloud (Railway/Render)
   connectionString: process.env.DATABASE_URL,
   
-  // MODE 2: Jika tidak ada DATABASE_URL, dia otomatis pakai variabel ini (untuk Lokal)
+  // MODE 2: Untuk Lokal
   user: process.env.DB_USER || 'postgres', 
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'skuy_db',
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT || 5432,
 
-  // SSL hanya aktif jika sedang di Cloud (Render)
+  // SSL aktif jika di Cloud
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
@@ -25,4 +26,4 @@ pool.connect((err, client, release) => {
   release();
 });
 
-module.exports = pool;
+export default pool; // PAKAI INI, BUKAN module.exports

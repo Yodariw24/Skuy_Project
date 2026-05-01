@@ -1,9 +1,9 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs'; // Pakai bcryptjs biar lebih stabil di Railway
+import nodemailer from 'nodemailer';
+import 'dotenv/config';
 
 // --- 1. SETUP NODEMAILER (RAILWAY READY) ---
 const transporter = nodemailer.createTransport({
@@ -27,17 +27,14 @@ const generateToken = (user) => {
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
     
-    // Proteksi Dasar
     if (!username || !email || !password) {
         return res.status(400).json({ success: false, message: "Data belum lengkap, Ri!" });
     }
 
     try {
-        // Hash password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Gunakan Transaction agar data balance ikut terbuat
         await req.db.query('BEGIN');
 
         const insertStreamer = `
@@ -48,7 +45,6 @@ router.post('/register', async (req, res) => {
         const { rows } = await req.db.query(insertStreamer, [username, email, hashedPassword, full_name]);
         const newUser = rows[0];
 
-        // Inisialisasi saldo otomatis buat Sultan baru
         await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, $2)', [newUser.id, 0]);
 
         await req.db.query('COMMIT');
@@ -82,7 +78,6 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ success: false, message: "Password Salah, Coba lagi!" });
         }
 
-        // Jika 2FA Aktif, kirim sinyal ke FE buat buka input OTP
         if (user.is_two_fa_enabled) {
             return res.json({ 
                 requiresTwoFA: true, 
@@ -110,7 +105,6 @@ router.post('/setup-2fa', async (req, res) => {
         if (rows.length === 0) return res.status(404).json({ message: "User not found" });
 
         const user = rows[0];
-        // Simpan OTP ke kolom secret buat sementara
         await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE id = $2", [otp, userId]);
 
         await transporter.sendMail({
@@ -121,17 +115,15 @@ router.post('/setup-2fa', async (req, res) => {
                 <div style="font-family:sans-serif; max-width:400px; margin:auto; border:5px solid #000; padding:30px; border-radius:30px; background:#f8faff;">
                     <h2 style="font-style:italic; text-transform:uppercase;">Shield Protocol</h2>
                     <p style="font-weight:bold;">Halo @${user.username},</p>
-                    <p>Seseorang mencoba masuk ke akun Sultan kamu. Gunakan kode di bawah:</p>
+                    <p>Gunakan kode di bawah untuk masuk:</p>
                     <div style="background:#7c3aed; color:#fff; padding:20px; border-radius:15px; text-align:center; font-size:35px; font-weight:900; letter-spacing:8px;">
                         ${otp}
                     </div>
-                    <p style="font-size:10px; color:#94a3b8; margin-top:20px;">Jika bukan kamu, segera ganti password akun lo!</p>
                 </div>
             `
         });
         res.json({ success: true, message: "Kode OTP meluncur ke email!" });
     } catch (err) {
-        console.error("MAIL ERROR:", err);
         res.status(500).json({ success: false, message: "Gagal memicu pengiriman email" });
     }
 });
@@ -144,7 +136,6 @@ router.post('/verify-2fa', async (req, res) => {
         const user = rows[0];
 
         if (user && user.two_fa_secret === token && token !== null) {
-            // Aktifkan status 2FA dan hapus secret yang sudah dipakai
             await req.db.query("UPDATE streamers SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
             
             res.json({ 
@@ -153,11 +144,11 @@ router.post('/verify-2fa', async (req, res) => {
                 user: { id: user.id, username: user.username, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "OTP Invalid atau Kadaluwarsa!" });
+            res.status(400).json({ success: false, message: "OTP Invalid!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal verifikasi sistem" });
+        res.status(500).json({ success: false, message: "Gagal verifikasi" });
     }
 });
 
-module.exports = router;
+export default router; // WAJIB PAKAI INI
