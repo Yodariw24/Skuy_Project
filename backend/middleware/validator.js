@@ -1,6 +1,6 @@
-const { body, validationResult } = require('express-validator');
+import { body, validationResult } from 'express-validator';
 
-const validateDonation = [
+export const validateDonation = [
   // 1. Validasi Nama: Bersihkan spasi berlebih & proteksi karakter
   body('donatur_name')
     .trim()
@@ -12,12 +12,12 @@ const validateDonation = [
     .isEmail().withMessage('Format email lo nggak valid jirr!')
     .normalizeEmail(),
 
-  // 3. Validasi Nominal: Minimal 10.000 (Sesuai settingan Skuy.GG)
+  // 3. Validasi Nominal: Minimal 10.000
   body('amount')
     .isFloat({ min: 10000 }).withMessage('Minimal donasi sultan adalah Rp 10.000')
     .isFloat({ max: 100000000 }).withMessage('Donasi maksimal Rp 100 Juta, Ri! Kebanyakan nanti kena limit.'),
 
-  // 4. Validasi Pesan: Opsional tapi jangan terlalu panjang
+  // 4. Validasi Pesan: Opsional
   body('message')
     .optional({ checkFalsy: true })
     .trim()
@@ -27,14 +27,11 @@ const validateDonation = [
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      // Kita kirim error pertama aja biar UI lo simpel nampilinnya
       return res.status(400).json({ 
         success: false, 
         message: errors.array()[0].msg 
       });
     }
-    next(); // Aman? Lanjut gas ke controller!
+    next(); 
   }
 ];
-
-module.exports = { validateDonation };

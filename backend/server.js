@@ -11,7 +11,7 @@ import 'dotenv/config';
 // Import Routes - WAJIB pakai akhiran .js karena type: module
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js'; 
-import walletRoutes from './routes/walletRoutes.js'; 
+import donationRoutes from './routes/donationRoutes.js'; // Gunakan ini sebagai pengganti wallet jika perlu
 
 // Fix untuk __dirname di ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -44,7 +44,7 @@ pool.connect((err, client, release) => {
 // --- 2. MIDDLEWARE & SECURITY ---
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://skuy-project.vercel.app", // URL Vercel lo
+  "https://skuy-project.vercel.app", 
   "https://skuy-gg.vercel.app", 
   process.env.FRONTEND_URL
 ].filter(Boolean);
@@ -105,7 +105,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/wallet', walletRoutes);
+app.use('/api/donations', donationRoutes); // Pakai rute yang sudah fix ada filenya
 
 // --- 5. ERROR HANDLING (Global) ---
 app.use((err, req, res, next) => {

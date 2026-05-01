@@ -1,5 +1,5 @@
-// Catatan: req.db sudah di-inject dari server.js melalui middleware
-// Jadi kita tidak perlu import pool lagi di sini jika ingin menggunakan req.db
+// Kita tidak perlu import Pool karena sudah di-inject ke req.db di server.js
+// Tapi kita butuh helper jika ada logika yang butuh library pg secara langsung
 
 // 1. Ambil Riwayat Dompet (INCOME & OUTCOME)
 export const getWalletHistory = async (req, res) => {
@@ -103,20 +103,23 @@ export const withdrawBalance = async (req, res) => {
         return res.status(400).json({ success: false, message: "Saldo tidak cukup, Ri! Gagal narik." });
     }
 
-    const formattedBankInfo = typeof bank_info === 'object' ? JSON.stringify(bank_info) : bank_info;
+    // Pastikan bank_info disimpan sebagai string agar PostgreSQL tidak bingung jika kolomnya TEXT/VARCHAR
+    const formattedBankInfo = typeof bank_info === 'object' ? JSON.stringify(bank_info) : String(bank_info);
+    
     const result = await req.db.query(
       "INSERT INTO withdrawals (streamer_id, amount, bank_info, status, created_at) VALUES ($1, $2, $3, 'PENDING', NOW()) RETURNING *",
       [streamer_id, amount, formattedBankInfo]
     );
     res.json({ success: true, message: "Permintaan WD diproses Railway!", data: result.rows[0] });
   } catch (err) {
+    console.error("WD ERROR:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// 6. Update Status (Bisa dari Payment Gateway Callback)
+// 6. Update Status (Socket.io Trigger)
 export const updateDonationStatus = async (req, res) => {
-  const { id } = req.params; // donationId
+  const { id } = req.params; 
   const { status } = req.body;
   try {
     const result = await req.db.query(
@@ -124,14 +127,16 @@ export const updateDonationStatus = async (req, res) => {
       [status.toUpperCase(), id]
     );
 
-    // LOGIKA SOCKET.IO: Jika sukses, tembak ke widget
     if (status.toUpperCase() === 'SUCCESS' && result.rows[0]) {
         const donation = result.rows[0];
-        req.io.to(`streamer_${donation.streamer_id}`).emit('new-donation', {
-            donatur_name: donation.donatur_name,
-            amount: donation.amount,
-            message: donation.message
-        });
+        // Pastikan req.io sudah di-inject di server.js
+        if (req.io) {
+            req.io.to(`streamer_${donation.streamer_id}`).emit('new-donation', {
+                donatur_name: donation.donatur_name,
+                amount: donation.amount,
+                message: donation.message
+            });
+        }
     }
 
     res.json({ success: true, data: result.rows[0] });
