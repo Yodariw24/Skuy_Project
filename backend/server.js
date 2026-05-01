@@ -21,7 +21,7 @@ const app = express();
 // --- 1. CONFIG DATABASE (PostgreSQL Railway) ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Wajib untuk koneksi ke infrastruktur cloud Railway
+  ssl: { rejectUnauthorized: false }
 });
 
 pool.connect((err, client, release) => {
@@ -32,17 +32,21 @@ pool.connect((err, client, release) => {
   release();
 });
 
-// --- 2. MIDDLEWARE & SECURITY ---
+// --- 2. MIDDLEWARE & SECURITY (FIXED CORS) ---
+// Membersihkan trailing slash dari environment variable secara otomatis
+const rawUrl = process.env.FRONTEND_URL || "";
+const cleanUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+
 const allowedOrigins = [
   "http://localhost:5173",
   "https://skuy-project.vercel.app", 
   "https://skuy-gg.vercel.app", 
-  process.env.FRONTEND_URL
+  cleanUrl
 ].filter(Boolean);
 
-// Konfigurasi CORS "Gacor" untuk menghalau error Preflight
 const corsOptions = {
   origin: function (origin, callback) {
+    // Jika origin tidak ada (seperti request server-to-server) atau ada di daftar, izinkan
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -55,13 +59,14 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Pasang CORS Middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Menjawab request OPTIONS browser
+// WAJIB: Handle preflight untuk semua rute
+app.options('*', cors(corsOptions)); 
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Header tambahan untuk Google Auth
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -82,7 +87,6 @@ io.on('connection', (socket) => {
   }
 });
 
-// Inject DB & IO ke Request
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
@@ -98,7 +102,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoutes); // Pastikan frontend menembak ke /api/auth/register
+app.use('/api/auth', authRoutes); 
 app.use('/api/user', userRoutes);
 app.use('/api/donations', donationRoutes);
 
