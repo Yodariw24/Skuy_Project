@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import axios from 'axios';
+// ✅ GANTI: Pakai instance api biar sinkron sama Railway
+import api from '../api/axios';
 import { skuyAlert } from '../utils/alerts';
 import { motion } from 'framer-motion';
 import { ShieldCheck, QrCode, Loader2 } from 'lucide-react';
-
-// KONFIGURASI API URL (Otomatis pakai Railway kalau sudah deploy)
-const API_URL = import.meta.env.VITE_API_URL || 'https://skuy-project-production.up.railway.app';
 
 function TwoFASetup({ user }) {
   const [qrCode, setQrCode] = useState(null);
@@ -17,7 +15,8 @@ function TwoFASetup({ user }) {
   const handleGenerateQR = async () => {
     setLoadingQR(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/setup-2fa`, { 
+      // ✅ Cukup panggil endpoint, instance api sudah tahu baseURL-nya
+      const res = await api.post('/auth/setup-2fa', { 
         userId: user.id 
       });
       
@@ -39,7 +38,7 @@ function TwoFASetup({ user }) {
     
     setIsVerifying(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/verify-2fa`, {
+      const res = await api.post('/auth/verify-2fa', {
         userId: user.id,
         token: otp
       });
@@ -48,7 +47,7 @@ function TwoFASetup({ user }) {
         skuyAlert("GACOR!", "2FA Berhasil aktif! Akun sekelas Sultan aman.", "success");
         setQrCode(null);
         setOtp('');
-        // Refresh halaman agar status 2FA terupdate
+        // Refresh halaman agar status 2FA terupdate di dashboard
         window.location.reload(); 
       }
     } catch (err) {
@@ -59,14 +58,14 @@ function TwoFASetup({ user }) {
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+    <div className="bg-white p-8 rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-left">
       <div className="flex items-center gap-4 mb-6">
         <div className="bg-violet-600 p-3 rounded-xl text-white">
           <ShieldCheck size={24} />
         </div>
         <div>
-          <h3 className="font-black italic text-lg uppercase">Keamanan Akun</h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase">Multi-Factor Authentication (2FA)</p>
+          <h3 className="font-black italic text-lg uppercase leading-none">Keamanan Akun</h3>
+          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Multi-Factor Authentication (2FA)</p>
         </div>
       </div>
 
@@ -85,7 +84,7 @@ function TwoFASetup({ user }) {
           </div>
           
           <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verify Authenticator Code</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Verify Authenticator Code</p>
             <input 
               type="text" maxLength="6" placeholder="000000"
               className="w-full p-4 text-center text-4xl font-black border-4 border-slate-950 rounded-xl outline-none focus:bg-violet-50 transition-all"

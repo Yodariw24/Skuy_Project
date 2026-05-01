@@ -2,11 +2,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Play } from 'lucide-react';
-import { io } from 'socket.io-client'; // GANTI: Pakai Socket.io untuk Realtime Alert
-import axios from 'axios'; // Buat ambil settingan awal
+import { io } from 'socket.io-client'; 
+// ✅ GANTI: Gunakan instance api kita
+import api from '../api/axios'; 
 
 const WidgetClient = () => {
-  const { type, key } = useParams(); // 'key' adalah ID Streamer
+  const { type, key } = useParams(); // 'key' di sini adalah ID Streamer (User ID) lo
   const [activeAlert, setActiveAlert] = useState(null);
   const [settings, setSettings] = useState({
     primary: '#6366f1',
@@ -16,11 +17,12 @@ const WidgetClient = () => {
     duration: 8
   });
 
-  // 1. FETCH SETTINGS VIA BACKEND RAILWAY
+  // --- 1. FETCH SETTINGS VIA BACKEND (SINKRON RAILWAY) ---
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get(`https://backend-lo.railway.app/api/streamers/settings/${key}`);
+        // ✅ Cukup panggil endpoint, instance api sudah tahu harus ke mana
+        const res = await api.get(`/streamers/settings/${key}`);
         if (res.data) {
           const data = res.data;
           setSettings(prev => ({
@@ -30,24 +32,26 @@ const WidgetClient = () => {
           }));
         }
       } catch (err) {
-        console.warn("Using default local settings.");
+        console.warn("⚠️ Gagal ambil settings, pakai default local.");
       }
     };
     if (key) fetchSettings();
   }, [key]);
 
-  // 2. SOCKET.IO REALTIME PROTOCOL (GANTI SUPABASE CHANNEL)
+  // --- 2. SOCKET.IO REALTIME PROTOCOL ---
   useEffect(() => {
     if (!key) return;
 
-    // Hubungkan ke Backend Railway lo
-    const socket = io('https://backend-lo.railway.app', {
+    // ✅ Ambil URL base dari variabel env lewat axios instance kita (tanpa /api di ujung)
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    
+    // Hubungkan ke Backend Railway lo untuk streaming alert
+    const socket = io(socketUrl, {
       query: { streamerId: key }
     });
 
-    // Dengarkan event 'new-donation' dari backend
+    // Dengarkan event 'new-donation' dari backend Railway
     socket.on('new-donation', (data) => {
-      // Trigger Alert
       setActiveAlert({
         sender: data.donatur_name,
         amount: data.amount,
@@ -59,13 +63,13 @@ const WidgetClient = () => {
       setTimeout(() => setActiveAlert(null), timer);
     });
 
-    // TESTER MANUAL (Tetap ada buat Ari testing di OBS)
+    // TESTER MANUAL (Pencet 'T' di OBS buat test alert Ri!)
     const handleKeyDown = (e) => {
       if (e.key.toLowerCase() === 't') {
         setActiveAlert({
-          sender: "SKUY_TEST_STABLE",
-          amount: 150000,
-          message: "Widget udah konek Railway, Ri! Gacor! 🚀",
+          sender: "TEST_GACOR_RAILWAY",
+          amount: 50000,
+          message: "Widget udah konek ke Railway Cloud, Ri! 🚀",
           type: type || 'tip'
         });
         setTimeout(() => setActiveAlert(null), 5000);

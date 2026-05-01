@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
+// ✅ GANTI: Gunakan instance api sentral
+import api from '../api/axios' 
 import * as Icon from 'lucide-react' 
-
-// URL Backend Railway lo
-const API_URL = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
 
 const FormInput = ({ label, iconName, helpText, textArea, ...props }) => {
   const IconComp = Icon[iconName] || Icon.HelpCircle;
@@ -50,14 +48,17 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
+  // Ambil URL Backend dari environment variabel lewat import.meta.env
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
     if (photoPath.startsWith('http')) return photoPath;
-    // GANTI: Arahkan ke folder static/uploads di backend Railway lo
+    // ✅ Mengarah ke folder uploads di backend Railway
     return `${API_URL}/uploads/${photoPath}`;
   };
 
-  // --- LOGIKA UPLOAD VIA BACKEND RAILWAY ---
+  // --- 1. LOGIKA UPLOAD (SINKRON RAILWAY) ---
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -67,15 +68,12 @@ export default function ProfileSettings({ user, setUser }) {
     uploadFormData.append('userId', user.id);
 
     setLoading(true);
-    setStatus({ type: 'success', message: 'Mengirim data ke Railway Cloud...' });
+    setStatus({ type: 'success', message: 'Sinkronisasi Cloud...' });
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_URL}/api/user/upload-avatar`, uploadFormData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        }
+      // ✅ Tidak perlu manual header token, sudah diurus api instance
+      const res = await api.post('/user/upload-avatar', uploadFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       if (res.data.success) {
@@ -96,44 +94,38 @@ export default function ProfileSettings({ user, setUser }) {
     if (!window.confirm("Hapus foto dan gunakan avatar default?")) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/api/user/delete-avatar`, { userId: user.id }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/user/delete-avatar', { userId: user.id });
 
       const updatedUser = { ...user, profile_picture: null };
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setStatus({ type: 'success', message: 'Kembali ke avatar default! ✌🏼' });
     } catch (err) {
-      setStatus({ type: 'error', message: 'Gagal reset foto profil.' });
+      setStatus({ type: 'error', message: 'Gagal reset profil.' });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     }
   }
 
-  // --- UPDATE PROFIL VIA BACKEND RAILWAY ---
+  // --- 2. UPDATE PROFIL (SINKRON RAILWAY) ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.put(`${API_URL}/api/user/update-profile`, {
+      const res = await api.put('/user/update-profile', {
         userId: user.id,
         ...formData
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (res.data.success) {
         const updatedUser = { ...user, ...res.data.user };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        setStatus({ type: 'success', message: 'Profil Railway Berhasil Diperbarui! ✨' });
+        setStatus({ type: 'success', message: 'Profil Berhasil Diperbarui! ✨' });
       }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Otoritas API ditolak: ' + (err.response?.data?.message || err.message) });
+      setStatus({ type: 'error', message: 'Gagal update: ' + (err.response?.data?.message || err.message) });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
@@ -149,7 +141,7 @@ export default function ProfileSettings({ user, setUser }) {
   if (!user) return null;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto font-sans text-slate-900 pb-20">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto font-sans text-slate-900 pb-20 text-left">
       <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm mb-8 group">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">

@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Landmark, CreditCard, User, Save, ChevronDown } from 'lucide-react'
+import { X, Landmark, CreditCard, User, Save, ChevronDown, Loader2 } from 'lucide-react'
 
-// Daftar Bank & E-Wallet (Tetap sesuai pilihanmu, Ri)
 const BANK_OPTIONS = [
   { label: '-- Pilih Bank / E-Wallet --', value: '' },
   { label: 'BCA (Bank Central Asia)', value: 'BCA' },
@@ -15,18 +14,17 @@ const BANK_OPTIONS = [
   { label: 'ShopeePay', value: 'SHOPEEPAY' },
 ]
 
-export default function EditBankModal({ isOpen, onClose, formData, setFormData, onSave }) {
-  // Fungsi penangan submit agar tidak refresh halaman
+export default function EditBankModal({ isOpen, onClose, formData, setFormData, onSave, loading }) {
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(e); // Memanggil fungsi onSave yang dikirim dari Dashboard (API call)
+    onSave(e); 
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          {/* Background Overlay khas Skuy.gg */}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 font-sans">
+          {/* Background Overlay */}
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
@@ -41,7 +39,7 @@ export default function EditBankModal({ isOpen, onClose, formData, setFormData, 
             exit={{ scale: 0.9, opacity: 0, y: 20 }} 
             className="bg-white w-full max-w-md rounded-[3rem] shadow-[0_30px_100px_-20px_rgba(0,0,0,0.3)] relative z-10 overflow-hidden border-4 border-slate-950"
           >
-            <div className="p-8 md:p-10">
+            <div className="p-8 md:p-10 text-left">
               {/* Header Modal */}
               <div className="flex justify-between items-center mb-10">
                 <div className="flex items-center gap-3">
@@ -59,7 +57,7 @@ export default function EditBankModal({ isOpen, onClose, formData, setFormData, 
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* 1. PILIHAN BANK (DROPDOWN) */}
+                {/* 1. PILIHAN BANK */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 px-1 italic">
                     Penyedia Jasa Keuangan
@@ -127,9 +125,15 @@ export default function EditBankModal({ isOpen, onClose, formData, setFormData, 
                 {/* Submit Button */}
                 <button 
                   type="submit" 
-                  className="w-full bg-slate-950 text-white font-black py-5 rounded-[1.5rem] uppercase italic text-xs tracking-[0.2em] shadow-2xl hover:bg-violet-600 active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
+                  disabled={loading}
+                  className="w-full bg-slate-950 text-white font-black py-5 rounded-[1.5rem] uppercase italic text-xs tracking-[0.2em] shadow-2xl hover:bg-violet-600 active:scale-95 transition-all flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save size={18} /> Simpan Protokol Bank
+                  {loading ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Save size={18} />
+                  )}
+                  {loading ? 'Menyinkronkan...' : 'Simpan Protokol Bank'}
                 </button>
               </form>
             </div>

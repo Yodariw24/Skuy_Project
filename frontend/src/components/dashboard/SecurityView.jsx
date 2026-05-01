@@ -3,10 +3,11 @@ import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, MailOpen } from 'lucide-
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, setOtp, loading }) => {
+  // ✅ Pastikan pengecekan status 2FA sesuai field di DB Railway lo
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 p-6 font-sans">
+    <div className="max-w-2xl mx-auto space-y-8 p-6 font-sans text-left">
       {/* Banner Status */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
@@ -18,7 +19,7 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
             {isEnabled ? <ShieldCheck className="text-emerald-500" size={32} /> : <Lock className="text-violet-600" size={32} />}
             {isEnabled ? 'Full Protected' : 'Security Setup'}
           </h2>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Agent: @{user?.username}</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Agent: @{user?.username || 'unknown'}</p>
         </div>
         {isEnabled && (
           <div className="hidden md:block px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl border-2 border-emerald-100 text-[10px] font-black uppercase italic tracking-widest">
@@ -44,13 +45,13 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                 <div className="space-y-2">
                   <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">Aktifkan Perisai Akun</p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
-                    Kirim kode rahasia ke email untuk mengunci akses saldo kamu secara permanen.
+                    Kirim kode rahasia ke email untuk mengunci akses saldo kamu secara permanen di Railway Cloud.
                   </p>
                 </div>
                 <button 
                   onClick={onGenerateQR} 
                   disabled={loading} 
-                  className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700"
+                  className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50"
                 >
                    {loading ? <Loader2 className="animate-spin" size={20}/> : 'Kirim Kode OTP'} <Zap size={18}/>
                 </button>
@@ -60,7 +61,7 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                 <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300">
                   <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Cek Email Kamu!</p>
                   <p className="text-[10px] text-amber-500 font-bold leading-tight uppercase">
-                    Masukkan 6 digit kode unik yang baru saja dikirim sistem.
+                    Masukkan 6 digit kode unik yang dikirim ke <span className="text-slate-900 lowercase font-black">{user?.email}</span>.
                   </p>
                 </div>
                 <div className="max-w-xs mx-auto space-y-4">
@@ -74,11 +75,14 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                     disabled={otp.length < 6 || loading} 
                     className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_6px_0_0_#1e293b] active:translate-y-1 transition-all hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Aktifkan Sekarang'}
+                    {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Verifikasi & Aktifkan'}
                   </button>
-                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                    Keamanan tingkat tinggi dienkripsi oleh Skuy.GG
-                  </p>
+                  <button 
+                    onClick={onGenerateQR}
+                    className="text-[9px] text-slate-400 font-black uppercase tracking-widest hover:text-violet-600 transition-colors"
+                  >
+                    Belum terima kode? Kirim ulang
+                  </button>
                 </div>
               </div>
             )}
@@ -94,7 +98,9 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                 <CheckCircle2 size={64} />
               </div>
               <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">Status: Secure</h3>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 italic">Aset Sultan aman terkendali di Railway Cloud.</p>
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 italic leading-relaxed">
+                Aset Sultan aman terkendali.<br/>Setiap login & penarikan saldo wajib verifikasi OTP.
+              </p>
               
               <div className="mt-10 pt-8 border-t border-slate-50">
                 <button 

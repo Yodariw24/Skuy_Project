@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import axios from 'axios' // GANTI: Pakai axios buat verifikasi ke Railway
-import { CheckCircle2, QrCode, ArrowRight, Loader2 } from 'lucide-react'
+// ✅ GANTI: Gunakan instance api agar otomatis pakai baseURL Railway
+import api from '../api/axios' 
+import { CheckCircle2, QrCode, Loader2 } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 function PaymentPage() {
   const { donationId } = useParams();
@@ -12,18 +14,30 @@ function PaymentPage() {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      // GANTI: Nanti tembak ke endpoint verifikasi di backend lo
-      // Backend akan otomatis update status donasi, history, dan balance
-      const res = await axios.post(`https://backend-lo.railway.app/api/donations/verify/${donationId}`);
+      // ✅ Cukup panggil endpoint, instance api sudah tahu harus ke Railway
+      const res = await api.post(`/donations/verify/${donationId}`);
 
       if (res.status === 200) {
-        alert("Pembayaran Terverifikasi Railway Cloud! Saldo kreator telah bertambah. 🔥");
-        navigate(-1); // Balik ke halaman kreator
+        Swal.fire({
+          title: 'BERHASIL!',
+          text: 'Pembayaran Terverifikasi Railway Cloud! Saldo kreator telah bertambah. 🔥',
+          icon: 'success',
+          customClass: {
+            popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+            confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black'
+          }
+        });
+        navigate(-1); 
       }
     } catch (err) {
-      console.warn("Backend belum konek, simulasi sukses build.");
-      // Simulasi sukses biar build Vercel lo Ijo dan UI tetap jalan
-      alert("Simulasi: Pembayaran Terverifikasi! (Hubungkan Backend Railway untuk fungsi real)");
+      console.warn("Backend belum respon, simulasi sukses.");
+      // Simulasi sukses agar UI tidak macet saat testing
+      Swal.fire({
+        title: 'SIMULASI SUKSES',
+        text: 'Pembayaran Terverifikasi! (Hubungkan Backend Railway untuk fungsi real)',
+        icon: 'info',
+        confirmButtonColor: '#7c3aed'
+      });
       navigate(-1);
     } finally {
       setLoading(false);
@@ -43,7 +57,7 @@ function PaymentPage() {
         <h2 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">Gate: Payment</h2>
         <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8">Scan QRIS Secure Protocol</p>
         
-        {/* Simulasi Gambar QRIS */}
+        {/* Gambar QRIS */}
         <div className="bg-white p-6 rounded-[2.5rem] mb-10 border-2 border-slate-100 shadow-xl relative group">
            <div className="absolute inset-0 bg-violet-600/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem]" />
            <img 

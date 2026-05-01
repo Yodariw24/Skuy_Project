@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Palette, Check, Sparkles, Layout, CheckCircle2 } from 'lucide-react'
+// ✅ GANTI: Gunakan instance api sentral, hapus Supabase client
+import api from '../../api/axios' 
+import { Palette, Check, Layout, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-// --- PERBAIKAN: Gunakan Supabase Client ---
-import { supabase } from '../../supabaseClient'
 
 const THEMES = [
   { id: 'violet', name: 'Royal Purple', class: 'bg-violet-600', shadow: 'shadow-violet-200' },
@@ -23,24 +23,19 @@ export default function AppearanceView({ user, setUser }) {
 
     setLoading(true)
     try {
-      // PROSES UPDATE KE SUPABASE CLOUD
-      const { data, error } = await supabase
-        .from('streamers')
-        .update({ theme_color: themeId })
-        .eq('id', user.id)
-        .select()
-        .single();
+      // ✅ PROSES UPDATE KE RAILWAY BACKEND
+      const res = await api.put('/user/update-theme', {
+        theme_color: themeId
+      });
 
-      if (error) throw error;
-
-      if (data) {
+      if (res.data && res.data.success) {
         // Update Local State agar UI berubah seketika
         setSelectedTheme(themeId)
         const updatedUser = { ...user, theme_color: themeId }
         setUser(updatedUser)
         
-        // Simpan ke LocalStorage agar sesi tetap konsisten
-        localStorage.setItem('user_data', JSON.stringify(updatedUser))
+        // ✅ Simpan ke LocalStorage agar sesi tetap konsisten (Gunakan key 'user' sesuai AuthPage)
+        localStorage.setItem('user', JSON.stringify(updatedUser))
         
         // Trigger Toast Gacor
         setShowToast(true)
@@ -48,14 +43,14 @@ export default function AppearanceView({ user, setUser }) {
       }
     } catch (err) {
       console.error("Gagal update tema cloud:", err.message)
-      alert("Gagal sinkronisasi tema ke pangkalan data cloud ⚠️")
+      alert("Gagal sinkronisasi tema ke pangkalan data Railway ⚠️")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20 text-left">
       
       {/* --- TOAST NOTIFICATION --- */}
       <AnimatePresence>
@@ -140,14 +135,19 @@ export default function AppearanceView({ user, setUser }) {
               {/* Mini Website Mockup */}
               <div className="w-full max-w-[220px] bg-white rounded-[2.5rem] p-5 shadow-2xl scale-110 relative z-10 border border-white/20">
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 mx-auto mb-4 border border-slate-50 shadow-inner overflow-hidden">
-                   <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} alt="Avatar" className="w-full h-full object-cover" />
+                   <img 
+                    src={user?.profile_picture ? (user.profile_picture.startsWith('http') ? user.profile_picture : `${import.meta.env.VITE_API_URL}/uploads/${user.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
+                   />
                 </div>
                 <div className="h-2 w-20 bg-slate-200 rounded-full mx-auto mb-2" />
                 <div className="h-1.5 w-12 bg-slate-100 rounded-full mx-auto mb-6" />
                 
                 <div className="space-y-2">
-                   <div className={`h-10 w-full rounded-2xl transition-all duration-700 shadow-lg ${THEMES.find(t => t.id === selectedTheme)?.class}`} />
-                   <div className="h-6 w-full rounded-xl bg-slate-50 border border-slate-100" />
+                    <div className={`h-10 w-full rounded-2xl transition-all duration-700 shadow-lg ${THEMES.find(t => t.id === selectedTheme)?.class}`} />
+                    <div className="h-6 w-full rounded-xl bg-slate-50 border border-slate-100" />
                 </div>
               </div>
             </div>
@@ -161,7 +161,7 @@ export default function AppearanceView({ user, setUser }) {
                     >
                         <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
                         <span className="text-[10px] font-black text-violet-600 uppercase italic tracking-widest">
-                            Encrypting Theme to Cloud...
+                            Syncing Theme to Railway...
                         </span>
                     </motion.div>
                 )}

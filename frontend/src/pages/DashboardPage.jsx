@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-// ✅ GANTI: Gunakan instance api yang sudah kita buat
 import api from '../api/axios' 
 import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
@@ -25,41 +24,45 @@ function DashboardPage() {
   const [otp, setOtp] = useState('')
   const [loading2FA, setLoading2FA] = useState(false)
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
+  
+  // ✅ Tambahkan state loading biar layar nggak langsung putih
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const navigate = useNavigate()
 
-  // --- 1. AMBIL DATA VIA BACKEND RAILWAY ---
   const fetchData = async () => {
     try {
-      // ✅ Tidak perlu manual header, sudah diurus axios.js
       const res = await api.get('/user/dashboard-sync');
-      
-      if (res.data) {
+      if (res.data && res.data.profile) {
         setUser(res.data.profile);
         setBalance(res.data.balance || 0);
         setBankData(res.data.bank || { bank_name: 'Belum Diatur', account_number: '-', account_name: '-' });
+      } else {
+        // Jika profile tidak ada, gunakan fallback agar tidak crash
+        throw new Error("Data profile kosong");
       }
     } catch (err) {
-      console.warn("Koneksi gagal, cek log Railway lo Ri.");
-      // Fallback data dummy jika server down
+      console.warn("Koneksi gagal, pakai data fallback.");
       setUser({ id: '1', username: 'ariwirayuda', full_name: 'Ari Wirayuda', is_two_fa_enabled: false });
+    } finally {
+      setIsInitialLoading(false);
     }
   }
 
   useEffect(() => {
-    // ✅ Gunakan key 'user_token' sesuai AuthPage & axios.js
     const token = localStorage.getItem('user_token');
-    if (!token) return navigate('/auth');
-    fetchData();
+    if (!token) {
+      navigate('/auth');
+    } else {
+      fetchData();
+    }
   }, [navigate]);
 
-  // --- 2. LOGIKA 2FA (SINKRON DENGAN BACKEND) ---
+  // --- LOGIKA 2FA ---
   const handleGenerateQR = async () => {
     setLoading2FA(true);
     try {
-      // ✅ Panggil endpoint /auth/2fa/generate
       const res = await api.post('/auth/2fa/generate');
-      
       if (res.data.qrCode) {
         setQrCodeData(res.data.qrCode);
         skuyAlert.fire({ title: 'QR SIAP', text: 'Scan pakai Google Authenticator!', icon: 'info' });
@@ -75,7 +78,6 @@ function DashboardPage() {
     setLoading2FA(true);
     try {
       const res = await api.post('/auth/2fa/verify', { token: otp });
-
       if (res.data.success) {
         setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
         skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif di Railway Cloud!', icon: 'success' });
@@ -98,7 +100,17 @@ function DashboardPage() {
     }
   };
 
-  if (!user) return null;
+  // ✅ HANDLING LAYAR PUTIH: Jangan render apapun kalau user masih null
+  if (isInitialLoading || !user) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="font-black italic uppercase tracking-tighter text-slate-900">Sinkronisasi Cloud...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left">

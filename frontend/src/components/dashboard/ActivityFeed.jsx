@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
-// --- PERBAIKAN: Gunakan Supabase Client ---
-import { supabase } from '../../supabaseClient'
+// ✅ GANTI: Gunakan instance api sentral, hapus Supabase client
+import api from '../../api/axios' 
 import { 
-  MessageSquare, Clock, Heart, RefreshCcw, Zap, 
-  TrendingUp, Crown, Sparkles, Share2, CheckCircle2 
+  Clock, Heart, RefreshCcw, Zap, 
+  Crown, Sparkles, Share2, CheckCircle2 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -12,58 +12,55 @@ function ActivityFeed({ userId }) {
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // --- 1. AMBIL DATA DARI BACKEND RAILWAY ---
   const fetchHistory = useCallback(async (isAuto = false) => {
     if (!isAuto) setLoading(true);
     else setIsRefreshing(true);
 
     try {
-      // AMBIL DATA DARI TABEL DONATIONS SUPABASE
-      const { data, error } = await supabase
-        .from('donations')
-        .select('*')
-        .eq('streamer_id', userId)
-        .eq('status', 'SUCCESS') // Hanya tampilkan yang sukses bayar
-        .order('created_at', { ascending: false });
+      // ✅ Cukup panggil endpoint, interceptor otomatis menempelkan user_token
+      const res = await api.get('/user/activity-feed');
       
-      if (error) throw error;
-      if (data) setHistory(data);
+      if (res.data && res.data.success) {
+        setHistory(res.data.donations);
+      }
     } catch (err) {
-      console.error("Gagal ambil history dari Cloud:", err.message);
+      console.error("Gagal ambil history dari Railway:", err.message);
+      // Fallback data dummy jika koneksi terputus agar UI tetap cantik
+      if (!isAuto) setHistory([]);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
-    if (userId) {
+    // ✅ Gunakan key 'user_token' sesuai standar keamanan TipFlow
+    const token = localStorage.getItem('user_token');
+    if (token) {
       fetchHistory();
+      // Auto-refresh setiap 30 detik untuk memantau donasi masuk (gacor!)
       const interval = setInterval(() => fetchHistory(true), 30000);
       return () => clearInterval(interval);
     }
-  }, [userId, fetchHistory]);
+  }, [fetchHistory]);
 
   const formatRelativeTime = (dateString) => {
     if (!dateString) return 'Baru saja';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Baru saja';
-
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
     if (diffInSeconds < 60) return 'Baru saja';
-    
     const diffInMinutes = Math.floor(diffInSeconds / 60);
     if (diffInMinutes < 60) return `${diffInMinutes}m lalu`;
-    
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}j lalu`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}h lalu`;
+    return `${Math.floor(diffInHours / 24)}h lalu`;
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-20 px-4 font-sans">
+    <div className="max-w-4xl mx-auto pb-20 px-4 font-sans text-left">
       {/* --- HEADER --- */}
       <div className="flex justify-between items-end mb-12">
         <div>
@@ -72,7 +69,7 @@ function ActivityFeed({ userId }) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
             </span>
-            <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em] italic">Cloud Live Feed</span>
+            <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em] italic">Railway Live Feed</span>
           </div>
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
             Recent Support
@@ -82,7 +79,7 @@ function ActivityFeed({ userId }) {
         <button 
           onClick={() => fetchHistory()}
           disabled={loading || isRefreshing}
-          className="group relative p-4 bg-white border-2 border-slate-100 rounded-[1.8rem] hover:border-violet-600 transition-all active:scale-90 shadow-xl shadow-slate-100/50 overflow-hidden"
+          className="group relative p-4 bg-white border-2 border-slate-100 rounded-[1.8rem] hover:border-violet-600 transition-all active:scale-90 shadow-xl shadow-slate-100/50"
         >
           <RefreshCcw 
             size={20} 
@@ -100,7 +97,7 @@ function ActivityFeed({ userId }) {
                 <div className="w-16 h-16 border-[6px] border-slate-100 rounded-full" />
                 <div className="absolute top-0 w-16 h-16 border-[6px] border-violet-600 border-t-transparent rounded-full animate-spin" />
              </div>
-             <p className="font-black italic uppercase tracking-[0.4em] text-[10px] text-slate-400 animate-pulse">Scanning Cloud History...</p>
+             <p className="font-black italic uppercase tracking-[0.4em] text-[10px] text-slate-400 animate-pulse">Syncing Cloud History...</p>
           </div>
         ) : history.length > 0 ? (
           <AnimatePresence mode='popLayout'>
@@ -111,7 +108,7 @@ function ActivityFeed({ userId }) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.08 }}
                 key={item.id} 
-                className="group relative bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 shadow-2xl shadow-slate-200/30 flex flex-col md:flex-row items-start md:items-center gap-8 hover:border-violet-200 hover:shadow-xl hover:shadow-violet-50 transition-all duration-500"
+                className="group relative bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 shadow-2xl shadow-slate-200/30 flex flex-col md:flex-row items-start md:items-center gap-8 hover:border-violet-200 transition-all duration-500"
               >
                 <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity">
                    <Sparkles size={120} />
@@ -125,11 +122,6 @@ function ActivityFeed({ userId }) {
                   }`}>
                     {item.amount >= 100000 ? <Crown size={32} strokeWidth={2.5} /> : <Heart size={32} strokeWidth={2.5} />}
                   </div>
-                  {item.amount >= 100000 && (
-                    <div className="absolute -bottom-2 -right-2 bg-slate-950 text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border-2 border-white shadow-lg">
-                      Whale 🐳
-                    </div>
-                  )}
                 </div>
                 
                 <div className="flex-1 w-full min-w-0">
@@ -143,7 +135,7 @@ function ActivityFeed({ userId }) {
                           <Clock size={12} strokeWidth={3} /> {formatRelativeTime(item.created_at)}
                         </span>
                         <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl">
-                          <CheckCircle2 size={12} strokeWidth={3} /> Authorized
+                          <CheckCircle2 size={12} strokeWidth={3} /> Verified
                         </span>
                       </div>
                     </div>
@@ -169,7 +161,7 @@ function ActivityFeed({ userId }) {
             ))}
           </AnimatePresence>
         ) : (
-          <div className="bg-white rounded-[4rem] border-4 border-dashed border-slate-100 py-32 text-center flex flex-col items-center group transition-all duration-500 hover:border-violet-200">
+          <div className="bg-white rounded-[4rem] border-4 border-dashed border-slate-100 py-32 text-center flex flex-col items-center group">
             <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-violet-50 transition-all duration-500">
               <Zap size={40} className="text-slate-200 group-hover:text-violet-400 animate-pulse" />
             </div>
@@ -179,8 +171,11 @@ function ActivityFeed({ userId }) {
               </p>
               <button 
                 onClick={() => {
-                   navigator.clipboard.writeText(`https://skuy.vercel.app/${localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data')).username : ''}`);
-                   alert('Link donasi disalin!');
+                  const user = JSON.parse(localStorage.getItem('user'));
+                  if (user) {
+                    navigator.clipboard.writeText(`https://skuy-project.vercel.app/${user.username}`);
+                    alert('Link donasi disalin!');
+                  }
                 }}
                 className="flex items-center gap-2 mx-auto bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-widest shadow-xl active:scale-95 transition-all"
               >

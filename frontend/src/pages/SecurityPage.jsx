@@ -1,33 +1,38 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import SecurityView from '../components/dashboard/SecurityView'; // Sesuaikan path-nya ke folder dashboard
+// ✅ GANTI: Gunakan instance api sentral agar sinkron dengan Railway
+import api from '../api/axios'; 
+import SecurityView from '../components/dashboard/SecurityView'; 
 import { useAuth } from '../context/AuthContext'; 
 import Swal from 'sweetalert2';
 
 const SecurityPage = () => {
-  const { user, setUser, API_URL } = useAuth();
+  // ✅ User tetap diambil dari context, tapi API_URL sudah diurus di axios.js
+  const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
-  const [qrCodeData, setQrCodeData] = useState(''); // State buat nyimpen URL QR Code dari backend
+  const [qrCodeData, setQrCodeData] = useState('');
 
-  // --- GENERATE SETUP 2FA (RAILWAY BACKEND) ---
+  // --- 1. GENERATE SETUP 2FA (SINKRON RAILWAY) ---
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Endpoint ini bakal nge-generate secret & QR code di backend lo
-      const res = await axios.post(`${API_URL}/api/auth/setup-2fa`, { userId: user.id });
+      // ✅ Cukup panggil endpoint, instance api sudah tahu baseURL-nya
+      const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
-        setQrCodeData(res.data.qrCode); // Simpan QR code dari backend
+        setQrCodeData(res.data.qrCode);
         setOtpSent(true);
         Swal.fire({
           icon: 'success',
           title: 'QR CODE SIAP',
           text: 'Scan pakai Google Authenticator kamu, Ri!',
           timer: 2000,
-          showConfirmButton: false
+          showConfirmButton: false,
+          customClass: {
+            popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
+          }
         });
       }
     } catch (err) {
@@ -38,25 +43,28 @@ const SecurityPage = () => {
     }
   };
 
-  // --- VERIFIKASI KODE OTP ---
+  // --- 2. VERIFIKASI KODE OTP ---
   const handleVerifyOTP = async () => {
     if (!otp) return;
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/verify-2fa`, { 
+      const res = await api.post('/auth/verify-2fa', { 
         userId: user.id, 
         token: otp 
       });
 
       if (res.data.success) {
-        setUser(res.data.user); // Update context user dengan status is_two_fa_enabled: true
+        setUser(res.data.user); 
         Swal.fire({
           icon: 'success',
           title: '2FA AKTIF',
           text: 'Akun kamu sekarang jauh lebih aman!',
+          customClass: {
+            popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
+          }
         }).then(() => {
-          // Ganti reload total dengan update state jika memungkinkan, 
-          // tapi reload aman buat pastiin semua komponen baca status terbaru.
+          // Sinkronisasi status terbaru tanpa reload total jika memungkinkan
+          // Tapi reload aman untuk memastikan state global terupdate
           window.location.reload(); 
         });
       }
@@ -68,7 +76,7 @@ const SecurityPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] pt-24 px-6">
+    <div className="min-h-screen bg-[#F8FAFF] pt-24 px-6 text-left">
       <div className="max-w-4xl mx-auto">
         <SecurityView 
           user={user}
@@ -76,7 +84,7 @@ const SecurityPage = () => {
           otp={otp}
           setOtp={setOtp}
           loading={loading}
-          qrCode={qrCodeData} // Kirim data QR Code ke view
+          qrCode={qrCodeData}
           onGenerateQR={handleGenerateOTP}
           onVerify={handleVerifyOTP}
         />

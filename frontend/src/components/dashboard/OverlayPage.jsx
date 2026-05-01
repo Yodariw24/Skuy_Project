@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Copy, Play, Eye, EyeOff, Save, Sparkles, Paintbrush, 
-  Settings2, Zap, Target, Trophy, Crown, 
-  ShieldCheck, Check, MousePointer2, Star, Video, Layers, Waves, Loader2
+  Copy, Play, Eye, EyeOff, Save, Zap, Target, Trophy, Crown, 
+  ShieldCheck, Check, Waves, Loader2, Settings2, Paintbrush
 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import axios from 'axios'; // GANTI: Pakai axios buat sinkron ke Railway
+// ✅ GANTI: Gunakan instance api sentral
+import api from '../api/axios'; 
 
 const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const [showUrl, setShowUrl] = useState(false);
@@ -44,14 +44,11 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const handleDeploy = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      // Kirim seluruh konfigurasi warna dan engine ke backend Railway
-      const res = await axios.put('https://backend-lo.railway.app/api/streamers/overlay-settings', {
+      // ✅ Cukup panggil endpoint, instance api sudah tahu baseURL dan token user_token
+      const res = await api.put('/streamers/overlay-settings', {
         userId: user.id,
         colors,
         config
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (res.status === 200) {
@@ -64,14 +61,20 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
         });
       }
     } catch (err) {
-      console.warn("Backend belum siap, simulasi ijo biar build sukses.");
-      Swal.fire('SIMULASI SUKSES', 'Protokol visual tersimpan lokal (Hubungkan Railway untuk real sync).', 'success');
+      console.warn("Backend belum respon, simulasi sukses.");
+      Swal.fire({
+        title: 'SIMULASI SUKSES', 
+        text: 'Protokol visual tersimpan lokal (Hubungkan Railway untuk real sync).', 
+        icon: 'success',
+        confirmButtonColor: colors.primary,
+        customClass: { popup: 'rounded-[3rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]' }
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. UNIQUE VISUAL ARCHITECTURE (Memoized)
+  // 3. UNIQUE VISUAL ARCHITECTURE
   const WidgetVisual = useMemo(() => {
     const variants = {
       tip: (
@@ -106,7 +109,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
       ),
       milestone: (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md bg-white p-12 rounded-[60px] shadow-2xl border border-slate-50 text-left">
-          <div className="flex justify-between items-end mb-8 px-2 text-left">
+          <div className="flex justify-between items-end mb-8 px-2">
             <h4 className="text-2xl font-black uppercase italic tracking-tighter text-slate-950">{config.goal_title}</h4>
             <span style={{ color: colors.primary }} className="text-3xl font-black italic">63%</span>
           </div>
@@ -162,11 +165,11 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
              <div className="flex-1 w-full text-left relative z-10">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-5 flex items-center gap-3 italic"> <ShieldCheck size={16} className="text-indigo-400" /> Railway Protocol Endpoint </h3>
                 <div className="bg-white/5 border border-white/10 p-6 rounded-3xl flex items-center justify-between backdrop-blur-md">
-                   <code className="text-[10px] font-mono text-indigo-300 font-bold truncate italic mr-8"> {showUrl ? `https://skuy.gg/widget/${user?.username}/${activeSubMenu}` : '••••••••••••••••••••••••••••••••'} </code>
-                   <button onClick={() => setShowUrl(!showUrl)} className="text-white/20 hover:text-white"> {showUrl ? <EyeOff size={20}/> : <Eye size={20}/>} </button>
+                    <code className="text-[10px] font-mono text-indigo-300 font-bold truncate italic mr-8"> {showUrl ? `https://skuy-project.vercel.app/v4/widget/${activeSubMenu}/${user?.id}` : '••••••••••••••••••••••••••••••••'} </code>
+                    <button onClick={() => setShowUrl(!showUrl)} className="text-white/20 hover:text-white"> {showUrl ? <EyeOff size={20}/> : <Eye size={20}/>} </button>
                 </div>
              </div>
-             <button onClick={() => { navigator.clipboard.writeText(`https://skuy.gg/widget/${user?.username}/${activeSubMenu}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-6 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl ${copied ? 'bg-green-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? 'Linked' : 'Copy Key'} </button>
+             <button onClick={() => { navigator.clipboard.writeText(`https://skuy-project.vercel.app/v4/widget/${activeSubMenu}/${user?.id}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-6 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl ${copied ? 'bg-green-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? 'Linked' : 'Copy Key'} </button>
           </div>
         </div>
 
@@ -177,26 +180,26 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
               <h3 className="text-[17px] font-black uppercase tracking-tighter italic text-slate-950">Engine Controls</h3>
             </div>
             <div className="space-y-12">
-               {activeSubMenu === 'tip' && (
-                 <div className="group text-left">
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-5 block px-1 tracking-[0.2em] italic">Activation Threshold (IDR)</label>
-                    <div className="bg-slate-50 border-2 border-transparent group-focus-within:border-indigo-600 group-focus-within:bg-white rounded-[35px] p-8 transition-all">
-                       <input type="number" value={config.min_tip} onChange={(e) => setConfig({...config, min_tip: e.target.value})} className="w-full bg-transparent font-black text-4xl outline-none tracking-tighter text-slate-950" />
-                    </div>
-                 </div>
-               )}
-               {activeSubMenu === 'milestone' && (
-                 <div className="space-y-10">
-                    <div className="group text-left">
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-4 block px-1 tracking-widest italic">Operation Objective</label>
-                      <input type="text" value={config.goal_title} onChange={(e) => setConfig({...config, goal_title: e.target.value})} className="w-full bg-slate-50 rounded-3xl p-7 font-black text-sm outline-none border-2 border-transparent focus:border-indigo-600 focus:bg-white transition-all uppercase" />
-                    </div>
-                 </div>
-               )}
-               <div className="pt-10 border-t border-slate-50">
-                  <div className="flex items-center gap-4 mb-10"> <Paintbrush size={20} className="text-fuchsia-500" /> <h4 className="text-[12px] font-black uppercase italic tracking-widest text-slate-950">Aesthetic Nodes</h4> </div>
-                  <div className="grid grid-cols-1 gap-5">
-                     {Object.keys(colors).map((key) => (
+                {activeSubMenu === 'tip' && (
+                  <div className="group text-left">
+                     <label className="text-[10px] font-black uppercase text-slate-400 mb-5 block px-1 tracking-[0.2em] italic">Activation Threshold (IDR)</label>
+                     <div className="bg-slate-50 border-2 border-transparent group-focus-within:border-indigo-600 group-focus-within:bg-white rounded-[35px] p-8 transition-all">
+                        <input type="number" value={config.min_tip} onChange={(e) => setConfig({...config, min_tip: e.target.value})} className="w-full bg-transparent font-black text-4xl outline-none tracking-tighter text-slate-950" />
+                     </div>
+                  </div>
+                )}
+                {activeSubMenu === 'milestone' && (
+                  <div className="space-y-10">
+                     <div className="group text-left">
+                       <label className="text-[10px] font-black uppercase text-slate-400 mb-4 block px-1 tracking-widest italic">Operation Objective</label>
+                       <input type="text" value={config.goal_title} onChange={(e) => setConfig({...config, goal_title: e.target.value})} className="w-full bg-slate-50 rounded-3xl p-7 font-black text-sm outline-none border-2 border-transparent focus:border-indigo-600 focus:bg-white transition-all uppercase" />
+                     </div>
+                  </div>
+                )}
+                <div className="pt-10 border-t border-slate-50">
+                   <div className="flex items-center gap-4 mb-10"> <Paintbrush size={20} className="text-fuchsia-500" /> <h4 className="text-[12px] font-black uppercase italic tracking-widest text-slate-950">Aesthetic Nodes</h4> </div>
+                   <div className="grid grid-cols-1 gap-5">
+                      {Object.keys(colors).map((key) => (
                         <div key={key} className="group relative bg-white border border-slate-100 p-5 rounded-[28px] hover:border-indigo-400 transition-all cursor-pointer">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
@@ -209,15 +212,10 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
                             <input type="color" value={colors[key]} onChange={(e) => setColors({...colors, [key]: e.target.value})} className="w-10 h-10 border-none cursor-pointer" />
                           </div>
                         </div>
-                     ))}
-                  </div>
-               </div>
+                      ))}
+                   </div>
+                </div>
             </div>
-          </div>
-          <div style={{ backgroundColor: colors.primary }} className="rounded-[65px] p-12 text-white shadow-2xl relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000"><Waves size={150} /></div>
-             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60 mb-3 italic">Expert Advisory</p>
-             <h4 className="text-xl font-black uppercase leading-tight italic tracking-tighter mb-6">Gunakan hardware acceleration di OBS untuk performa visual 60FPS.</h4>
           </div>
         </div>
       </div>

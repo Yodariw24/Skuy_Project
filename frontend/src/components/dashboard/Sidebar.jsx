@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, LogIn, Activity, Tv, LogOut, User, Moon, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette } from 'lucide-react';
+import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
@@ -18,10 +18,9 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     ];
     const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
     
-    // Pakai Swal langsung biar konsisten pro
     Swal.fire({
       title: 'SKUY TIPS 💡',
-      html: `<div className="text-left font-bold italic text-slate-600">${randomTip}</div>`,
+      html: `<div class="text-left font-bold italic text-slate-600">${randomTip}</div>`,
       icon: 'info',
       customClass: {
         popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
@@ -31,7 +30,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     });
   };
 
-  // --- PERBAIKAN: Logout Bersih Tanpa Supabase ---
+  // --- PERBAIKAN: Logout Bersih & Sinkron ---
   const logout = async () => {
     const result = await Swal.fire({
       title: 'KELUAR SESI?',
@@ -50,8 +49,8 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     });
 
     if (result.isConfirmed) {
-      // Bersihkan semua jejak login dari Railway
-      localStorage.removeItem('token');
+      // ✅ GANTI: Hapus key 'user_token' agar sinkron dengan file lainnya
+      localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       localStorage.clear(); 
       
@@ -108,7 +107,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 overflow-hidden font-sans shadow-sm">
+    <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 overflow-hidden font-sans shadow-sm text-left">
       <div className="p-8 flex items-center gap-3.5 group cursor-default">
         <div className="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-violet-100 group-hover:rotate-12 transition-all duration-500">
           <Zap size={18} fill="currentColor" />
@@ -174,7 +173,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
               src={user?.profile_picture} 
               alt="Avatar" 
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
+              onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
              />
           </div>
           <div className="overflow-hidden">

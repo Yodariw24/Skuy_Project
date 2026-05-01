@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
+// ✅ GANTI: Gunakan instance api sentral
+import api from '../api/axios' 
 import { 
   Copy, ExternalLink, Eye, EyeOff, Edit3, Landmark, ChevronDown, 
-  Wallet, ArrowUpRight, Clock, CheckCircle2, Link as LinkIcon, 
-  History, ArrowDownLeft, ChevronRight, Info, AlertCircle, RefreshCw
+  Wallet, ArrowUpRight, Clock, Link as LinkIcon, 
+  History, ArrowDownLeft, Info, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Swal from 'sweetalert2'
-
-// URL Backend Railway lo
-const API_URL = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
 
 function EarningsView({ user, balance, showBalance, setShowBalance, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua')
@@ -22,19 +20,17 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
 
   const navigate = useNavigate();
 
-  // --- FETCH HISTORY DARI BACKEND RAILWAY ---
+  // --- 1. FETCH HISTORY DARI BACKEND RAILWAY ---
   const fetchHistory = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/api/wallet/history/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ Cukup panggil endpoint, interceptor otomatis menempelkan user_token
+      const res = await api.get(`/wallet/history/${user.id}`);
       if (res.data) setTransactions(res.data);
     } catch (err) {
-      console.warn("Backend belum konek, pake data simulasi dulu Ri.");
-      // DATA DUMMY BIAR UI GAK KOSONG PAS BUILD VERCEL
+      console.warn("Koneksi gagal, cek log Railway lo Ri.");
+      // Fallback data simulasi agar UI tidak kosong saat build
       setTransactions([
         { id: 1, type: 'IN', amount: 50000, description: 'Donasi dari Sultan_Reza', created_at: new Date() },
         { id: 2, type: 'OUT', amount: 100000, description: 'Penarikan ke BCA', created_at: new Date() }
@@ -55,7 +51,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     return true;
   });
 
-  // --- LOGIKA WITHDRAW (KIRIM KE BACKEND RAILWAY) ---
+  // --- 2. LOGIKA WITHDRAW (SINKRON RAILWAY) ---
   const handleWithdraw = async () => {
     if (!withdrawAmount || withdrawAmount < 10000) {
       return Swal.fire('DITOLAK', 'Minimal penarikan Rp 10.000, Ri!', 'error');
@@ -65,13 +61,11 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/api/wallet/withdraw`, {
+      // ✅ Kirim permintaan tarik saldo ke Railway Cloud
+      await api.post('/wallet/withdraw', {
         userId: user.id,
         amount: parseInt(withdrawAmount),
         bank: bankData
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       Swal.fire({
@@ -85,8 +79,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
       setWithdrawAmount('');
       fetchHistory(); 
     } catch (err) {
-      console.warn("Simulasi: Penarikan Berhasil!");
-      setIsWithdrawModalOpen(false);
+      Swal.fire('ERROR', 'Gagal memproses penarikan di server.', 'error');
     }
   };
 
@@ -96,10 +89,10 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
   };
 
   return (
-    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-20 px-2 font-sans">
+    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-20 px-2 font-sans text-left">
       
       {/* --- HEADER --- */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4 text-left">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
         <div>
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none mb-3">
             My Wallet
@@ -118,7 +111,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
         </motion.button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* --- LEFT SIDE --- */}
         <div className="lg:col-span-8 space-y-8">
@@ -186,7 +179,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               {loading ? (
                 <div className="py-20 flex flex-col items-center gap-4 text-slate-300">
                   <RefreshCw size={32} className="animate-spin" />
-                  <p className="text-[10px] font-black uppercase tracking-widest italic">Connecting to Railway Cloud...</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest italic">Syncing with Railway Cloud...</p>
                 </div>
               ) : filteredTransactions.length > 0 ? (
                 <div className="space-y-5">
@@ -194,10 +187,10 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
                       key={tx.id} 
-                      className="group flex flex-col md:flex-row md:items-center justify-between p-7 rounded-[2.5rem] bg-slate-50/50 border border-transparent hover:border-violet-100 hover:bg-white transition-all duration-300 hover:shadow-2xl hover:shadow-slate-200/50"
+                      className="group flex flex-col md:flex-row md:items-center justify-between p-7 rounded-[2.5rem] bg-slate-50/50 border border-transparent hover:border-violet-100 transition-all duration-300 shadow-sm"
                     >
                       <div className="flex items-center gap-6">
-                        <div className={`p-4 rounded-[1.5rem] shadow-lg ${tx.type === 'IN' ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-rose-500 text-white shadow-rose-100'}`}>
+                        <div className={`p-4 rounded-[1.5rem] shadow-lg ${tx.type === 'IN' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {tx.type === 'IN' ? <ArrowDownLeft size={20} strokeWidth={3} /> : <ArrowUpRight size={20} strokeWidth={3} />}
                         </div>
                         <div>
@@ -243,7 +236,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               skuy.gg/<span className="text-violet-600">{user?.username}</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => copyToClipboard(`https://skuy.gg/${user?.username}`, "Link profil disalin! 📋")} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
+              <button onClick={() => copyToClipboard(`https://skuy-project.vercel.app/${user?.username}`, "Link profil disalin! 📋")} className="py-4 bg-violet-50 text-violet-600 rounded-2xl text-[9px] font-black uppercase hover:bg-violet-600 hover:text-white transition-all italic tracking-widest">Copy</button>
               <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="py-4 bg-slate-950 text-white rounded-2xl text-[9px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-lg shadow-slate-200 transition-all hover:bg-violet-600 italic tracking-widest">Visit <ExternalLink size={12}/></a>
             </div>
           </div>
@@ -251,7 +244,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
           <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50 group-hover:opacity-100 transition-all" />
             <div className="flex justify-between items-start mb-8 relative z-10">
-              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 italic text-left leading-none">
+              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 italic leading-none">
                 <Landmark size={14} className="text-violet-600" /> Bank Account
               </h4>
               <button onClick={openEditModal} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-violet-600 hover:bg-violet-100 transition-all border border-slate-100 active:scale-90 shadow-sm"><Edit3 size={14} /></button>

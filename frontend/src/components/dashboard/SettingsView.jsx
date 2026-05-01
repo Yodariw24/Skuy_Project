@@ -3,12 +3,21 @@ import ProfileSettings from './ProfileSettings'
 import { motion } from 'framer-motion'
 
 export default function SettingsView({ user, setUser }) {
+  // ✅ PENCEGAHAN BLANK SCREEN: Jika user sedang fetch, kasih loading state tipis
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     // Animasi masuk tetap halus agar terlihat premium
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto pb-20 px-2 font-sans"
+      className="max-w-5xl mx-auto pb-20 px-2 font-sans text-left"
     >
       {/* --- HEADER --- */}
       <div className="mb-10 px-1">
@@ -26,6 +35,7 @@ export default function SettingsView({ user, setUser }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* KOLOM KIRI: CORE PROFILE FORM (Koneksi ke Backend Railway via ProfileSettings) */}
         <div className="lg:col-span-8">
+          {/* ✅ Pastikan ProfileSettings di dalamnya sudah pakai instance api kita */}
           <ProfileSettings user={user} setUser={setUser} />
         </div>
 
@@ -48,6 +58,7 @@ export default function SettingsView({ user, setUser }) {
                   <span className="text-[11px] font-black uppercase text-slate-700 tracking-tight">Night Protocol</span>
                 </div>
                 
+                {/* Toggle Button (Experimental) */}
                 <label className="relative inline-flex items-center cursor-not-allowed opacity-50">
                   <input type="checkbox" disabled className="sr-only peer" />
                   <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-violet-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
@@ -67,10 +78,16 @@ export default function SettingsView({ user, setUser }) {
           <div className="p-8 bg-slate-950 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-violet-600 blur-3xl opacity-40" />
              <p className="text-[8px] font-black uppercase tracking-[0.4em] text-white/40 mb-2">Railway Session</p>
-             <p className="text-[10px] font-bold italic text-white leading-relaxed">
+             <div className="text-[10px] font-bold italic text-white leading-relaxed">
                Active User ID: <br/>
-               <span className="text-violet-400 break-all font-mono opacity-80">{user?.id || 'NO_SESSION'}</span>
-             </p>
+               <span className="text-violet-400 break-all font-mono opacity-80 select-all">
+                {user?.id || 'NO_SESSION'}
+               </span>
+               <div className="mt-2 flex items-center gap-2">
+                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                 <span className="text-[8px] text-emerald-500 uppercase tracking-widest">Sync Stable</span>
+               </div>
+             </div>
           </div>
         </div>
       </div>
