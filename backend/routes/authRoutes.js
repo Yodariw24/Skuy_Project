@@ -1,13 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt'); // WAJIB buat hashing password
-const { OAuth2Client } = require('google-auth-library');
+const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+require('dotenv').config();
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// --- 1. SETUP NODEMAILER ---
+// --- 1. SETUP NODEMAILER (RAILWAY READY) ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -25,95 +23,116 @@ const generateToken = (user) => {
     );
 };
 
-// --- 3. REGISTER (Biar data masuk ke Railway) ---
+// --- 3. REGISTER (SULTAN ONBOARDING) ---
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
+    
+    // Proteksi Dasar
+    if (!username || !email || !password) {
+        return res.status(400).json({ success: false, message: "Data belum lengkap, Ri!" });
+    }
+
     try {
-        // Hash password sebelum simpan (Biar login gak Invalid)
+        // Hash password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const query = `
-            INSERT INTO streamers (username, email, password, full_name, role) 
-            VALUES ($1, $2, $3, $4, 'creator') 
+        // Gunakan Transaction agar data balance ikut terbuat
+        await req.db.query('BEGIN');
+
+        const insertStreamer = `
+            INSERT INTO streamers (username, email, password, full_name, role, theme_color) 
+            VALUES ($1, $2, $3, $4, 'creator', 'violet') 
             RETURNING id, username, email
         `;
-        
-        // req.db didapat dari index.js yang kita buat tadi
-        const { rows } = await req.db.query(query, [username, email, hashedPassword, full_name]);
+        const { rows } = await req.db.query(insertStreamer, [username, email, hashedPassword, full_name]);
+        const newUser = rows[0];
+
+        // Inisialisasi saldo otomatis buat Sultan baru
+        await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, $2)', [newUser.id, 0]);
+
+        await req.db.query('COMMIT');
         
         res.status(201).json({ 
             success: true, 
-            message: "Akun Sultan Berhasil Dibuat! 🚀",
-            user: rows[0] 
+            message: "Akun Sultan & Wallet Berhasil Dibuat! 🚀",
+            user: newUser 
         });
     } catch (err) {
+        await req.db.query('ROLLBACK');
         console.error("REGISTER ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Username atau Email sudah dipakai, Ri!" });
+        res.status(500).json({ success: false, message: "Username/Email sudah terdaftar atau Database Error!" });
     }
 });
 
-// --- 4. LOGIN ---
+// --- 4. LOGIN (CORE GATEWAY) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const { rows } = await req.db.query("SELECT * FROM streamers WHERE email = $1", [email]);
         
         if (rows.length === 0) {
-            return res.status(404).json({ success: false, message: "Email tidak terdaftar!" });
+            return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
         }
 
         const user = rows[0];
-        
-        // Bandingkan password input dengan hash di database
         const isMatch = await bcrypt.compare(password, user.password);
+        
         if (!isMatch) {
-            return res.status(400).json({ success: false, message: "Password Salah!" });
+            return res.status(400).json({ success: false, message: "Password Salah, Coba lagi!" });
         }
 
-        // Kalau user aktifin 2FA, jangan kasih token dulu
+        // Jika 2FA Aktif, kirim sinyal ke FE buat buka input OTP
         if (user.is_two_fa_enabled) {
             return res.json({ 
                 requiresTwoFA: true, 
                 userId: user.id, 
-                message: "Masukkan Kode OTP dari Email lo!" 
+                message: "Keamanan Tinggi Aktif! Cek OTP di Email lo." 
             });
         }
 
         res.json({ 
             success: true, 
             token: generateToken(user), 
-            user: { id: user.id, username: user.username, role: user.role } 
+            user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name } 
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Server Login Error" });
+        res.status(500).json({ success: false, message: "Server Login Failure" });
     }
 });
 
-// --- 5. SETUP 2FA (Kirim OTP) ---
+// --- 5. SETUP/RESEND 2FA (EMAIL ENGINE) ---
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-        const { rows } = await req.db.query("SELECT email FROM streamers WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ message: "User tak ada" });
+        const { rows } = await req.db.query("SELECT email, username FROM streamers WHERE id = $1", [userId]);
+        if (rows.length === 0) return res.status(404).json({ message: "User not found" });
 
-        const userEmail = rows[0].email;
+        const user = rows[0];
+        // Simpan OTP ke kolom secret buat sementara
         await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE id = $2", [otp, userId]);
 
         await transporter.sendMail({
-            from: '"SkuyGG Security" <noreply@skuy.gg>',
-            to: userEmail,
-            subject: `[${otp}] Kode Keamanan SkuyGG`,
-            html: `<div style="font-family:sans-serif; text-align:center; border:4px solid #000; padding:20px; border-radius:20px;">
-                    <h1 style="font-style:italic;">SECURITY PROTOCOL</h1>
-                    <p>Masukkan kode ini untuk verifikasi akun Sultan kamu:</p>
-                    <h2 style="letter-spacing:10px; color:#7c3aed; font-size:40px;">${otp}</h2>
-                   </div>`
+            from: '"SkuyGG Security" <security@skuy.gg>',
+            to: user.email,
+            subject: `[${otp}] Otorisasi Masuk SkuyGG`,
+            html: `
+                <div style="font-family:sans-serif; max-width:400px; margin:auto; border:5px solid #000; padding:30px; border-radius:30px; background:#f8faff;">
+                    <h2 style="font-style:italic; text-transform:uppercase;">Shield Protocol</h2>
+                    <p style="font-weight:bold;">Halo @${user.username},</p>
+                    <p>Seseorang mencoba masuk ke akun Sultan kamu. Gunakan kode di bawah:</p>
+                    <div style="background:#7c3aed; color:#fff; padding:20px; border-radius:15px; text-align:center; font-size:35px; font-weight:900; letter-spacing:8px;">
+                        ${otp}
+                    </div>
+                    <p style="font-size:10px; color:#94a3b8; margin-top:20px;">Jika bukan kamu, segera ganti password akun lo!</p>
+                </div>
+            `
         });
-        res.json({ success: true, message: "OTP Terkirim ke Email!" });
+        res.json({ success: true, message: "Kode OTP meluncur ke email!" });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal kirim email" });
+        console.error("MAIL ERROR:", err);
+        res.status(500).json({ success: false, message: "Gagal memicu pengiriman email" });
     }
 });
 
@@ -124,18 +143,20 @@ router.post('/verify-2fa', async (req, res) => {
         const { rows } = await req.db.query("SELECT * FROM streamers WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (user && user.two_fa_secret === token) {
+        if (user && user.two_fa_secret === token && token !== null) {
+            // Aktifkan status 2FA dan hapus secret yang sudah dipakai
             await req.db.query("UPDATE streamers SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
+            
             res.json({ 
                 success: true, 
                 token: generateToken(user), 
                 user: { id: user.id, username: user.username, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "Kode OTP Salah!" });
+            res.status(400).json({ success: false, message: "OTP Invalid atau Kadaluwarsa!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal verifikasi" });
+        res.status(500).json({ success: false, message: "Gagal verifikasi sistem" });
     }
 });
 

@@ -1,8 +1,6 @@
-const pool = require('../config/db');
-
-// 1. Update Setting (Deploy Protocol)
+// 1. Update Setting (Deploy Protocol dari Dashboard)
 exports.updateSettings = async (req, res) => {
-    // Destructuring dengan default value agar tidak error saat dikirim kosong
+    // Destructuring dengan default value agar aman
     const { userId, widgetType, colors = {}, config = {} } = req.body;
 
     // Proteksi: Pastikan data esensial ada
@@ -29,7 +27,7 @@ exports.updateSettings = async (req, res) => {
             RETURNING *;
         `;
         
-        // Gunakan fallback (||) agar tidak null di Database
+        // Gunakan fallback agar data di Railway tetap konsisten
         const values = [
             userId, 
             widgetType, 
@@ -37,34 +35,48 @@ exports.updateSettings = async (req, res) => {
             colors.accent || '#fbbf24', 
             colors.text || '#ffffff', 
             colors.glow || '#818cf8', 
-            config.min_tip || 1000, 
+            config.min_tip || 10000, 
             config.duration || 8,
-            config.goal_title || 'Donation Goal', 
-            config.goal_target || 1000000
+            config.goal_title || 'EVOLVE STREAM SETUP', 
+            config.goal_target || 15000000
         ];
         
-        const result = await pool.query(query, values);
-        res.status(200).json({ success: true, data: result.rows[0] });
+        const result = await req.db.query(query, values);
+
+        // KIRIM SINYAL UPDATE KE WIDGET YANG SEDANG LIVE DI OBS
+        // Ini biar streamer nggak usah refresh Browser Source di OBS tiap kali ganti warna
+        req.io.to(`streamer_${userId}`).emit('widget-update', {
+            type: widgetType,
+            settings: result.rows[0]
+        });
+
+        res.status(200).json({ 
+            success: true, 
+            message: "Protocol deployed to Railway Cloud! 🚀",
+            data: result.rows[0] 
+        });
     } catch (err) {
-        console.error("Error updateSettings:", err.message);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("🔥 Error updateSettings:", err.message);
+        res.status(500).json({ success: false, message: "Gagal deploy protokol visual" });
     }
 };
 
-// 2. Get Setting (Dipanggil oleh OBS Widget Client)
+// 2. Get Setting (Dipanggil oleh Browser Source OBS)
 exports.getSettings = async (req, res) => {
     const { streamKey, widgetType } = req.params;
     
     try {
+        // FIX: Sesuaikan nama tabel ke 'streamers'
         const query = `
-            SELECT ws.* FROM widget_settings ws
-            JOIN users u ON u.id = ws.user_id
-            WHERE u.stream_key = $1 AND ws.widget_type = $2;
+            SELECT ws.* 
+            FROM widget_settings ws
+            JOIN streamers s ON s.id = ws.user_id
+            WHERE s.username = $1 AND ws.widget_type = $2;
         `;
-        const result = await pool.query(query, [streamKey, widgetType]);
+        // Catatan: Jika lo pake stream_key (UUID), ganti s.username jadi s.stream_key
+        const result = await req.db.query(query, [streamKey, widgetType]);
         
-        // JANGAN ERROR 404 kalau data tidak ada, tapi kasih DATA DEFAULT
-        // Ini supaya widget di OBS tidak mati/error saat streamer baru pertama kali pakai
+        // DATA DEFAULT: Biar OBS nggak blank pas pertama pasang
         if (result.rows.length === 0) {
             return res.status(200).json({ 
                 success: true, 
@@ -75,15 +87,16 @@ exports.getSettings = async (req, res) => {
                     text_color: '#ffffff',
                     glow_color: '#818cf8',
                     duration: 8,
-                    goal_title: 'Support Me!',
-                    goal_target: 1000000
+                    min_tip: 10000,
+                    goal_title: 'Support My Journey!',
+                    goal_target: 10000000
                 } 
             });
         }
         
         res.status(200).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        console.error("Error getSettings:", err.message);
-        res.status(500).json({ success: false, message: "Error fetching settings" });
+        console.error("🔥 Error getSettings:", err.message);
+        res.status(500).json({ success: false, message: "Error fetching Skuy Engine settings" });
     }
 };

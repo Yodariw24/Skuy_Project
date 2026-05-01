@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/db'); 
+// req.db sudah di-inject di server.js, jadi kita gak butuh require pool lagi di sini kalau mau konsisten
 const { 
   createDonation, 
   getDonationsByStreamer, 
@@ -13,40 +13,39 @@ const {
 
 const { validateDonation } = require('../middleware/validator');
 
-// --- 1. ROUTE AMBIL PROFIL VIA USERNAME (FIXED TOTAL) ---
+// --- 1. PROFIL PROTOCOL (Dinamis via Username) ---
 router.get('/profile/:username', async (req, res) => {
   const { username } = req.params;
   try {
-    // FIX: Nama tabel 'streamers' (bukan users)
-    // FIX: Kolom 'profile_picture' (bukan avatar)
-    const result = await pool.query(
+    // ILIKE biar case-insensitive (Ari atau ari sama aja)
+    const result = await req.db.query(
       "SELECT id, username, display_name, full_name, bio, theme_color, profile_picture FROM streamers WHERE username ILIKE $1",
       [username]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Creator tidak ditemukan" });
+      return res.status(404).json({ success: false, message: "Sultan tidak ditemukan di database Railway!" });
     }
 
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
-    // Pesan ini akan muncul di terminal backend kamu kalau ada masalah
-    console.error("SQL ERROR DI GUDANG STREAMERS:", err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("🔥 DATABASE PROFILE ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Gagal mengambil data Sultan." });
   }
 });
 
-// --- 2. ROUTE SPESIFIK ---
+// --- 2. TRANSACTIONAL ROUTES (Urutan Statis di Atas) ---
+// Catatan: Pastikan endpoint withdraw ini diproteksi middleware auth nantinya
 router.post('/withdraw', withdrawBalance); 
 
-// --- 3. ROUTE DENGAN PARAMETER :id ---
-router.get('/:id/wallet-history', getWalletHistory); 
+// --- 3. STREAMER SPECIFIC DATA (Via ID) ---
 router.get('/:id/balance', getStreamerBalance);
-router.get('/:id/history', getPublicHistory);
-router.put('/:id/status', updateDonationStatus);
+router.get('/:id/wallet-history', getWalletHistory); 
+router.get('/:id/history', getPublicHistory); // History publik untuk halaman donasi
 router.get('/:id', getDonationsByStreamer);
 
-// --- 4. PUBLIC ROUTE ---
+// --- 4. DONATION ACTION ---
 router.post('/', validateDonation, createDonation); 
+router.put('/:id/status', updateDonationStatus); // ID di sini adalah donationId
 
 module.exports = router;

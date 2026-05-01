@@ -1,25 +1,35 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http'); 
+const path = require('path');
 const { Server } = require('socket.io'); 
 const { Pool } = require('pg'); 
 require('dotenv').config();
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes'); // Nanti kita buat ini
+const walletRoutes = require('./routes/walletRoutes'); // Nanti kita buat ini
 
 const app = express();
 
 // --- 1. CONFIG DATABASE (PostgreSQL Railway) ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost') 
+    ? { rejectUnauthorized: false } 
+    : false
 });
 
-// Cek koneksi ke database saat server nyala
+// Cek koneksi ke database
+pool.on('error', (err) => {
+  console.error('❌ Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
 pool.connect((err, client, release) => {
   if (err) {
-    return console.error('❌ DATABASE ERROR:', err.stack);
+    return console.error('❌ DATABASE CONNECTION ERROR:', err.stack);
   }
   console.log('✅ KONEKSI KE POSTGRESQL RAILWAY BERHASIL!');
   release();
@@ -38,8 +48,12 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Header tambahan untuk keamanan & Google Auth
+// Akses file statis (Foto Profil)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Header tambahan untuk Google Auth & Security
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -52,7 +66,20 @@ const io = new Server(server, {
   cors: { origin: allowedOrigins, credentials: true }
 });
 
-// Inject database & io ke setiap request (Biar gampang dipanggil di controller)
+// Logika Real-time Engine
+io.on('connection', (socket) => {
+  const streamerId = socket.handshake.query.streamerId;
+  if (streamerId) {
+    socket.join(`streamer_${streamerId}`);
+    console.log(`📡 Widget Connected: Streamer ${streamerId}`);
+  }
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket Disconnected');
+  });
+});
+
+// Inject database & io ke setiap request
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
@@ -63,22 +90,40 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.json({ 
     status: "online", 
-    message: "SkuyGG Engine is Running! 🚀",
-    database: "Connected" 
+    message: "SkuyGG Engine v4.0 is Gacor! 🚀",
+    database: "Connected",
+    timestamp: new Date()
   });
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // --- 5. ERROR HANDLING (Global) ---
-// Biar kalau ada error kodingan, server nggak langsung mati total
 app.use((err, req, res, next) => {
   console.error('🔥 SERVER ERROR:', err.stack);
-  res.status(500).json({ error: 'Ada masalah di server, Ri!' });
+  res.status(err.status || 500).json({ 
+    success: false,
+    message: err.message || 'Ada masalah di server Railway, Ri!' 
+  });
 });
 
 // --- 6. LISTEN SERVER ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 ENGINE NYALA DI PORT ${PORT}`);
+  console.log(`🌍 Health Check: http://localhost:${PORT}/`);
+});
+
+// Graceful Shutdown
+process.on('SIGTERM', () => {
+  console.info('SIGTERM signal received. Closing server...');
+  server.close(() => {
+    console.log('Http server closed.');
+    pool.end(() => {
+      console.log('Database pool has ended.');
+      process.exit(0);
+    });
+  });
 });
