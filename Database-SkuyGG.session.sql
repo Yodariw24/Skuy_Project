@@ -1,12 +1,11 @@
--- 1. Hapus sementara data saldo yang lama agar tidak bentrok
-TRUNCATE TABLE balance;
-
--- 2. Pastikan tabel balance punya kolom yang benar dan sinkron
--- Jika tabel balance menggunakan streamer_id, pastikan dia merujuk ke ID yang benar
+-- 1. Hapus dulu aturan lama yang bikin error
 ALTER TABLE balance DROP CONSTRAINT IF EXISTS balance_streamer_id_fkey;
 
--- 3. Tambahkan kembali constraint yang benar (referensi ke user_id atau id streamer yang baru)
--- Catatan: Sesuaikan 'streamer_id' dengan kolom yang ada di kodingan controller pendaftaran lo
+-- 2. Kosongkan tabel balance (biar data sampah nggak bikin bentrok)
+TRUNCATE TABLE balance;
+
+-- 3. Pasang aturan baru: hubungkan balance langsung ke users(id) 
+-- karena di kodingan lo newUser.id itu berasal dari tabel users
 ALTER TABLE balance 
 ADD CONSTRAINT balance_streamer_id_fkey 
-FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE;
+FOREIGN KEY (streamer_id) REFERENCES users(id) ON DELETE CASCADE;

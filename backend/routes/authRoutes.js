@@ -23,7 +23,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 3. REGISTER (SINKRONISASI USERS & STREAMERS) ---
+// --- 3. REGISTER (FIXED SYNC) ---
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
     
@@ -35,9 +35,10 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        // Mulai Transaksi Database
         await req.db.query('BEGIN');
 
-        // ✅ LANGKAH 1: Masukkan ke tabel USERS (Pondasi Utama)
+        // ✅ LANGKAH 1: Masukkan ke tabel USERS
         const insertUser = `
             INSERT INTO users (username, email, password, role) 
             VALUES ($1, $2, $3, 'creator') 
@@ -46,16 +47,22 @@ router.post('/register', async (req, res) => {
         const userRes = await req.db.query(insertUser, [username, email, hashedPassword]);
         const newUser = userRes.rows[0];
 
-        // ✅ LANGKAH 2: Masukkan ke tabel STREAMERS (Gunakan ID dari USERS)
+        // ✅ LANGKAH 2: Masukkan ke tabel STREAMERS (Hubungkan via user_id)
         const insertStreamer = `
             INSERT INTO streamers (user_id, username, email, full_name, role, theme_color) 
             VALUES ($1, $2, $3, $4, $5, 'violet')
         `;
         await req.db.query(insertStreamer, [newUser.id, newUser.username, newUser.email, full_name, newUser.role]);
 
-        // ✅ LANGKAH 3: Setup Balance (Wallet) berdasarkan user_id
-        await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, $2)', [newUser.id, 0]);
+        // ✅ LANGKAH 3: Setup Balance (Wallet)
+        // Menggunakan newUser.id karena SQL lo merujuk balance(streamer_id) ke users(id)
+        const insertBalance = `
+            INSERT INTO balance (streamer_id, total_saldo) 
+            VALUES ($1, $2)
+        `;
+        await req.db.query(insertBalance, [newUser.id, 0]);
 
+        // Selesaikan Transaksi
         await req.db.query('COMMIT');
         
         res.status(201).json({ 
@@ -64,17 +71,17 @@ router.post('/register', async (req, res) => {
             user: newUser 
         });
     } catch (err) {
+        // Batalkan jika ada salah satu yang gagal
         await req.db.query('ROLLBACK');
         console.error("REGISTER ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Username/Email sudah terdaftar!" });
+        res.status(500).json({ success: false, message: "Pendaftaran gagal, cek apakah email/username sudah dipakai." });
     }
 });
 
-// --- 4. LOGIN (JOIN USERS & STREAMERS) ---
+// --- 4. LOGIN (FIXED JOIN) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        // ✅ UPDATE: Ambil data gabungan agar 'role' dan 'full_name' sinkron
         const query = `
             SELECT u.*, s.full_name, s.is_two_fa_enabled, s.two_fa_secret, s.profile_picture 
             FROM users u
@@ -91,14 +98,14 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         
         if (!isMatch) {
-            return res.status(400).json({ success: false, message: "Password Salah, Coba lagi!" });
+            return res.status(400).json({ success: false, message: "Password Salah!" });
         }
 
         if (user.is_two_fa_enabled) {
             return res.json({ 
                 requiresTwoFA: true, 
                 userId: user.id, 
-                message: "Keamanan Tinggi Aktif! Cek OTP di Email lo." 
+                message: "2FA Aktif! Silakan verifikasi." 
             });
         }
 
@@ -115,18 +122,17 @@ router.post('/login', async (req, res) => {
         });
     } catch (err) {
         console.error("LOGIN ERROR:", err);
-        res.status(500).json({ success: false, message: "Server Login Failure" });
+        res.status(500).json({ success: false, message: "Server Error saat Login" });
     }
 });
 
-// --- 5. SETUP/RESEND 2FA ---
+// --- 5. SETUP 2FA (EMAIL OTP) ---
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-        // ✅ UPDATE: Ambil data dari tabel gabungan
         const { rows } = await req.db.query("SELECT email, username FROM users WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ message: "User not found" });
+        if (rows.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
 
         const user = rows[0];
         await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otp, userId]);
@@ -134,21 +140,13 @@ router.post('/setup-2fa', async (req, res) => {
         await transporter.sendMail({
             from: '"SkuyGG Security" <security@skuy.gg>',
             to: user.email,
-            subject: `[${otp}] Otorisasi Masuk SkuyGG`,
-            html: `
-                <div style="font-family:sans-serif; max-width:400px; margin:auto; border:5px solid #000; padding:30px; border-radius:30px; background:#f8faff;">
-                    <h2 style="font-style:italic; text-transform:uppercase;">Shield Protocol</h2>
-                    <p style="font-weight:bold;">Halo @${user.username},</p>
-                    <p>Gunakan kode di bawah untuk masuk:</p>
-                    <div style="background:#7c3aed; color:#fff; padding:20px; border-radius:15px; text-align:center; font-size:35px; font-weight:900; letter-spacing:8px;">
-                        ${otp}
-                    </div>
-                </div>
-            `
+            subject: `[${otp}] Kode Keamanan SkuyGG`,
+            html: `<div style="padding:20px; border:1px solid #ddd;"><h2>OTP: ${otp}</h2></div>`
         });
-        res.json({ success: true, message: "Kode OTP meluncur ke email!" });
+
+        res.json({ success: true, message: "OTP terkirim ke email!" });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal mengirim email" });
+        res.status(500).json({ success: false, message: "Gagal kirim OTP" });
     }
 });
 
@@ -156,7 +154,6 @@ router.post('/setup-2fa', async (req, res) => {
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
-        // ✅ UPDATE: JOIN agar dapet data role saat login via 2FA
         const query = `
             SELECT u.*, s.two_fa_secret 
             FROM users u
@@ -175,10 +172,10 @@ router.post('/verify-2fa', async (req, res) => {
                 user: { id: user.id, username: user.username, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "OTP Invalid!" });
+            res.status(400).json({ success: false, message: "OTP Salah!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal verifikasi" });
+        res.status(500).json({ success: false, message: "Verifikasi gagal" });
     }
 });
 
