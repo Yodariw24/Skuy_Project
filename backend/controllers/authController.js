@@ -2,7 +2,7 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import jwt from 'jsonwebtoken';
 
-// FUNGSI 1: SETUP 2FA (Update: Gunakan user_id sebagai foreign key)
+// --- 1. SETUP 2FA ---
 export const setup2FA = async (req, res) => {
   const { id, email, username } = req.user; 
   
@@ -11,7 +11,7 @@ export const setup2FA = async (req, res) => {
       name: `Skuy.GG (${email || username})` 
     });
     
-    // ✅ PERBAIKAN: Gunakan user_id agar sinkron dengan tabel users
+    // Simpan secret ke tabel streamers berdasarkan user_id (FK)
     await req.db.query(
       'UPDATE streamers SET two_fa_secret = $1, is_two_fa_enabled = false WHERE user_id = $2', 
       [secret.base32, id]
@@ -30,15 +30,14 @@ export const setup2FA = async (req, res) => {
   }
 };
 
-// FUNGSI 2: VERIFIKASI & LOGIN (Final Gateway - SINKRONISASI ROLE)
+// --- 2. VERIFY & LOGIN (OBAT UNDEFINED ROLE) ---
 export const verify2FA = async (req, res) => {
   const { userId, token } = req.body;
   
   if (!token) return res.status(400).json({ message: "Kode OTP wajib diisi!" });
 
   try {
-    // ✅ PERBAIKAN VITAL: Gunakan JOIN agar narik data 'role' dari tabel users
-    // Ini yang bikin menu My Wallet lo kebuka otomatis!
+    // JOIN VITAL: Menggabungkan data 'role' dari users dan profil dari streamers
     const query = `
       SELECT u.id, u.username, u.role, s.two_fa_secret, s.full_name, s.profile_picture 
       FROM users u
@@ -48,7 +47,7 @@ export const verify2FA = async (req, res) => {
     const result = await req.db.query(query, [userId]);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Data User & Streamer tidak sinkron, Ri!" });
+      return res.status(404).json({ success: false, message: "Data Sultan gak sinkron di database!" });
     }
 
     const user = result.rows[0];
@@ -61,12 +60,12 @@ export const verify2FA = async (req, res) => {
     });
 
     if (verified) {
-      // 1. Permanenkan status 2FA di Database
+      // Update status 2FA jadi aktif
       await req.db.query('UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1', [userId]);
       
-      // 2. Generate JWT (Pastikan role 'creator' masuk ke sini)
+      // Bungkus data role ke dalam JWT
       const appToken = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
+        { id: user.id, username: user.username, role: user.role || 'creator' },
         process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026',
         { expiresIn: '7d' }
       );
@@ -79,7 +78,7 @@ export const verify2FA = async (req, res) => {
             id: user.id,
             username: user.username,
             full_name: user.full_name,
-            role: user.role, // Sekarang role 'creator' pasti kebawa ke Frontend
+            role: user.role || 'creator', // Paksa kirim 'creator' jika null
             profile_picture: user.profile_picture,
             is_two_fa_enabled: true
         }
@@ -93,7 +92,7 @@ export const verify2FA = async (req, res) => {
   }
 };
 
-// FUNGSI 3: DISABLE 2FA
+// --- 3. DISABLE 2FA ---
 export const disable2FA = async (req, res) => {
     try {
         await req.db.query(
