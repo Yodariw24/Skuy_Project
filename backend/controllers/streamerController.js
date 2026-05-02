@@ -1,23 +1,31 @@
 import fs from 'fs';
 import path from 'path';
 
-// 1. Ambil SEMUA Streamer (JOIN dengan users untuk ambil role)
+// 1. Ambil SEMUA Streamer (Sinkronisasi Elit Kreator di Homepage)
 export const getAllStreamers = async (req, res) => {
   try {
     const query = `
       SELECT s.id, u.username, s.display_name, s.full_name, s.profile_picture, s.theme_color, u.role 
       FROM streamers s
       JOIN users u ON s.user_id = u.id
+      WHERE u.role = 'creator'  -- ✅ Hanya tampilkan yang statusnya creator di database
       ORDER BY s.id DESC
     `;
     const result = await req.db.query(query);
-    res.json({ success: true, data: result.rows });
+
+    // ✅ FIX: Kirim result.rows (Array) secara langsung.
+    // Fallback [] memastikan frontend tidak crash (White Screen) saat datanya kosong.
+    const streamers = result.rows || [];
+    
+    res.json(streamers); 
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("🔥 Error GET ELIT KREATOR:", err.message);
+    // ✅ Kirim array kosong saat error agar .map() di frontend tidak meledak
+    res.status(500).json([]); 
   }
 };
 
-// 2. Ambil SATU Streamer berdasarkan Username (JOIN untuk sinkronisasi role)
+// 2. Ambil SATU Streamer berdasarkan Username
 export const getStreamerByUsername = async (req, res) => {
   const { username } = req.params;
   try {
@@ -41,7 +49,7 @@ export const getStreamerByUsername = async (req, res) => {
 
 // 3. Update Informasi Rekening
 export const updateBankInfo = async (req, res) => {
-  const { id } = req.params; // ID di sini harusnya user_id
+  const { id } = req.params; 
   const { bank_name, account_number, account_name } = req.body;
 
   try {
@@ -66,7 +74,7 @@ export const updateBankInfo = async (req, res) => {
   }
 };
 
-// 4. UPDATE PROFILE & THEME
+// 4. Update Profile & Theme
 export const updateProfileInfo = async (req, res) => {
   const { id } = req.params;
   const { display_name, bio, instagram, tiktok, youtube, theme_color } = req.body;
@@ -93,7 +101,7 @@ export const updateProfileInfo = async (req, res) => {
   }
 };
 
-// 5. UPDATE FOTO PROFIL
+// 5. Update Foto Profil
 export const updateProfilePhoto = async (req, res) => {
   const { id } = req.params;
   
@@ -130,7 +138,7 @@ export const updateProfilePhoto = async (req, res) => {
   }
 };
 
-// 6. HAPUS FOTO PROFIL
+// 6. Hapus Foto Profil
 export const deleteProfilePhoto = async (req, res) => {
   const { id } = req.params;
   try {
