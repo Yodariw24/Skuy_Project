@@ -7,9 +7,9 @@ import { Server } from 'socket.io';
 import pkg from 'pg';
 import 'dotenv/config';
 
-// Import Routes
+// Import Routes (Sesuai folder backend/routes lo)
 import authRoutes from './routes/authRoutes.js';
-import streamerRoutes from './routes/userRoutes.js'; // ✅ FIX: Mengarah ke nama file asli 'userRoutes.js'
+import streamerRoutes from './routes/userRoutes.js'; 
 import donationRoutes from './routes/donationRoutes.js';
 
 const { Pool } = pkg;
@@ -63,7 +63,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ MIDDLEWARE STATIC: Agar foto profil bisa diakses lewat URL
+// Middleware Static untuk file uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Custom Middleware untuk Inject Database & Socket.io
@@ -95,16 +95,21 @@ io.on('connection', (socket) => {
 // --- 4. API ROUTES ---
 app.use(injectContext); 
 
-// ✅ PENYESUAIAN RUTE: Menggunakan variabel streamerRoutes yang merujuk ke userRoutes.js
+// Rute Standar
 app.use('/api/auth', authRoutes);
 app.use('/api/streamers', streamerRoutes); 
 app.use('/api/donations', donationRoutes);
+
+// ✅ FIX ERROR 404: 
+// Mengarahkan request wallet dan user ke streamerRoutes (userRoutes.js)
+// agar Frontend lo bisa narik data dashboard & saldo tanpa error 404.
+app.use('/api/user', streamerRoutes); 
+app.use('/api/wallet', streamerRoutes); 
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "TipFlow Engine",
-    version: "4.0.0",
     db_status: "Connected"
   });
 });
@@ -113,10 +118,9 @@ app.get('/', (req, res) => {
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
   console.error(`🔥 [SERVER ERROR ${statusCode}]:`, err.message);
-  
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'Terjadi kesalahan pada internal server Railway.',
+    message: err.message || 'Kesalahan internal server Railway.',
     error_code: statusCode
   });
 });
