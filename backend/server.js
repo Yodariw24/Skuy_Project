@@ -9,7 +9,7 @@ import 'dotenv/config';
 
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
-import userRoutes from './routes/userRoutes.js';
+import streamerRoutes from './routes/streamerRoutes.js'; 
 import donationRoutes from './routes/donationRoutes.js';
 
 const { Pool } = pkg;
@@ -28,14 +28,13 @@ pool.on('error', (err) => {
   console.error('🔥 PostgreSQL Pool Error:', err.message);
 });
 
-// --- 2. CORS & SECURITY CONFIGURATION ---
+// --- 2. CORS CONFIGURATION ---
 const allowedOrigins = [
   "http://localhost:5173",
   "https://skuy-project.vercel.app",
   "https://skuy-gg.vercel.app"
 ];
 
-// Menambahkan FRONTEND_URL dari environment secara dinamis
 if (process.env.FRONTEND_URL) {
   const cleanEnvUrl = process.env.FRONTEND_URL.replace(/\/$/, "");
   if (!allowedOrigins.includes(cleanEnvUrl)) {
@@ -45,9 +44,7 @@ if (process.env.FRONTEND_URL) {
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Izinkan request tanpa origin (seperti Postman atau mobile)
     if (!origin) return callback(null, true);
-    
     const cleanOrigin = origin.replace(/\/$/, "");
     if (allowedOrigins.includes(cleanOrigin)) {
       callback(null, true);
@@ -58,14 +55,16 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 204
+  credentials: true
 };
 
 // Middleware Global
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ✅ MIDDLEWARE STATIC: Agar foto profil di folder uploads bisa diakses oleh Frontend
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Custom Middleware untuk Inject Database & Socket.io
 const injectContext = (req, res, next) => {
@@ -94,16 +93,12 @@ io.on('connection', (socket) => {
 });
 
 // --- 4. API ROUTES ---
-app.use(injectContext); // Gunakan injection sebelum routes
+app.use(injectContext); 
 
+// ✅ PENYESUAIAN RUTE: Pastikan /api/streamers sudah benar
 app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
+app.use('/api/streamers', streamerRoutes); 
 app.use('/api/donations', donationRoutes);
-
-// Health Check & Sync Endpoint
-app.get('/api/user/dashboard-sync', (req, res) => {
-  res.status(200).json({ success: true, message: "Backend Synced Successfully!" });
-});
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
@@ -117,7 +112,7 @@ app.get('/', (req, res) => {
 // --- 5. GLOBAL ERROR HANDLING ---
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
-  console.error(`🔥 [ERROR ${statusCode}]:`, err.message);
+  console.error(`🔥 [SERVER ERROR ${statusCode}]:`, err.message);
   
   res.status(statusCode).json({
     success: false,
@@ -131,6 +126,5 @@ const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
   console.log(`🚀 TIPFLOW ENGINE IS RUNNING ON PORT ${PORT}`);
-  console.log(`📡 DATABASE: ${process.env.DATABASE_URL ? 'CONNECTED' : 'DISCONNECTED'}`);
   console.log('-----------------------------------------');
 });
