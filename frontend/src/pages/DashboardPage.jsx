@@ -24,26 +24,35 @@ function DashboardPage() {
   const [otp, setOtp] = useState('')
   const [loading2FA, setLoading2FA] = useState(false)
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
-  
-  // ✅ Tambahkan state loading biar layar nggak langsung putih
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const navigate = useNavigate()
 
   const fetchData = async () => {
     try {
-      const res = await api.get('/user/dashboard-sync');
-      if (res.data && res.data.profile) {
-        setUser(res.data.profile);
-        setBalance(res.data.balance || 0);
-        setBankData(res.data.bank || { bank_name: 'Belum Diatur', account_number: '-', account_name: '-' });
-      } else {
-        // Jika profile tidak ada, gunakan fallback agar tidak crash
-        throw new Error("Data profile kosong");
+      // ✅ Ambil data user dari localStorage dulu buat dapetin ID
+      const savedUser = JSON.parse(localStorage.getItem('user'));
+      if (!savedUser?.id) throw new Error("ID Hilang");
+
+      // ✅ Manggil endpoint yang sudah kita perbaiki di userRoutes.js
+      const res = await api.get(`/user/dashboard-sync?userId=${savedUser.id}`);
+      
+      if (res.data && res.data.user) {
+        // ✅ SINKRONISASI: Pakai res.data.user (bukan .profile) sesuai backend
+        const userData = res.data.user;
+        setUser(userData);
+        setBalance(userData.total_saldo || 0);
+        
+        // Simpan ulang ke localStorage biar data 'role' terupdate
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        console.log("✅ Sync Success! Role:", userData.role);
       }
     } catch (err) {
-      console.warn("Koneksi gagal, pakai data fallback.");
-      setUser({ id: '1', username: 'ariwirayuda', full_name: 'Ari Wirayuda', is_two_fa_enabled: false });
+      console.error("❌ Sync Error:", err.message);
+      // Fallback Data biar nggak white screen
+      const fallback = JSON.parse(localStorage.getItem('user')) || { id: '1', username: 'guest', role: 'member' };
+      setUser(fallback);
     } finally {
       setIsInitialLoading(false);
     }
@@ -77,7 +86,7 @@ function DashboardPage() {
   const handleVerify2FA = async () => {
     setLoading2FA(true);
     try {
-      const res = await api.post('/auth/2fa/verify', { token: otp });
+      const res = await api.post('/auth/2fa/verify', { token: otp, userId: user.id });
       if (res.data.success) {
         setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
         skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif di Railway Cloud!', icon: 'success' });
@@ -100,7 +109,6 @@ function DashboardPage() {
     }
   };
 
-  // ✅ HANDLING LAYAR PUTIH: Jangan render apapun kalau user masih null
   if (isInitialLoading || !user) {
     return (
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
