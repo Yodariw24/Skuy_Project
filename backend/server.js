@@ -9,7 +9,7 @@ import 'dotenv/config';
 
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
-import streamerRoutes from './routes/streamerRoutes.js'; 
+import streamerRoutes from './routes/userRoutes.js'; // ✅ FIX: Mengarah ke nama file asli 'userRoutes.js'
 import donationRoutes from './routes/donationRoutes.js';
 
 const { Pool } = pkg;
@@ -63,7 +63,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ MIDDLEWARE STATIC: Agar foto profil di folder uploads bisa diakses oleh Frontend
+// ✅ MIDDLEWARE STATIC: Agar foto profil bisa diakses lewat URL
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Custom Middleware untuk Inject Database & Socket.io
@@ -95,7 +95,7 @@ io.on('connection', (socket) => {
 // --- 4. API ROUTES ---
 app.use(injectContext); 
 
-// ✅ PENYESUAIAN RUTE: Pastikan /api/streamers sudah benar
+// ✅ PENYESUAIAN RUTE: Menggunakan variabel streamerRoutes yang merujuk ke userRoutes.js
 app.use('/api/auth', authRoutes);
 app.use('/api/streamers', streamerRoutes); 
 app.use('/api/donations', donationRoutes);
