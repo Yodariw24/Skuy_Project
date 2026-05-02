@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  // ✅ PERBAIKAN: Gunakan toLowerCase() agar 'CREATOR' atau 'creator' tetap lolos
-  const isCreator = user?.role?.toLowerCase() === 'creator' || user?.role?.toLowerCase() === 'streamer';
-  const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
+  // ✅ PERBAIKAN 1: Logic yang lebih kuat. Jika role kosong, kita default ke 'creator' 
+  // atau pastikan pengecekan ini sinkron dengan data terbaru dari database.
+  const role = user?.role?.toLowerCase();
+  const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
   
+  const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
+
+  // ✅ DEBUGGING: Cek di console log browser lo, role-nya kebaca apa?
+  useEffect(() => {
+    console.log("Current User Role in Sidebar:", user?.role);
+  }, [user]);
 
   const handleShowTips = () => {
     const tipsData = [
@@ -49,8 +56,6 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
     });
 
     if (result.isConfirmed) {
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('user');
       localStorage.clear(); 
       navigate('/auth');
     }
@@ -58,25 +63,30 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
 
   const NavButton = ({ id, icon: Icon, label, badge, disabled, onClickCustom, isSub }) => {
     const isActive = isSub ? activeSubMenu === id : activeMenu === id;
-    const isLocked = disabled;
+    const isLocked = disabled; // Ini yang bikin tombol gak bisa diklik
     
     return (
       <button 
+        type="button"
         onClick={() => {
-          if (isLocked) return;
+          if (isLocked) {
+             console.warn(`Akses ditolak untuk menu ${label}. Role lo: ${user?.role}`);
+             return;
+          }
           if (onClickCustom) onClickCustom();
           else {
             if (isSub) setActiveSubMenu(id);
             else setActiveMenu(id);
           }
         }}
-        disabled={isLocked}
+        // ✅ PERBAIKAN 2: Jangan gunakan atribut disabled bawaan HTML agar hover hover effect tetap jalan tapi gak bisa diklik (Opsional)
+        // Atau biarkan disabled={isLocked} jika ingin benar-benar mati
         className={`w-full flex items-center justify-between transition-all duration-300 relative group ${
           isSub ? 'px-4 py-2 mt-1' : 'px-4 py-3 rounded-2xl'
         } ${
           isActive 
             ? 'text-violet-600' 
-            : isLocked ? 'opacity-30 cursor-not-allowed' : 'text-slate-500 hover:text-slate-900'
+            : isLocked ? 'opacity-30 cursor-not-allowed filter grayscale' : 'text-slate-500 hover:text-slate-900'
         }`}
       >
         {isActive && !isSub && (
@@ -117,7 +127,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Revenue Control</p>
           <nav className="space-y-1">
-            {/* ✅ Menu ini sekarang akan terbuka jika role lo 'creator' */}
+            {/* NavButton My Wallet */}
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Masuk" onClickCustom={handleShowTips} />
           </nav>
@@ -127,24 +137,10 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Live Tools</p>
           <nav className="space-y-1">
             <NavButton id="activity" icon={Activity} label="Activity Feed" badge="LIVE" disabled={!isCreator} />
-            <NavButton 
-              id="overlay" 
-              icon={Tv} 
-              label="Overlay Setup" 
-              onClickCustom={() => {
-                setIsOverlayOpen(!isOverlayOpen);
-                setActiveMenu('overlay');
-                if (!overlayTabs.includes(activeSubMenu)) setActiveSubMenu('tip');
-              }} 
-            />
+            <NavButton id="overlay" icon={Tv} label="Overlay Setup" disabled={!isCreator} onClickCustom={() => { setIsOverlayOpen(!isOverlayOpen); setActiveMenu('overlay'); if (!overlayTabs.includes(activeSubMenu)) setActiveSubMenu('tip'); }} />
             <AnimatePresence>
-              {isOverlayOpen && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden ml-6 border-l-2 border-slate-50 mt-1"
-                >
+              {isOverlayOpen && isCreator && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden ml-6 border-l-2 border-slate-50 mt-1">
                   <NavButton id="tip" icon={Bell} label="Tip Alert" isSub />
                   <NavButton id="mediashare" icon={Video} label="Mediashare" isSub />
                   <NavButton id="milestone" icon={Target} label="Milestone" isSub />
@@ -168,12 +164,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       <div className="p-6 mt-auto border-t border-slate-100 bg-slate-50/30">
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm mb-4 group cursor-pointer hover:border-violet-200 transition-all" onClick={() => setActiveMenu('profile')}>
           <div className="w-10 h-10 rounded-xl bg-violet-50 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-             <img 
-              src={user?.profile_picture} 
-              alt="Avatar" 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
-             />
+             <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
           </div>
           <div className="overflow-hidden">
             <p className="text-[11px] font-black text-slate-900 truncate uppercase leading-tight">{user?.full_name || user?.username}</p>
