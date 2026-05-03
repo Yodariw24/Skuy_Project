@@ -1,5 +1,4 @@
-import { useState } from 'react'
-// ✅ GANTI: Gunakan instance api sentral, hapus Supabase client
+import { useState, useEffect } from 'react'
 import api from '../../api/axios' 
 import { Palette, Check, Layout, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -14,30 +13,38 @@ const THEMES = [
 ]
 
 export default function AppearanceView({ user, setUser }) {
+  // Inisialisasi state dengan fallback ke localStorage jika user object belum sinkron
   const [selectedTheme, setSelectedTheme] = useState(user?.theme_color || 'violet')
   const [loading, setLoading] = useState(false)
   const [showToast, setShowToast] = useState(false)
+
+  // Pastikan selectedTheme terupdate jika data user berubah dari DashboardPage
+  useEffect(() => {
+    if (user?.theme_color) {
+      setSelectedTheme(user.theme_color)
+    }
+  }, [user])
 
   const handleSaveTheme = async (themeId) => {
     if (themeId === selectedTheme) return; 
 
     setLoading(true)
     try {
-      // ✅ PROSES UPDATE KE RAILWAY BACKEND
+      // ✅ UPDATE KE BACKEND RAILWAY
       const res = await api.put('/user/update-theme', {
         theme_color: themeId
       });
 
       if (res.data && res.data.success) {
-        // Update Local State agar UI berubah seketika
         setSelectedTheme(themeId)
         const updatedUser = { ...user, theme_color: themeId }
+        
+        // Update state di parent (DashboardPage)
         setUser(updatedUser)
         
-        // ✅ Simpan ke LocalStorage agar sesi tetap konsisten (Gunakan key 'user' sesuai AuthPage)
+        // Update LocalStorage agar sesi tetap konsisten
         localStorage.setItem('user', JSON.stringify(updatedUser))
         
-        // Trigger Toast Gacor
         setShowToast(true)
         setTimeout(() => setShowToast(false), 3000)
       }

@@ -4,15 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  // ✅ PERBAIKAN 1: Logic yang lebih kuat. Jika role kosong, kita default ke 'creator' 
-  // atau pastikan pengecekan ini sinkron dengan data terbaru dari database.
+  // Logic Role
   const role = user?.role?.toLowerCase();
   const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
   
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
 
-  // ✅ DEBUGGING: Cek di console log browser lo, role-nya kebaca apa?
   useEffect(() => {
     console.log("Current User Role in Sidebar:", user?.role);
   }, [user]);
@@ -63,7 +61,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
 
   const NavButton = ({ id, icon: Icon, label, badge, disabled, onClickCustom, isSub }) => {
     const isActive = isSub ? activeSubMenu === id : activeMenu === id;
-    const isLocked = disabled; // Ini yang bikin tombol gak bisa diklik
+    const isLocked = disabled; 
     
     return (
       <button 
@@ -75,12 +73,11 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           }
           if (onClickCustom) onClickCustom();
           else {
+            // ✅ FIX: Pastikan ini memicu setActiveMenu yang dikirim dari DashboardPage
             if (isSub) setActiveSubMenu(id);
             else setActiveMenu(id);
           }
         }}
-        // ✅ PERBAIKAN 2: Jangan gunakan atribut disabled bawaan HTML agar hover hover effect tetap jalan tapi gak bisa diklik (Opsional)
-        // Atau biarkan disabled={isLocked} jika ingin benar-benar mati
         className={`w-full flex items-center justify-between transition-all duration-300 relative group ${
           isSub ? 'px-4 py-2 mt-1' : 'px-4 py-3 rounded-2xl'
         } ${
@@ -127,7 +124,6 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Revenue Control</p>
           <nav className="space-y-1">
-            {/* NavButton My Wallet */}
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Masuk" onClickCustom={handleShowTips} />
           </nav>
@@ -154,6 +150,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Preferences</p>
           <nav className="space-y-1">
+            {/* ✅ FIX: Tombol-tombol ini sekarang sinkron dengan setActiveMenu */}
             <NavButton id="profile" icon={User} label="Profile Edit" />
             <NavButton id="security" icon={ShieldCheck} label="Security (2FA)" />
             <NavButton id="appearance" icon={Palette} label="Appearance" />

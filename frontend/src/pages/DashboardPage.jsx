@@ -5,6 +5,7 @@ import Sidebar from '../components/dashboard/Sidebar'
 import EarningsView from '../components/dashboard/EarningsView'
 import ProfileSettings from '../components/dashboard/ProfileSettings' 
 import SecurityView from '../components/dashboard/SecurityView'
+import AppearanceView from '../components/dashboard/AppearanceView' // Fix: Import Appearance
 import Swal from 'sweetalert2'
 
 const skuyAlert = Swal.mixin({
@@ -20,8 +21,8 @@ function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('wallet')
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
-  const [qrCodeData, setQrCodeData] = useState('') 
   const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false) // State baru untuk tracking WA OTP
   const [loading2FA, setLoading2FA] = useState(false)
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -30,27 +31,20 @@ function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      // ✅ Ambil data user dari localStorage dulu buat dapetin ID
       const savedUser = JSON.parse(localStorage.getItem('user'));
       if (!savedUser?.id) throw new Error("ID Hilang");
 
-      // ✅ Manggil endpoint yang sudah kita perbaiki di userRoutes.js
       const res = await api.get(`/user/dashboard-sync?userId=${savedUser.id}`);
       
       if (res.data && res.data.user) {
-        // ✅ SINKRONISASI: Pakai res.data.user (bukan .profile) sesuai backend
         const userData = res.data.user;
         setUser(userData);
         setBalance(userData.total_saldo || 0);
-        
-        // Simpan ulang ke localStorage biar data 'role' terupdate
         localStorage.setItem('user', JSON.stringify(userData));
-        
         console.log("✅ Sync Success! Role:", userData.role);
       }
     } catch (err) {
       console.error("❌ Sync Error:", err.message);
-      // Fallback Data biar nggak white screen
       const fallback = JSON.parse(localStorage.getItem('user')) || { id: '1', username: 'guest', role: 'member' };
       setUser(fallback);
     } finally {
@@ -67,33 +61,40 @@ function DashboardPage() {
     }
   }, [navigate]);
 
-  // --- LOGIKA 2FA ---
-  const handleGenerateQR = async () => {
+  // --- LOGIKA 2FA WHATSAPP (FIXED) ---
+  const handleGenerateWA = async () => {
     setLoading2FA(true);
     try {
-      const res = await api.post('/auth/2fa/generate');
-      if (res.data.qrCode) {
-        setQrCodeData(res.data.qrCode);
-        skuyAlert.fire({ title: 'QR SIAP', text: 'Scan pakai Google Authenticator!', icon: 'info' });
+      // Menembak endpoint WhatsApp OTP, bukan QR lagi
+      const res = await api.post('/auth/setup-2fa', { userId: user.id });
+      if (res.data.success) {
+        setOtpSent(true);
+        skuyAlert.fire({ 
+          title: 'OTP MELUNCUR 📱', 
+          text: 'Cek WhatsApp lo, Ri! Kodenya udah meluncur. 🚀', 
+          icon: 'success' 
+        });
       }
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal generate security protocol', 'error');
+      skuyAlert.fire('ERROR', 'Gagal kirim WA. Pastikan WA_TOKEN di Railway benar!', 'error');
     } finally {
       setLoading2FA(false);
     }
   };
 
   const handleVerify2FA = async () => {
+    if (!otp) return;
     setLoading2FA(true);
     try {
-      const res = await api.post('/auth/2fa/verify', { token: otp, userId: user.id });
+      const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
       if (res.data.success) {
         setUser(prev => ({ ...prev, is_two_fa_enabled: true }));
-        skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif di Railway Cloud!', icon: 'success' });
-        setQrCodeData(''); setOtp('');
+        skuyAlert.fire({ title: 'SUCCESS', text: '2FA Aktif via WhatsApp! 🛡️', icon: 'success' });
+        setOtp('');
+        window.location.reload();
       }
     } catch (err) {
-      skuyAlert.fire({ title: 'FAILED', text: 'OTP salah atau expired!', icon: 'error' });
+      skuyAlert.fire({ title: 'FAILED', text: 'Kode OTP salah atau expired!', icon: 'error' });
     } finally {
       setLoading2FA(false);
     }
@@ -101,9 +102,13 @@ function DashboardPage() {
 
   const handleDisable2FA = async () => {
     try {
-      await api.post('/auth/2fa/disable');
-      setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
-      skuyAlert.fire('OFF', 'Keamanan dimatikan.', 'info');
+      const res = await api.post('/auth/disable-2fa', { userId: user.id });
+      if (res.data.success) {
+        setUser(prev => ({ ...prev, is_two_fa_enabled: false }));
+        skuyAlert.fire('OFF', 'Keamanan WhatsApp dimatikan.', 'info').then(() => {
+            window.location.reload();
+        });
+      }
     } catch (err) {
       skuyAlert.fire('ERROR', 'Gagal mematikan protokol', 'error');
     }
@@ -133,15 +138,19 @@ function DashboardPage() {
           </div>
         </header>
 
+        {/* --- ROUTING CONTENT --- */}
         {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
         {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
         
+        {/* Fix: Appearance tidak akan kosong lagi */}
+        {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
+        
         {activeMenu === 'security' && (
           <SecurityView 
-            key={user.is_two_fa_enabled ? 'secured' : 'unsecured'} 
             user={user} 
-            qrCode={qrCodeData} 
-            onGenerateQR={handleGenerateQR} 
+            otpSent={otpSent}
+            qrCode={''} // Kosongkan karena pindah ke WhatsApp
+            onGenerateQR={handleGenerateWA} 
             onVerify={handleVerify2FA} 
             onDisable={handleDisable2FA} 
             otp={otp} 
