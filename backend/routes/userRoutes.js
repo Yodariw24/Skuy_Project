@@ -40,13 +40,11 @@ const upload = multer({
     limits: { fileSize: 2 * 1024 * 1024 } 
 });
 
-// --- 2. ENDPOINT KHUSUS DASHBOARD & THEME (FIX APPEARANCE) ---
+// --- 2. ENDPOINT KHUSUS DASHBOARD & THEME (FIX SYNC) ---
 
-// ✅ UPDATE TEMA: Supaya pilihan warna di AppearanceView tersimpan ke Railway DB
+// ✅ UPDATE TEMA: Visual Protocol
 router.put('/update-theme', async (req, res) => {
-    const { theme_color, userId } = req.body; // userId bisa dikirim dari frontend atau ambil dari JWT
-    
-    // Fallback userId jika tidak dikirim di body (bisa lo sesuaikan dengan middleware auth lo)
+    const { theme_color, userId } = req.body;
     const targetId = userId || req.query.userId;
 
     if (!theme_color) return res.status(400).json({ success: false, message: "Warna temanya mana, Ri?" });
@@ -63,22 +61,25 @@ router.put('/update-theme', async (req, res) => {
         if (result.rows.length > 0) {
             res.json({ success: true, message: "Visual Protocol Applied! ✨", user: result.rows[0] });
         } else {
-            res.status(404).json({ success: false, message: "Gagal update, user gak ketemu!" });
+            res.status(404).json({ success: false, message: "User gak ketemu!" });
         }
     } catch (err) {
-        console.error("THEME UPDATE ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal sinkronisasi tema ke pangkalan data" });
+        res.status(500).json({ success: false, message: "Gagal update tema" });
     }
 });
 
-// ✅ SYNC DASHBOARD: Pastikan role 'creator' dan 'theme_color' terkirim
+// ✅ SYNC DASHBOARD: FIX SINGLE SOURCE OF TRUTH (USERS TABLE)
 router.get('/dashboard-sync', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ success: false, message: "UserId mana, Ri?" });
 
     try {
+        // ✅ FIX: Ambil u.is_two_fa_enabled dari tabel users, bukan streamers!
         const query = `
-            SELECT u.id, u.username, u.role, s.full_name, s.profile_picture, s.theme_color, b.total_saldo
+            SELECT 
+                u.id, u.username, u.role, u.is_two_fa_enabled, 
+                s.full_name, s.profile_picture, s.theme_color, 
+                b.total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
             LEFT JOIN balance b ON u.id = b.streamer_id
@@ -89,7 +90,6 @@ router.get('/dashboard-sync', async (req, res) => {
         if (result.rows.length > 0) {
             const userData = result.rows[0];
             userData.role = userData.role || 'creator'; 
-            // Pastikan theme_color ada defaultnya
             userData.theme_color = userData.theme_color || 'violet';
             
             res.json({ success: true, user: userData });
@@ -114,7 +114,7 @@ router.get('/wallet/history/:id', async (req, res) => {
             history: resHistory.rows || [] 
         });
     } catch (err) {
-        res.status(500).json({ success: false, history: [], message: "Gagal ambil history" });
+        res.status(500).json({ success: false, message: "Gagal ambil history" });
     }
 });
 
@@ -124,7 +124,6 @@ router.get('/public/:username', getStreamerByUsername);
 router.put('/bank/:id', updateBankInfo);
 router.put('/profile/:id', updateProfileInfo); 
 
-// Widget & Photo
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', widgetController.updateSettings);
 router.post('/upload-photo/:id', upload.single('profile_picture'), updateProfilePhoto);

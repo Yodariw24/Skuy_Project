@@ -12,7 +12,8 @@ const SecurityView = ({
   setOtp, 
   loading 
 }) => {
-  const isEnabled = user?.is_two_fa_enabled;
+  // ✅ Mengacu pada status tunggal dari pangkalan data users
+  const isEnabled = user?.is_two_fa_enabled === true;
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 p-6 font-sans text-left pb-20">
@@ -64,7 +65,6 @@ const SecurityView = ({
             exit={{ opacity: 0, scale: 1.05 }}
             className="bg-white p-10 rounded-[3.5rem] border-4 border-slate-950 shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden"
           >
-            {/* Background Decoration */}
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-violet-600 via-emerald-500 to-amber-500" />
 
             {!otpSent ? (
@@ -81,7 +81,7 @@ const SecurityView = ({
                     Aktifkan 2FA WhatsApp
                   </h3>
                   <p className="text-slate-500 font-bold text-xs uppercase leading-relaxed max-w-sm mx-auto italic">
-                    Kunci akses saldo lo dengan protokol WhatsApp. <br/>
+                    Kunci akses saldo lo dengan protokol WhatsApp Fonnte. <br/>
                     <span className="text-slate-900 not-italic">Simple, Cepet, & Gacor Keamanannya!</span>
                   </p>
                 </div>
@@ -121,6 +121,7 @@ const SecurityView = ({
                       placeholder="••••••"
                       className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.3em] outline-none focus:bg-white focus:shadow-inner transition-all placeholder:text-slate-200"
                       value={otp} 
+                      // ✅ Pastikan hanya angka yang masuk
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     />
                   </div>
@@ -153,7 +154,8 @@ const SecurityView = ({
                 </div>
                 <h3 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">STATUS: GACOR</h3>
                 <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.4em] italic leading-relaxed">
-                  Encryption Layer Active. Aset lo aman Ri!
+                  Encryption Layer Active. <br/>
+                  Setiap login berikutnya wajib input kode WA.
                 </p>
               </div>
               
@@ -174,7 +176,6 @@ const SecurityView = ({
   );
 };
 
-// Penambahan icon yang ketinggalan
 const Smartphone = ({ size, ...props }) => (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
