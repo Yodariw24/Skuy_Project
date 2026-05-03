@@ -1,11 +1,11 @@
 import React from 'react';
-import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, Mail } from 'lucide-react'; // Ganti QrCode jadi Mail
+import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, MessageSquare } from 'lucide-react'; 
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ 
   user, 
   otpSent, 
-  onGenerateQR, // Sekarang berfungsi sebagai Request Email OTP
+  onGenerateQR, // Sekarang berfungsi sebagai Request WhatsApp OTP
   onVerify, 
   onDisable, 
   otp, 
@@ -53,35 +53,35 @@ const SecurityView = ({
           >
             {!otpSent ? (
               <div className="space-y-6 text-center flex flex-col items-center">
-                <div className="p-5 bg-violet-50 rounded-3xl mb-2 text-violet-600 border-2 border-violet-100 shadow-inner">
-                  <Mail size={40} />
+                <div className="p-5 bg-emerald-50 rounded-3xl mb-2 text-emerald-600 border-2 border-emerald-100 shadow-inner">
+                  <MessageSquare size={40} />
                 </div>
                 <div className="space-y-2">
                   <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">
-                    Aktifkan 2FA via Email
+                    Aktifkan 2FA via WhatsApp
                   </p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
-                    Gunakan kode verifikasi yang dikirim ke email untuk mengunci akses akun sultan lo secara permanen.
+                    Gunakan kode verifikasi yang dikirim ke WhatsApp untuk mengunci akses akun sultan lo secara permanen.
                   </p>
                 </div>
                 <button 
                   onClick={onGenerateQR}
                   disabled={loading} 
-                  className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50 disabled:cursor-wait"
+                  className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#065f46] active:translate-y-1 transition-all hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-wait"
                 >
                     {loading ? (
                       <Loader2 className="animate-spin" size={20}/>
                     ) : (
-                      <>Kirim Kode ke Email <Zap size={18}/></>
+                      <>Kirim Kode ke WhatsApp <Zap size={18}/></>
                     )}
                 </button>
               </div>
             ) : (
               <div className="space-y-8 flex flex-col items-center">
                 <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300 w-full text-center">
-                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Cek Email Lo</p>
+                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Cek WhatsApp Lo</p>
                   <p className="text-[10px] text-amber-500 font-bold leading-tight uppercase">
-                    Buka Gmail lo, salin 6 digit kode keamanan yang baru saja dikirim.
+                    Buka WhatsApp lo, salin 6 digit kode keamanan yang baru saja dikirim oleh sistem.
                   </p>
                 </div>
 
@@ -91,7 +91,7 @@ const SecurityView = ({
                     type="text" 
                     maxLength="6" 
                     placeholder="000000"
-                    className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-8 focus:ring-violet-50 transition-all placeholder:text-slate-200"
+                    className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-8 focus:ring-emerald-50 transition-all placeholder:text-slate-200"
                     value={otp} 
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />

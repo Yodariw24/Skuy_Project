@@ -2,20 +2,10 @@ import express from 'express';
 const router = express.Router();
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer'; // Pindah ke Nodemailer
+import axios from 'axios'; // Pakai Axios buat nembak Fonnte
 import 'dotenv/config';
 
-// --- 1. SETUP NODEMAILER ---
-// Pastikan EMAIL_USER dan EMAIL_PASS (App Password) sudah ada di Railway Variables
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-// --- 2. HELPER: GENERATE JWT ---
+// --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -24,7 +14,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 3. GOOGLE AUTH ---
+// --- 2. GOOGLE AUTH ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -69,40 +59,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 4. REGISTER (MANUAL) ---
-router.post('/register', async (req, res) => {
-    const { username, email, password, full_name } = req.body;
-    if (!username || !email || !password) {
-        return res.status(400).json({ success: false, message: "Data belum lengkap, Ri!" });
-    }
-
-    try {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        await req.db.query('BEGIN');
-        const userRes = await req.db.query(
-            'INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role',
-            [username, email, hashedPassword, 'creator']
-        );
-        const newUser = userRes.rows[0];
-
-        await req.db.query(
-            'INSERT INTO streamers (user_id, username, email, full_name, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6)',
-            [newUser.id, newUser.username, newUser.email, full_name, newUser.role, 'violet']
-        );
-
-        await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [newUser.id]);
-        await req.db.query('COMMIT');
-        
-        res.status(201).json({ success: true, message: "Akun Sultan Berhasil Dibuat! 🚀", user: newUser });
-    } catch (err) {
-        if (req.db) await req.db.query('ROLLBACK');
-        res.status(500).json({ success: false, message: "Pendaftaran gagal." });
-    }
-});
-
-// --- 5. LOGIN (MANUAL) ---
+// --- 3. LOGIN (MANUAL) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -119,20 +76,20 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
 
-        // Jika 2FA Aktif, kirim OTP ke email secara otomatis saat login
+        // Jika 2FA Aktif, kirim OTP ke WhatsApp otomatis
         if (user.is_two_fa_enabled) {
             const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
             await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otpCode, user.id]);
 
-            const mailOptions = {
-                from: `"TipFlow Security" <${process.env.EMAIL_USER}>`,
-                to: user.email,
-                subject: 'Kode Login TipFlow lo, Ri!',
-                html: `<div style="border:2px solid #000; padding:20px;"><h2>Kode Login: ${otpCode}</h2></div>`
-            };
-            await transporter.sendMail(mailOptions);
+            // KIRIM VIA FONNTE
+            await axios.post('https://api.fonnte.com/send', {
+                target: '6283148678039', // Ganti dengan field nomor HP dari database lo jika ada
+                message: `*SKUYGG LOGIN CODE*\n\nHalo @${user.username}, kode login lo: *${otpCode}*\n\nJangan kasih tahu siapa-siapa ya! 🛡️`,
+            }, {
+                headers: { 'Authorization': process.env.WA_TOKEN }
+            });
 
-            return res.json({ requiresTwoFA: true, userId: user.id, message: "Cek email buat kode login!" });
+            return res.json({ requiresTwoFA: true, userId: user.id, message: "Cek WhatsApp buat kode login!" });
         }
 
         res.json({ 
@@ -141,48 +98,40 @@ router.post('/login', async (req, res) => {
             user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, profile_picture: user.profile_picture } 
         });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: "Server Error saat Login" });
     }
 });
 
-// --- 6. SETUP & VERIFY 2FA (EMAIL VERSION) ---
+// --- 4. SETUP & VERIFY 2FA (WHATSAPP VERSION) ---
 
-// Step A: Generate & Kirim OTP Aktivasi
+// Step A: Generate & Kirim OTP Aktivasi via WA
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
-        const { rows } = await req.db.query("SELECT email FROM users WHERE id = $1", [userId]);
+        const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
 
-        const userEmail = rows[0].email;
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
         // Simpan OTP di kolom two_fa_secret
         await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otpCode, userId]);
 
-        const mailOptions = {
-            from: `"TipFlow Security" <${process.env.EMAIL_USER}>`,
-            to: userEmail,
-            subject: '🛡️ Aktivasi Keamanan TipFlow',
-            html: `
-                <div style="font-family:sans-serif; padding:20px; border:4px solid #000;">
-                    <h2>Halo Sultan!</h2>
-                    <p>Masukkan kode ini buat aktifin 2FA lo:</p>
-                    <h1 style="background:#eee; padding:10px; text-align:center; letter-spacing:10px;">${otpCode}</h1>
-                    <p>Jangan kasih tau siapa-siapa ya!</p>
-                </div>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
+        // KIRIM VIA FONNTE
+        await axios.post('https://api.fonnte.com/send', {
+            target: '6283148678039', // Pake nomor lo yang di Fonnte tadi Ri
+            message: `*SKUYGG SECURITY PROTOCOL*\n\nHalo @${rows[0].username}, masukkan kode ini buat aktifin 2FA lo: *${otpCode}*\n\nAkun Sultan harus aman! 🛡️`,
+        }, {
+            headers: { 'Authorization': process.env.WA_TOKEN }
+        });
 
         res.json({ 
             success: true, 
-            message: `Kode OTP sudah dikirim ke ${userEmail}!` 
+            message: `Kode OTP sudah dikirim ke WhatsApp lo!` 
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: "Gagal kirim email OTP" });
+        console.error("FONNTE ERROR:", err.response?.data || err.message);
+        res.status(500).json({ success: false, message: "Gagal kirim WhatsApp OTP" });
     }
 });
 
