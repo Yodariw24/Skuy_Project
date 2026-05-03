@@ -11,14 +11,14 @@ const SecurityPage = () => {
   const [otp, setOtp] = useState('');
   const [qrCodeData, setQrCodeData] = useState('');
 
-  // --- 1. GENERATE SETUP 2FA ---
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
-    console.log("🚀 Memicu endpoint baru: /auth/setup-2fa"); 
+    // DEBUG: Cek di F12, harus muncul teks di bawah ini!
+    console.log("🚀 Menghubungi Railway: /api/auth/setup-2fa"); 
 
     try {
-      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa sesuai backend
+      // ✅ SINKRON: Menggunakan endpoint sesuai backend
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -28,22 +28,19 @@ const SecurityPage = () => {
           icon: 'success',
           title: 'QR CODE READY',
           text: 'Scan pake Google Authenticator lo, Ri!',
-          timer: 2000,
-          showConfirmButton: false,
           customClass: {
             popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
           }
         });
       }
     } catch (err) {
-      console.error("Setup 2FA Error:", err);
-      Swal.fire('ERROR', 'Gagal generate security protocol. Cek koneksi backend!', 'error');
+      console.error("Setup Error:", err);
+      Swal.fire('ERROR', 'Gagal generate security protocol.', 'error');
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 2. VERIFIKASI KODE OTP ---
   const handleVerifyOTP = async () => {
     if (!otp) return;
     setLoading(true);
@@ -58,37 +55,29 @@ const SecurityPage = () => {
         Swal.fire({
           icon: 'success',
           title: '2FA AKTIF',
-          text: 'Akun sultan lo sekarang full protected!',
-          customClass: {
-            popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
-          }
+          text: 'Akun sultan lo aman!',
         }).then(() => {
           window.location.reload(); 
         });
       }
     } catch (err) { 
-      Swal.fire('GAGAL', 'Kode OTP salah atau expired!', 'error');
+      Swal.fire('GAGAL', 'Kode OTP salah!', 'error');
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 3. DISABLE 2FA ---
   const handleDisable2FA = async () => {
     Swal.fire({
       title: 'MATIKAN 2FA?',
-      text: "Keamanan akun lo bakal turun, yakin Ri?",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Ya, Matikan',
-      cancelButtonText: 'Batal'
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
           const res = await api.post('/auth/disable-2fa');
-          if (res.data.success) {
-            window.location.reload();
-          }
+          if (res.data.success) window.location.reload();
         } catch (err) {
           Swal.fire('ERROR', 'Gagal mematikan protokol.', 'error');
         }

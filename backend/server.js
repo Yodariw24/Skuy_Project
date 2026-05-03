@@ -24,10 +24,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-pool.on('error', (err) => {
-  console.error('🔥 PostgreSQL Pool Error:', err.message);
-});
-
 // --- 2. CORS CONFIGURATION ---
 const allowedOrigins = [
   "http://localhost:5173",
@@ -35,13 +31,6 @@ const allowedOrigins = [
   "https://skuy-project.vercel.app",
   "https://skuy-gg.vercel.app"
 ];
-
-if (process.env.FRONTEND_URL) {
-  const cleanEnvUrl = process.env.FRONTEND_URL.replace(/\/$/, "");
-  if (!allowedOrigins.includes(cleanEnvUrl)) {
-    allowedOrigins.push(cleanEnvUrl);
-  }
-}
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -65,10 +54,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- 3. SOCKET.IO SETUP ---
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: corsOptions,
-  transports: ['websocket', 'polling']
-});
+const io = new Server(server, { cors: corsOptions });
 
 // Inject Context Middleware
 app.use((req, res, next) => {
@@ -77,16 +63,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 4. API ROUTES (FIXED ORDER) ---
+// --- 4. API ROUTES (FIXED & ALIGNED) ---
 
 // A. Auth Routes (Handle /setup-2fa & /verify-2fa)
 app.use('/api/auth', authRoutes);
 
-// B. Wallet & History (Explicit order to fix 404)
+// B. Wallet & History (Urutan eksplisit agar tidak 404)
 app.use('/api/wallet/history', streamerRoutes); 
 app.use('/api/wallet', streamerRoutes); 
 
-// C. User & Streamer Profiles
+// C. User & Profiles
 app.use('/api/user', streamerRoutes); 
 app.use('/api/streamers', streamerRoutes); 
 
@@ -94,20 +80,15 @@ app.use('/api/streamers', streamerRoutes);
 app.use('/api/donations', donationRoutes);
 
 app.get('/', (req, res) => {
-  res.status(200).json({ 
-    status: "online", 
-    project: "TipFlow Engine",
-    db_status: "Connected"
-  });
+  res.status(200).json({ status: "online", project: "SkuyGG Engine" });
 });
 
 // --- 5. GLOBAL ERROR HANDLING ---
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
-  console.error(`🔥 [SERVER ERROR ${statusCode}]:`, err.message);
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'Kesalahan internal server Railway.',
+    message: err.message || 'Internal Server Error',
     error_code: statusCode
   });
 });
@@ -115,7 +96,5 @@ app.use((err, req, res, next) => {
 // --- 6. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('-----------------------------------------');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
-  console.log('-----------------------------------------');
 });

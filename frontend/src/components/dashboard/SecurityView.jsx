@@ -2,7 +2,17 @@ import React from 'react';
 import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, setOtp, loading, qrCode }) => {
+const SecurityView = ({ 
+  user, 
+  otpSent, 
+  onGenerateQR, 
+  onVerify, 
+  onDisable, 
+  otp, 
+  setOtp, 
+  loading, 
+  qrCode 
+}) => {
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
@@ -15,10 +25,16 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
       >
         <div className="space-y-1">
           <h2 className="text-2xl font-black italic uppercase text-slate-950 flex items-center gap-3">
-            {isEnabled ? <ShieldCheck className="text-emerald-500" size={32} /> : <Lock className="text-violet-600" size={32} />}
+            {isEnabled ? (
+              <ShieldCheck className="text-emerald-500" size={32} />
+            ) : (
+              <Lock className="text-violet-600" size={32} />
+            )}
             {isEnabled ? 'Full Protected' : 'Security Setup'}
           </h2>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Agent: @{user?.username || 'unknown'}</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+            Agent: @{user?.username || 'unknown'}
+          </p>
         </div>
         {isEnabled && (
           <div className="hidden md:block px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl border-2 border-emerald-100 text-[10px] font-black uppercase italic tracking-widest">
@@ -42,17 +58,23 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                   <QrCode size={40} />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">Aktifkan 2FA Authenticator</p>
+                  <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">
+                    Aktifkan 2FA Authenticator
+                  </p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
                     Gunakan Google Authenticator untuk mengunci akses akun sultan lo secara permanen.
                   </p>
                 </div>
                 <button 
-                  onClick={onGenerateQR} // ✅ Memanggil fungsi handleGenerateOTP
+                  onClick={onGenerateQR}
                   disabled={loading} 
-                  className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50"
+                  className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50 disabled:cursor-wait"
                 >
-                    {loading ? <Loader2 className="animate-spin" size={20}/> : 'Generate QR Code'} <Zap size={18}/>
+                    {loading ? (
+                      <Loader2 className="animate-spin" size={20}/>
+                    ) : (
+                      <>Generate QR Code <Zap size={18}/></>
+                    )}
                 </button>
               </div>
             ) : (
@@ -65,24 +87,31 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                 </div>
 
                 {qrCode && (
-                  <div className="p-4 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0_0_#000]">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0_0_#000]"
+                  >
                     <img src={qrCode} alt="Scan QR" className="w-48 h-48" />
-                  </div>
+                  </motion.div>
                 )}
 
                 <div className="max-w-xs mx-auto space-y-4 w-full">
                   <p className="text-xs font-black text-slate-900 uppercase italic">Step 2: Masukkan 6 Digit Kode</p>
                   <input 
-                    type="text" maxLength="6" placeholder="000000"
-                    className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-8 focus:ring-violet-50 transition-all"
-                    value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    type="text" 
+                    maxLength="6" 
+                    placeholder="000000"
+                    className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-8 focus:ring-violet-50 transition-all placeholder:text-slate-200"
+                    value={otp} 
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />
                   <button 
-                    onClick={onVerify} // ✅ Memanggil handleVerifyOTP
+                    onClick={onVerify}
                     disabled={otp.length < 6 || loading} 
-                    className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_6px_0_0_#1e293b] active:translate-y-1 transition-all hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_6px_0_0_#1e293b] active:translate-y-1 transition-all hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                   >
-                    {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Verifikasi & Aktifkan'}
+                    {loading ? <Loader2 className="animate-spin" size={24} /> : 'Verifikasi & Aktifkan'}
                   </button>
                 </div>
               </div>
@@ -105,10 +134,11 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
               
               <div className="mt-10 pt-8 border-t border-slate-50">
                 <button 
-                  onClick={onDisable} // ✅ Memanggil handleDisable2FA
-                  className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 transition-colors tracking-[0.2em]"
+                  onClick={onDisable}
+                  disabled={loading}
+                  className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 transition-colors tracking-[0.2em] disabled:opacity-50"
                 >
-                  Disable Security Protocol
+                  {loading ? 'Processing...' : 'Disable Security Protocol'}
                 </button>
               </div>
           </motion.div>
