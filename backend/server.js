@@ -28,10 +28,10 @@ pool.on('error', (err) => {
   console.error('🔥 PostgreSQL Pool Error:', err.message);
 });
 
-// --- 2. CORS CONFIGURATION (SINKRON PORT 8080 & 5173) ---
+// --- 2. CORS CONFIGURATION ---
 const allowedOrigins = [
-  "http://localhost:5173",          // Port Frontend (Vite)
-  "http://localhost:8080",          // Port Backend lo
+  "http://localhost:5173",
+  "http://localhost:8080",
   "https://skuy-project.vercel.app",
   "https://skuy-gg.vercel.app"
 ];
@@ -50,8 +50,7 @@ const corsOptions = {
     if (allowedOrigins.includes(cleanOrigin)) {
       callback(null, true);
     } else {
-      console.warn(`⚠️ CORS Blocked for: ${origin}`);
-      callback(new Error('Domain tidak diizinkan oleh kebijakan CORS SkuyGG!'));
+      callback(new Error('CORS Policy Blocked!'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -59,20 +58,10 @@ const corsOptions = {
   credentials: true
 };
 
-// Middleware Global
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware Static untuk file uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Custom Middleware untuk Inject Database & Socket.io
-const injectContext = (req, res, next) => {
-  req.db = pool;
-  req.io = io;
-  next();
-};
 
 // --- 3. SOCKET.IO SETUP ---
 const server = http.createServer(app);
@@ -81,29 +70,28 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
-io.on('connection', (socket) => {
-  const { streamerId } = socket.handshake.query;
-  if (streamerId) {
-    socket.join(`streamer_${streamerId}`);
-    console.log(`📡 Widget Connected: Streamer ID ${streamerId}`);
-  }
-  
-  socket.on('disconnect', () => {
-    console.log('🔌 Socket Disconnected');
-  });
+// Inject Context Middleware
+app.use((req, res, next) => {
+  req.db = pool;
+  req.io = io;
+  next();
 });
 
-// --- 4. API ROUTES ---
-app.use(injectContext); 
+// --- 4. API ROUTES (FIXED ORDER) ---
 
-// Rute Utama
+// A. Auth Routes (Handle /setup-2fa & /verify-2fa)
 app.use('/api/auth', authRoutes);
-app.use('/api/streamers', streamerRoutes); 
-app.use('/api/donations', donationRoutes);
 
-// Fix Route Dashboard
-app.use('/api/user', streamerRoutes); 
+// B. Wallet & History (Explicit order to fix 404)
+app.use('/api/wallet/history', streamerRoutes); 
 app.use('/api/wallet', streamerRoutes); 
+
+// C. User & Streamer Profiles
+app.use('/api/user', streamerRoutes); 
+app.use('/api/streamers', streamerRoutes); 
+
+// D. Donations
+app.use('/api/donations', donationRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
@@ -124,10 +112,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- 6. SERVER START (PORT 8080) ---
+// --- 6. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
-  console.log(`🚀 TIPFLOW ENGINE IS RUNNING ON PORT ${PORT}`);
+  console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
   console.log('-----------------------------------------');
 });
