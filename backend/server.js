@@ -7,7 +7,7 @@ import { Server } from 'socket.io';
 import pkg from 'pg';
 import 'dotenv/config';
 
-// Import Routes (Sesuai folder backend/routes lo)
+// Import Routes
 import authRoutes from './routes/authRoutes.js';
 import streamerRoutes from './routes/userRoutes.js'; 
 import donationRoutes from './routes/donationRoutes.js';
@@ -28,9 +28,10 @@ pool.on('error', (err) => {
   console.error('🔥 PostgreSQL Pool Error:', err.message);
 });
 
-// --- 2. CORS CONFIGURATION ---
+// --- 2. CORS CONFIGURATION (SINKRON PORT 8080 & 5173) ---
 const allowedOrigins = [
-  "http://localhost:5173",
+  "http://localhost:5173",          // Port Frontend (Vite)
+  "http://localhost:8080",          // Port Backend lo
   "https://skuy-project.vercel.app",
   "https://skuy-gg.vercel.app"
 ];
@@ -95,14 +96,12 @@ io.on('connection', (socket) => {
 // --- 4. API ROUTES ---
 app.use(injectContext); 
 
-// Rute Standar
+// Rute Utama
 app.use('/api/auth', authRoutes);
 app.use('/api/streamers', streamerRoutes); 
 app.use('/api/donations', donationRoutes);
 
-// ✅ FIX ERROR 404: 
-// Mengarahkan request wallet dan user ke streamerRoutes (userRoutes.js)
-// agar Frontend lo bisa narik data dashboard & saldo tanpa error 404.
+// Fix Route Dashboard
 app.use('/api/user', streamerRoutes); 
 app.use('/api/wallet', streamerRoutes); 
 
@@ -125,7 +124,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- 6. SERVER START ---
+// --- 6. SERVER START (PORT 8080) ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');

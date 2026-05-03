@@ -1,9 +1,9 @@
 import React from 'react';
-import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, MailOpen } from 'lucide-react';
+import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, setOtp, loading }) => {
-  // ✅ Pastikan pengecekan status 2FA sesuai field di DB Railway lo
+const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, setOtp, loading, qrCode }) => {
+  // ✅ Pengecekan status 2FA sesuai field di DB Railway
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
@@ -40,12 +40,12 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
             {!otpSent ? (
               <div className="space-y-6 text-center flex flex-col items-center">
                 <div className="p-5 bg-violet-50 rounded-3xl mb-2 text-violet-600 border-2 border-violet-100 shadow-inner">
-                  <MailOpen size={40} />
+                  <QrCode size={40} />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">Aktifkan Perisai Akun</p>
+                  <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">Aktifkan 2FA Authenticator</p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
-                    Kirim kode rahasia ke email untuk mengunci akses saldo kamu secara permanen di Railway Cloud.
+                    Gunakan Google Authenticator untuk mengunci akses akun sultan lo secara permanen. Lebih aman dari sekadar email!
                   </p>
                 </div>
                 <button 
@@ -53,18 +53,27 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                   disabled={loading} 
                   className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50"
                 >
-                   {loading ? <Loader2 className="animate-spin" size={20}/> : 'Kirim Kode OTP'} <Zap size={18}/>
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : 'Generate QR Code'} <Zap size={18}/>
                 </button>
               </div>
             ) : (
-              <div className="space-y-8">
-                <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300">
-                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Cek Email Kamu!</p>
+              <div className="space-y-8 flex flex-col items-center">
+                <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300 w-full">
+                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Scan QR Code</p>
                   <p className="text-[10px] text-amber-500 font-bold leading-tight uppercase">
-                    Masukkan 6 digit kode unik yang dikirim ke <span className="text-slate-900 lowercase font-black">{user?.email}</span>.
+                    Buka Google Authenticator di HP, lalu scan gambar di bawah ini.
                   </p>
                 </div>
-                <div className="max-w-xs mx-auto space-y-4">
+
+                {/* ✅ Tampilan QR Code dari Backend */}
+                {qrCode && (
+                  <div className="p-4 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0_0_#000]">
+                    <img src={qrCode} alt="Scan QR" className="w-48 h-48" />
+                  </div>
+                )}
+
+                <div className="max-w-xs mx-auto space-y-4 w-full">
+                  <p className="text-xs font-black text-slate-900 uppercase italic">Step 2: Masukkan 6 Digit Kode</p>
                   <input 
                     type="text" maxLength="6" placeholder="000000"
                     className="w-full bg-slate-50 border-4 border-slate-950 p-5 rounded-2xl text-center text-4xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-8 focus:ring-violet-50 transition-all"
@@ -76,12 +85,6 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                     className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_6px_0_0_#1e293b] active:translate-y-1 transition-all hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Verifikasi & Aktifkan'}
-                  </button>
-                  <button 
-                    onClick={onGenerateQR}
-                    className="text-[9px] text-slate-400 font-black uppercase tracking-widest hover:text-violet-600 transition-colors"
-                  >
-                    Belum terima kode? Kirim ulang
                   </button>
                 </div>
               </div>
@@ -99,7 +102,7 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
               </div>
               <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">Status: Secure</h3>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 italic leading-relaxed">
-                Aset Sultan aman terkendali.<br/>Setiap login & penarikan saldo wajib verifikasi OTP.
+                Aset Sultan aman terkendali.<br/>Sekarang setiap login wajib masukin kode dari HP lo.
               </p>
               
               <div className="mt-10 pt-8 border-t border-slate-50">

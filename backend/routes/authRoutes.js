@@ -3,6 +3,8 @@ const router = express.Router();
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode';
 import 'dotenv/config';
 
 // --- 1. SETUP NODEMAILER ---
@@ -23,19 +25,15 @@ const generateToken = (user) => {
     );
 };
 
-// --- 3. GOOGLE AUTH (NEW: LOGIN & REGIS OTOMATIS) ---
+// --- 3. GOOGLE AUTH (LOGIN & REGIS OTOMATIS) ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
-
     try {
-        // 1. Cek apakah email sudah ada
         let userResult = await req.db.query('SELECT * FROM users WHERE email = $1', [email]);
         let user = userResult.rows[0];
 
         if (!user) {
-            // 2. Jika USER BARU: Mulai Transaksi
             await req.db.query('BEGIN');
-
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
             
             const newUserRes = await req.db.query(
@@ -44,19 +42,15 @@ router.post('/google', async (req, res) => {
             );
             user = newUserRes.rows[0];
 
-            // 3. Masukkan ke tabel streamers
             await req.db.query(
                 'INSERT INTO streamers (user_id, username, email, full_name, profile_picture, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                 [user.id, user.username, user.email, name, picture, 'creator', 'violet']
             );
 
-            // 4. Inisialisasi Wallet
             await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [user.id]);
-
             await req.db.query('COMMIT');
         }
 
-        // 5. Kirim Token & Data User
         res.json({
             success: true,
             message: "Login Google Berhasil! 🔥",
@@ -79,7 +73,6 @@ router.post('/google', async (req, res) => {
 // --- 4. REGISTER (MANUAL) ---
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
-    
     if (!username || !email || !password) {
         return res.status(400).json({ success: false, message: "Data belum lengkap, Ri!" });
     }
@@ -89,23 +82,18 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         await req.db.query('BEGIN');
-
-        const insertUser = `
-            INSERT INTO users (username, email, password, role) 
-            VALUES ($1, $2, $3, 'creator') 
-            RETURNING id, username, email, role
-        `;
-        const userRes = await req.db.query(insertUser, [username, email, hashedPassword]);
+        const userRes = await req.db.query(
+            'INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role',
+            [username, email, hashedPassword, 'creator']
+        );
         const newUser = userRes.rows[0];
 
-        const insertStreamer = `
-            INSERT INTO streamers (user_id, username, email, full_name, role, theme_color) 
-            VALUES ($1, $2, $3, $4, $5, 'violet')
-        `;
-        await req.db.query(insertStreamer, [newUser.id, newUser.username, newUser.email, full_name, newUser.role]);
+        await req.db.query(
+            'INSERT INTO streamers (user_id, username, email, full_name, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6)',
+            [newUser.id, newUser.username, newUser.email, full_name, newUser.role, 'violet']
+        );
 
         await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [newUser.id]);
-
         await req.db.query('COMMIT');
         
         res.status(201).json({ success: true, message: "Akun Sultan Berhasil Dibuat! 🚀", user: newUser });
@@ -126,16 +114,14 @@ router.post('/login', async (req, res) => {
             WHERE u.email = $1
         `;
         const { rows } = await req.db.query(query, [email]);
-        
         if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
 
         const user = rows[0];
         const isMatch = await bcrypt.compare(password, user.password);
-        
         if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
 
         if (user.is_two_fa_enabled) {
-            return res.json({ requiresTwoFA: true, userId: user.id, message: "2FA Aktif!" });
+            return res.json({ requiresTwoFA: true, userId: user.id, message: "Minta kode 2FA dari Authenticator lo!" });
         }
 
         res.json({ 
@@ -148,41 +134,72 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 6. SETUP & VERIFY 2FA (EMAIL OTP) ---
+// --- 6. SETUP & VERIFY 2FA (QR CODE TOTP) ---
+
+// Step A: Generate QR & Simpan Secret Permanen
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
         const { rows } = await req.db.query("SELECT email FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
 
-        await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otp, userId]);
-        await transporter.sendMail({
-            from: '"SkuyGG Security" <security@skuy.gg>',
-            to: rows[0].email,
-            subject: `[${otp}] Kode Keamanan SkuyGG`,
-            html: `<h2>Kode OTP lo: ${otp}</h2>`
+        // Generate Secret TOTP
+        const secret = speakeasy.generateSecret({
+            name: `SkuyGG (${rows[0].email})`
         });
-        res.json({ success: true, message: "OTP terkirim ke email!" });
+
+        // Simpan secret ke database Railway (kolom two_fa_secret)
+        await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [secret.base32, userId]);
+
+        // Generate QR Code untuk Frontend
+        const qrCodeImageUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+        res.json({ 
+            success: true, 
+            qrCode: qrCodeImageUrl, 
+            secret: secret.base32,
+            message: "Scan QR Code ini di aplikasi Authenticator lo!" 
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal kirim OTP" });
+        console.error(err);
+        res.status(500).json({ success: false, message: "Gagal setup QR 2FA" });
     }
 });
 
+// Step B: Verifikasi Token & Aktifkan Status is_two_fa_enabled
 router.post('/verify-2fa', async (req, res) => {
-    const { userId, token } = req.body;
+    const { userId, token } = req.body; 
     try {
         const query = `SELECT u.*, s.two_fa_secret FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1`;
         const { rows } = await req.db.query(query, [userId]);
         const user = rows[0];
 
-        if (user && user.two_fa_secret === token) {
-            await req.db.query("UPDATE streamers SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE user_id = $1", [userId]);
-            res.json({ success: true, token: generateToken(user), user: { id: user.id, username: user.username, role: user.role } });
+        if (!user || !user.two_fa_secret) {
+            return res.status(400).json({ success: false, message: "Setup QR dulu baru verifikasi!" });
+        }
+
+        // Cek apakah 6 digit token dari HP cocok dengan secret di DB
+        const verified = speakeasy.totp.verify({
+            secret: user.two_fa_secret,
+            encoding: 'base32',
+            token: token
+        });
+
+        if (verified) {
+            // Aktifkan kolom boolean di Railway
+            await req.db.query("UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1", [userId]);
+            
+            res.json({ 
+                success: true, 
+                message: "2FA Aktif! Akun lo sekarang makin Sultan dan Aman! 🛡️",
+                token: generateToken(user), 
+                user: { id: user.id, username: user.username, role: user.role } 
+            });
         } else {
-            res.status(400).json({ success: false, message: "OTP Salah!" });
+            res.status(400).json({ success: false, message: "Kode OTP dari HP Salah atau Kadaluwarsa!" });
         }
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: "Verifikasi gagal" });
     }
 });

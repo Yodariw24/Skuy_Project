@@ -54,11 +54,12 @@ function AuthPage() {
     } finally { setLoading(false); }
   };
 
-  // --- 2. VERIFIKASI 2FA ---
+  // --- 2. VERIFIKASI 2FA (LOGIN) ---
   const handleVerify2FALogin = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
     try {
+      // ✅ Mengirim token 6 digit dari Authenticator App
       const res = await api.post('/auth/verify-2fa', { userId: tempUserId, token: otp });
       if (res.data.success) {
         localStorage.setItem('user_token', res.data.token);
@@ -66,7 +67,7 @@ function AuthPage() {
         navigate('/dashboard/wallet');
       }
     } catch (err) {
-      skuyAlert("OTP SALAH", "Kode tidak valid.", "error");
+      skuyAlert("KODE SALAH", "Kode Authenticator tidak valid atau expired.", "error");
     } finally { setLoading(false); }
   };
 
@@ -77,10 +78,12 @@ function AuthPage() {
     try {
       if (isLogin) {
         const res = await api.post('/auth/login', { email: formData.identifier, password: formData.password });
+        
         if (res.data.requiresTwoFA) {
+          // ✅ HANYA SET STATE, jangan panggil setup-2fa lagi di sini
+          // Karena secret sudah tersimpan permanen di DB Railway lo saat pertama setup.
           setTempUserId(res.data.userId);
           setShow2FA(true);
-          await api.post('/auth/setup-2fa', { userId: res.data.userId });
         } else {
           localStorage.setItem('user_token', res.data.token);
           localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -104,7 +107,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7FF] flex items-center justify-center p-6 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#F4F7FF] flex items-center justify-center p-6 font-sans relative overflow-hidden text-left">
       {/* Background Ornaments */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-violet-200/40 blur-[120px] rounded-full" />
@@ -113,10 +116,9 @@ function AuthPage() {
 
       <div className="w-full max-w-[1000px] grid grid-cols-1 md:grid-cols-2 bg-white rounded-[2.5rem] border-[3px] border-slate-950 shadow-[24px_24px_0px_0px_rgba(15,15,15,1)] z-10 overflow-hidden">
         
-        {/* LEFT SIDE: Value Proposition */}
+        {/* LEFT SIDE */}
         <div className="bg-slate-950 p-12 text-white flex flex-col justify-between relative overflow-hidden hidden md:flex">
           <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/20 blur-[80px] rounded-full" />
-          
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
               <div className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center font-black text-xl italic shadow-lg">S</div>
@@ -136,7 +138,7 @@ function AuthPage() {
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 italic">© 2026 Skuy.GG Studio • Karawang Pride</p>
         </div>
 
-        {/* RIGHT SIDE: Auth Form */}
+        {/* RIGHT SIDE */}
         <div className="p-10 md:p-14 flex flex-col justify-center bg-white">
           <AnimatePresence mode="wait">
             {!show2FA ? (
@@ -193,12 +195,13 @@ function AuthPage() {
                   <div className="w-20 h-20 bg-violet-100 text-violet-600 rounded-3xl mx-auto flex items-center justify-center border-4 border-violet-200">
                     <ShieldCheck size={40} />
                   </div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Enter 6-Digit Security Code</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Authenticator Code Required</p>
                   <input 
-                    type="text" maxLength="6" placeholder="******" required autoFocus
+                    type="text" maxLength="6" placeholder="000000" required autoFocus
                     className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-3xl text-center text-5xl font-black tracking-[0.4em] outline-none shadow-inner"
                     value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Input the 6-digit code from your phone</p>
                 </div>
                 <button type="submit" className="w-full bg-slate-950 text-white py-6 rounded-3xl font-black uppercase italic tracking-widest border-4 border-slate-800 active:scale-95 transition-all">
                   {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Authorize Identity'}
