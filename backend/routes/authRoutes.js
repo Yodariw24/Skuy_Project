@@ -2,11 +2,20 @@ import express from 'express';
 const router = express.Router();
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import speakeasy from 'speakeasy';
-import qrcode from 'qrcode';
+import nodemailer from 'nodemailer'; // Pindah ke Nodemailer
 import 'dotenv/config';
 
-// --- 1. HELPER: GENERATE JWT ---
+// --- 1. SETUP NODEMAILER ---
+// Pastikan EMAIL_USER dan EMAIL_PASS (App Password) sudah ada di Railway Variables
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// --- 2. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -15,7 +24,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 2. GOOGLE AUTH (LOGIN & REGIS OTOMATIS) ---
+// --- 3. GOOGLE AUTH ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -60,7 +69,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 3. REGISTER (MANUAL) ---
+// --- 4. REGISTER (MANUAL) ---
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
     if (!username || !email || !password) {
@@ -89,11 +98,11 @@ router.post('/register', async (req, res) => {
         res.status(201).json({ success: true, message: "Akun Sultan Berhasil Dibuat! 🚀", user: newUser });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
-        res.status(500).json({ success: false, message: "Pendaftaran gagal, email/username mungkin sudah ada." });
+        res.status(500).json({ success: false, message: "Pendaftaran gagal." });
     }
 });
 
-// --- 4. LOGIN (MANUAL) ---
+// --- 5. LOGIN (MANUAL) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -110,8 +119,20 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
 
+        // Jika 2FA Aktif, kirim OTP ke email secara otomatis saat login
         if (user.is_two_fa_enabled) {
-            return res.json({ requiresTwoFA: true, userId: user.id, message: "Minta kode 2FA!" });
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otpCode, user.id]);
+
+            const mailOptions = {
+                from: `"TipFlow Security" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: 'Kode Login TipFlow lo, Ri!',
+                html: `<div style="border:2px solid #000; padding:20px;"><h2>Kode Login: ${otpCode}</h2></div>`
+            };
+            await transporter.sendMail(mailOptions);
+
+            return res.json({ requiresTwoFA: true, userId: user.id, message: "Cek email buat kode login!" });
         }
 
         res.json({ 
@@ -124,65 +145,70 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 5. SETUP & VERIFY 2FA ---
+// --- 6. SETUP & VERIFY 2FA (EMAIL VERSION) ---
 
-// Step A: Generate QR & Simpan Secret
+// Step A: Generate & Kirim OTP Aktivasi
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         const { rows } = await req.db.query("SELECT email FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
 
-        const secret = speakeasy.generateSecret({
-            name: `SkuyGG (${rows[0].email})`,
-            issuer: "SkuyGG"
-        });
+        const userEmail = rows[0].email;
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [secret.base32, userId]);
-        const qrCodeImageUrl = await qrcode.toDataURL(secret.otpauth_url);
+        // Simpan OTP di kolom two_fa_secret
+        await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [otpCode, userId]);
+
+        const mailOptions = {
+            from: `"TipFlow Security" <${process.env.EMAIL_USER}>`,
+            to: userEmail,
+            subject: '🛡️ Aktivasi Keamanan TipFlow',
+            html: `
+                <div style="font-family:sans-serif; padding:20px; border:4px solid #000;">
+                    <h2>Halo Sultan!</h2>
+                    <p>Masukkan kode ini buat aktifin 2FA lo:</p>
+                    <h1 style="background:#eee; padding:10px; text-align:center; letter-spacing:10px;">${otpCode}</h1>
+                    <p>Jangan kasih tau siapa-siapa ya!</p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
 
         res.json({ 
             success: true, 
-            qrCode: qrCodeImageUrl, 
-            secret: secret.base32,
-            message: "Scan QR Code ini di aplikasi Authenticator lo!" 
+            message: `Kode OTP sudah dikirim ke ${userEmail}!` 
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: "Gagal setup QR 2FA" });
+        res.status(500).json({ success: false, message: "Gagal kirim email OTP" });
     }
 });
 
-// Step B: Verifikasi Token
+// Step B: Verifikasi OTP & Aktifkan 2FA
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body; 
     try {
-        const query = `SELECT u.*, s.two_fa_secret FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1`;
-        const { rows } = await req.db.query(query, [userId]);
+        const { rows } = await req.db.query(
+            "SELECT u.*, s.two_fa_secret FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
+            [userId]
+        );
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) {
-            return res.status(400).json({ success: false, message: "Setup QR dulu baru verifikasi!" });
+        if (!user || user.two_fa_secret !== token.trim()) {
+            return res.status(400).json({ success: false, message: "Kode OTP Salah atau Kadaluwarsa!" });
         }
 
-        const verified = speakeasy.totp.verify({
-            secret: user.two_fa_secret,
-            encoding: 'base32',
-            token: token.replace(/\s/g, ''), // Hapus spasi jika ada
-            window: 1 // Kompensasi delay waktu
+        // Aktifkan status 2FA
+        await req.db.query("UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1", [userId]);
+        
+        res.json({ 
+            success: true, 
+            message: "2FA Aktif! Akun lo sekarang aman banget! 🛡️",
+            token: generateToken(user), 
+            user: { id: user.id, username: user.username, role: user.role } 
         });
-
-        if (verified) {
-            await req.db.query("UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1", [userId]);
-            res.json({ 
-                success: true, 
-                message: "2FA Aktif! 🛡️",
-                token: generateToken(user), 
-                user: { id: user.id, username: user.username, role: user.role } 
-            });
-        } else {
-            res.status(400).json({ success: false, message: "Kode OTP Salah atau Kadaluwarsa!" });
-        }
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: "Verifikasi gagal" });
