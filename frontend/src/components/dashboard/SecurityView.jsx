@@ -3,7 +3,6 @@ import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, QrCode } from 'lucide-re
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, setOtp, loading, qrCode }) => {
-  // ✅ Pengecekan status 2FA sesuai field di DB Railway
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
@@ -45,11 +44,11 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                 <div className="space-y-2">
                   <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">Aktifkan 2FA Authenticator</p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
-                    Gunakan Google Authenticator untuk mengunci akses akun sultan lo secara permanen. Lebih aman dari sekadar email!
+                    Gunakan Google Authenticator untuk mengunci akses akun sultan lo secara permanen.
                   </p>
                 </div>
                 <button 
-                  onClick={onGenerateQR} 
+                  onClick={onGenerateQR} // ✅ Memanggil fungsi handleGenerateOTP
                   disabled={loading} 
                   className="bg-violet-600 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest flex items-center gap-3 shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 transition-all hover:bg-violet-700 disabled:opacity-50"
                 >
@@ -58,14 +57,13 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
               </div>
             ) : (
               <div className="space-y-8 flex flex-col items-center">
-                <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300 w-full">
+                <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300 w-full text-center">
                   <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Scan QR Code</p>
                   <p className="text-[10px] text-amber-500 font-bold leading-tight uppercase">
                     Buka Google Authenticator di HP, lalu scan gambar di bawah ini.
                   </p>
                 </div>
 
-                {/* ✅ Tampilan QR Code dari Backend */}
                 {qrCode && (
                   <div className="p-4 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0_0_#000]">
                     <img src={qrCode} alt="Scan QR" className="w-48 h-48" />
@@ -80,7 +78,7 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
                     value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />
                   <button 
-                    onClick={onVerify} 
+                    onClick={onVerify} // ✅ Memanggil handleVerifyOTP
                     disabled={otp.length < 6 || loading} 
                     className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_6px_0_0_#1e293b] active:translate-y-1 transition-all hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
@@ -102,12 +100,12 @@ const SecurityView = ({ user, otpSent, onGenerateQR, onVerify, onDisable, otp, s
               </div>
               <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">Status: Secure</h3>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 italic leading-relaxed">
-                Aset Sultan aman terkendali.<br/>Sekarang setiap login wajib masukin kode dari HP lo.
+                Aset Sultan aman terkendali.
               </p>
               
               <div className="mt-10 pt-8 border-t border-slate-50">
                 <button 
-                  onClick={onDisable} 
+                  onClick={onDisable} // ✅ Memanggil handleDisable2FA
                   className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 transition-colors tracking-[0.2em]"
                 >
                   Disable Security Protocol

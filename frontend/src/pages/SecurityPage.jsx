@@ -1,24 +1,22 @@
 import React, { useState } from 'react';
-// ✅ GANTI: Gunakan instance api sentral agar sinkron dengan Railway
 import api from '../api/axios'; 
 import SecurityView from '../components/dashboard/SecurityView'; 
 import { useAuth } from '../context/AuthContext'; 
 import Swal from 'sweetalert2';
 
 const SecurityPage = () => {
-  // ✅ User tetap diambil dari context, tapi API_URL sudah diurus di axios.js
   const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [qrCodeData, setQrCodeData] = useState('');
 
-  // --- 1. GENERATE SETUP 2FA (SINKRON RAILWAY) ---
+  // --- 1. GENERATE SETUP 2FA ---
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // ✅ Cukup panggil endpoint, instance api sudah tahu baseURL-nya
+      // Pastikan endpoint ini sesuai dengan backend/index.js lo
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -26,8 +24,8 @@ const SecurityPage = () => {
         setOtpSent(true);
         Swal.fire({
           icon: 'success',
-          title: 'QR CODE SIAP',
-          text: 'Scan pakai Google Authenticator kamu, Ri!',
+          title: 'QR CODE READY',
+          text: 'Scan pakai Google Authenticator lo, Ri!',
           timer: 2000,
           showConfirmButton: false,
           customClass: {
@@ -37,7 +35,7 @@ const SecurityPage = () => {
       }
     } catch (err) {
       console.error("Setup 2FA Error:", err);
-      Swal.fire('ERROR', 'Gagal inisialisasi protokol keamanan.', 'error');
+      Swal.fire('ERROR', 'Gagal generate security protocol. Cek koneksi backend!', 'error');
     } finally { 
       setLoading(false); 
     }
@@ -58,21 +56,42 @@ const SecurityPage = () => {
         Swal.fire({
           icon: 'success',
           title: '2FA AKTIF',
-          text: 'Akun kamu sekarang jauh lebih aman!',
+          text: 'Akun sultan lo sekarang full protected!',
           customClass: {
             popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
           }
         }).then(() => {
-          // Sinkronisasi status terbaru tanpa reload total jika memungkinkan
-          // Tapi reload aman untuk memastikan state global terupdate
           window.location.reload(); 
         });
       }
     } catch (err) { 
-      Swal.fire('GAGAL', 'Kode OTP salah atau expired. Coba lagi!', 'error');
+      Swal.fire('GAGAL', 'Kode OTP salah atau expired. Cek jam di HP lo!', 'error');
     } finally { 
       setLoading(false); 
     }
+  };
+
+  // --- 3. DISABLE 2FA (Fixing "a is not a function") ---
+  const handleDisable2FA = async () => {
+    Swal.fire({
+      title: 'MATIKAN 2FA?',
+      text: "Keamanan akun lo bakal turun, yakin Ri?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, Matikan',
+      cancelButtonText: 'Batal'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await api.post('/auth/disable-2fa');
+          if (res.data.success) {
+            window.location.reload();
+          }
+        } catch (err) {
+          Swal.fire('ERROR', 'Gagal mematikan protokol.', 'error');
+        }
+      }
+    });
   };
 
   return (
@@ -87,6 +106,7 @@ const SecurityPage = () => {
           qrCode={qrCodeData}
           onGenerateQR={handleGenerateOTP}
           onVerify={handleVerifyOTP}
+          onDisable={handleDisable2FA} // ✅ Sekarang fungsi ini sudah ada
         />
       </div>
     </div>
