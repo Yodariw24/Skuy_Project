@@ -29,19 +29,18 @@ function DashboardPage() {
 
   const navigate = useNavigate()
 
+  // --- 1. SYNC DATA CORE ---
   const fetchData = async () => {
     try {
       const savedUser = JSON.parse(localStorage.getItem('user'));
       if (!savedUser?.id) throw new Error("Session Expired");
 
-      // ✅ Sync data Sultan dari tabel Users & Streamers sekaligus
       const res = await api.get(`/user/dashboard-sync?userId=${savedUser.id}`);
       
       if (res.data && res.data.user) {
         const userData = res.data.user;
         setUser(userData);
         setBalance(userData.total_saldo || 0);
-        // Simpan versi terbaru ke localStorage agar sinkron dengan Sidebar/Navbar
         localStorage.setItem('user', JSON.stringify(userData));
       }
     } catch (err) {
@@ -61,51 +60,68 @@ function DashboardPage() {
     }
   }, [navigate]);
 
-  // --- LOGIKA 2FA WHATSAPP (SINKRON DENGAN FONNTE) ---
+  // --- 2. LOGIKA 2FA WHATSAPP ---
   const handleGenerateWA = async () => {
     setLoading2FA(true);
     try {
-      // ✅ Menembak setup-2fa yang sekarang menyimpan OTP ke tabel users
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       if (res.data.success) {
         setOtpSent(true);
         skuyAlert.fire({ 
-          title: 'OTP MELUNCUR 📱', 
-          text: 'Cek WhatsApp lo, Ri! Kode protokol sudah dikirim. 🚀', 
-          icon: 'success' 
+          title: 'OTP TERKIRIM 📱', 
+          text: 'Protokol enkripsi dikirim ke WhatsApp lo, Ri. Cek sekarang!', 
+          icon: 'info' 
         });
       }
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal kirim WA. Cek WA_TOKEN Railway!', 'error');
+      skuyAlert.fire('ERROR', 'Gagal kirim WA. Pastikan server Railway aktif!', 'error');
     } finally {
       setLoading2FA(false);
     }
   };
 
   const handleVerify2FA = async () => {
-    if (!otp) return;
+    if (!otp || otp.length < 6) return;
     setLoading2FA(true);
     try {
       const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
       if (res.data.success) {
-        // ✅ Update state lokal agar UI langsung berubah jadi "GACOR/SECURE"
+        // ✅ STEP 1: Update State Lokal & LocalStorage secara instan
         const updatedUser = { ...user, is_two_fa_enabled: true };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        skuyAlert.fire({ title: 'SUCCESS', text: 'Perisai WA Aktif! 🛡️', icon: 'success' })
-          .then(() => {
-            window.location.reload(); // Re-sync total
-          });
+        setOtpSent(false); // Reset view input
+        setOtp('');
+
+        // ✅ STEP 2: Notifikasi Sukses
+        skuyAlert.fire({ 
+          title: 'SECURED! 🛡️', 
+          text: 'Akun Sultan resmi terproteksi. Login berikutnya wajib pakai WA!', 
+          icon: 'success' 
+        }).then(() => {
+            // Optional: Reload hanya jika perlu sinkronisasi ulang tema/role berat
+            window.location.reload(); 
+        });
       }
     } catch (err) {
-      skuyAlert.fire({ title: 'FAILED', text: 'Kode salah atau expired!', icon: 'error' });
+      skuyAlert.fire({ title: 'FAILED', text: 'Kode verifikasi salah atau kadaluwarsa!', icon: 'error' });
     } finally {
       setLoading2FA(false);
     }
   };
 
   const handleDisable2FA = async () => {
+    const confirm = await skuyAlert.fire({
+        title: 'NONAKTIFKAN?',
+        text: 'Akun lo bakal jadi rentan kalo protokol keamanan dicabut, Ri!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'IYA, COPOT AJA',
+        cancelButtonText: 'BATAL'
+    });
+
+    if (!confirm.isConfirmed) return;
+
     try {
       const res = await api.post('/auth/disable-2fa', { userId: user.id });
       if (res.data.success) {
@@ -113,12 +129,12 @@ function DashboardPage() {
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
-        skuyAlert.fire('OFF', 'Protokol keamanan dimatikan.', 'info').then(() => {
+        skuyAlert.fire('STATUS: OPEN', 'Protokol keamanan dicabut.', 'info').then(() => {
           window.location.reload();
         });
       }
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal mematikan protokol', 'error');
+      skuyAlert.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
     }
   };
 
@@ -127,7 +143,7 @@ function DashboardPage() {
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="font-black italic uppercase tracking-tighter text-slate-900">Sinkronisasi Cloud...</p>
+          <p className="font-black italic uppercase tracking-tighter text-slate-900">Synchronizing Sultan Data...</p>
         </div>
       </div>
     );
@@ -135,33 +151,42 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left">
+      {/* Sidebar otomatis baca status user.is_two_fa_enabled dari state */}
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={user} navigate={navigate} />
+      
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8 flex justify-between items-center border-b border-slate-100 pb-5">
           <div>
             <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">Skuy Cloud Hub</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">
-              Node: <span className="text-emerald-500">Railway-DB-Cluster</span>
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+                <div className={`w-2 h-2 rounded-full ${user?.is_two_fa_enabled ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                   Status: <span className={user?.is_two_fa_enabled ? 'text-emerald-500' : 'text-amber-500'}>
+                        {user?.is_two_fa_enabled ? 'Double Encrypted' : 'Standard Protection'}
+                   </span>
+                </p>
+            </div>
           </div>
         </header>
 
         {/* --- DYNAMIC VIEW --- */}
-        {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
-        {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
-        {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
-        {activeMenu === 'security' && (
-          <SecurityView 
-            user={user} 
-            otpSent={otpSent}
-            onGenerateQR={handleGenerateWA} 
-            onVerify={handleVerify2FA} 
-            onDisable={handleDisable2FA} 
-            otp={otp} 
-            setOtp={setOtp} 
-            loading={loading2FA} 
-          />
-        )}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
+            {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
+            {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
+            {activeMenu === 'security' && (
+              <SecurityView 
+                user={user} 
+                otpSent={otpSent}
+                onGenerateQR={handleGenerateWA} 
+                onVerify={handleVerify2FA} 
+                onDisable={handleDisable2FA} 
+                otp={otp} 
+                setOtp={setOtp} 
+                loading={loading2FA} 
+              />
+            )}
+        </div>
       </main>
     </div>
   )

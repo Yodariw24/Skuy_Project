@@ -37,12 +37,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage, 
-    limits: { fileSize: 2 * 1024 * 1024 } 
+    limits: { fileSize: 2 * 1024 * 1024 } // Batas 2MB
 });
 
-// --- 2. ENDPOINT KHUSUS DASHBOARD & THEME (FIX SYNC) ---
+// --- 2. ENDPOINT KHUSUS DASHBOARD & THEME ---
 
-// ✅ UPDATE TEMA: Visual Protocol
+// ✅ UPDATE TEMA: Supaya tampilan Sultan tetap estetik
 router.put('/update-theme', async (req, res) => {
     const { theme_color, userId } = req.body;
     const targetId = userId || req.query.userId;
@@ -54,32 +54,32 @@ router.put('/update-theme', async (req, res) => {
             UPDATE streamers 
             SET theme_color = $1 
             WHERE user_id = $2 
-            RETURNING *
+            RETURNING theme_color
         `;
         const result = await req.db.query(query, [theme_color, targetId]);
 
         if (result.rows.length > 0) {
-            res.json({ success: true, message: "Visual Protocol Applied! ✨", user: result.rows[0] });
+            res.json({ success: true, message: "Visual Protocol Applied! ✨", theme: result.rows[0].theme_color });
         } else {
-            res.status(404).json({ success: false, message: "User gak ketemu!" });
+            res.status(404).json({ success: false, message: "User tidak ditemukan!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal update tema" });
+        res.status(500).json({ success: false, message: "Gagal sinkronisasi tema." });
     }
 });
 
-// ✅ SYNC DASHBOARD: FIX SINGLE SOURCE OF TRUTH (USERS TABLE)
+// ✅ SYNC DASHBOARD: Mengambil data dari 3 tabel sekaligus (Users, Streamers, Balance)
 router.get('/dashboard-sync', async (req, res) => {
     const { userId } = req.query;
-    if (!userId) return res.status(400).json({ success: false, message: "UserId mana, Ri?" });
+    if (!userId) return res.status(400).json({ success: false, message: "ID Sultan diperlukan!" });
 
     try {
-        // ✅ FIX: Ambil u.is_two_fa_enabled dari tabel users, bukan streamers!
+        // ✅ MENGAMBIL STATUS 2FA LANGSUNG DARI TABEL USERS
         const query = `
             SELECT 
                 u.id, u.username, u.role, u.is_two_fa_enabled, 
-                s.full_name, s.profile_picture, s.theme_color, 
-                b.total_saldo
+                s.full_name, s.display_name, s.profile_picture, s.theme_color, 
+                COALESCE(b.total_saldo, 0) as total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
             LEFT JOIN balance b ON u.id = b.streamer_id
@@ -89,16 +89,18 @@ router.get('/dashboard-sync', async (req, res) => {
         
         if (result.rows.length > 0) {
             const userData = result.rows[0];
+            
+            // Default Values agar Frontend tidak crash
             userData.role = userData.role || 'creator'; 
             userData.theme_color = userData.theme_color || 'violet';
             
             res.json({ success: true, user: userData });
         } else {
-            res.status(404).json({ success: false, message: "User gak ketemu!" });
+            res.status(404).json({ success: false, message: "Data tidak ditemukan." });
         }
     } catch (err) {
-        console.error("SYNC ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal sinkron dashboard" });
+        console.error("DASHBOARD SYNC ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal sinkronisasi cloud." });
     }
 });
 
@@ -106,7 +108,10 @@ router.get('/dashboard-sync', async (req, res) => {
 router.get('/wallet/history/:id', async (req, res) => {
     try {
         const resBalance = await req.db.query('SELECT total_saldo FROM balance WHERE streamer_id = $1', [req.params.id]);
-        const resHistory = await req.db.query('SELECT * FROM transactions WHERE streamer_id = $1 ORDER BY created_at DESC LIMIT 10', [req.params.id]);
+        const resHistory = await req.db.query(
+            'SELECT * FROM transactions WHERE streamer_id = $1 ORDER BY created_at DESC LIMIT 10', 
+            [req.params.id]
+        );
 
         res.json({ 
             success: true, 
@@ -114,7 +119,7 @@ router.get('/wallet/history/:id', async (req, res) => {
             history: resHistory.rows || [] 
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal ambil history" });
+        res.status(500).json({ success: false, message: "Gagal menarik riwayat transaksi." });
     }
 });
 

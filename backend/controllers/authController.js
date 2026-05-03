@@ -15,7 +15,7 @@ export const googleAuth = async (req, res) => {
     let userResult = await req.db.query(queryCheck, [email]);
     let user = userResult.rows[0];
 
-    // Jika User Baru
+    // Jika User Baru (Registrasi Otomatis)
     if (!user) {
       const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
       const newUser = await req.db.query(
@@ -35,29 +35,29 @@ export const googleAuth = async (req, res) => {
     if (user.is_two_fa_enabled === true) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Simpan OTP ke DB
+      // Update OTP rahasia ke DB
       await req.db.query('UPDATE users SET two_fa_secret = $1 WHERE id = $2', [otp, user.id]);
 
       // Kirim via Fonnte
       try {
         await axios.post('https://api.fonnte.com/send', {
-            target: '6283148678039', // Sesuaikan target nomor Ri
-            message: `KODE SKUY-GG: ${otp}. Masukkan kode ini untuk login ke akun lo!`,
+            target: '6283148678039', // Pastikan nomor target Sultan sudah dinamis nantinya
+            message: `[SKUY-GG SECURITY] Kode verifikasi Anda adalah: ${otp}. Kode ini bersifat rahasia.`,
         }, {
             headers: { Authorization: process.env.WA_TOKEN }
         });
       } catch (waErr) {
-        console.error("Gagal kirim WA saat login:", waErr.message);
+        console.error("Fonnte API Error:", waErr.message);
       }
 
       return res.json({
           requiresTwoFA: true,
           userId: user.id,
-          message: "Protokol WA-OTP Aktif! Cek WA lo, Ri."
+          message: "Verification Protocol Required. Check your WhatsApp."
       });
     }
 
-    // Jika 2FA tidak aktif, langsung kasih token
+    // Jika 2FA tidak aktif, langsung rilis JWT
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role || 'creator' },
       process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026',
@@ -78,13 +78,13 @@ export const googleAuth = async (req, res) => {
     });
   } catch (err) {
     console.error("GOOGLE AUTH ERROR:", err);
-    res.status(500).json({ success: false, message: "Gagal login via Google!" });
+    res.status(500).json({ success: false, message: "Internal Authentication Error" });
   }
 };
 
-// --- 2. SETUP 2FA (UNTUK AKTIVASI PERTAMA) ---
+// --- 2. SETUP 2FA (AKTIVASI PERTAMA) ---
 export const setup2FA = async (req, res) => {
-  const { id } = req.user; 
+  const { id } = req.user; // Diambil dari middleware autentikasi
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
@@ -92,18 +92,19 @@ export const setup2FA = async (req, res) => {
 
     await axios.post('https://api.fonnte.com/send', {
         target: '6283148678039', 
-        message: `KODE AKTIVASI SKUY-GG: ${otp}. Masukkan kode ini untuk mengaktifkan perisai akun lo!`,
+        message: `[SKUY-GG] KODE AKTIVASI: ${otp}. Gunakan kode ini untuk mengaktifkan fitur perlindungan akun Sultan.`,
     }, {
         headers: { Authorization: process.env.WA_TOKEN }
     });
 
-    res.json({ success: true, message: "OTP Aktivasi terkirim!" });
+    res.json({ success: true, message: "Security code sent to WhatsApp." });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Gagal kirim OTP" });
+    console.error("SETUP 2FA ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Failed to initiate 2FA setup." });
   }
 };
 
-// --- 3. VERIFY & LOGIN (SINKRONISASI TOTAL) ---
+// --- 3. VERIFY & LOGIN (PROSES VALIDASI) ---
 export const verify2FA = async (req, res) => {
   const { userId, token } = req.body;
   
@@ -116,12 +117,12 @@ export const verify2FA = async (req, res) => {
     `;
     const result = await req.db.query(query, [userId]);
     
-    if (result.rows.length === 0) return res.status(404).json({ message: "User gak ketemu!" });
+    if (result.rows.length === 0) return res.status(404).json({ message: "Identity not found." });
     const user = result.rows[0];
 
-    // Bandingkan OTP
-    if (user.two_fa_secret === token.trim()) {
-      // ✅ Update status AKTIF & bersihkan secret
+    // Validasi OTP (Gunakan trim untuk mencegah spasi tak sengaja)
+    if (user.two_fa_secret && user.two_fa_secret === token.trim()) {
+      // ✅ Aktifkan status & bersihkan secret agar tidak bisa dipakai ulang
       await req.db.query(
         'UPDATE users SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1', 
         [userId]
@@ -146,23 +147,24 @@ export const verify2FA = async (req, res) => {
         }
       });
     } else {
-      res.status(400).json({ success: false, message: "Kode OTP WA salah!" });
+      res.status(400).json({ success: false, message: "Invalid or expired verification code." });
     }
   } catch (err) {
-    res.status(500).json({ success: false, message: "Error verifikasi." });
+    console.error("VERIFY ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Verification process failed." });
   }
 };
 
 // --- 4. DISABLE 2FA ---
 export const disable2FA = async (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user?.id; // Pastikan id didapat dari token sesi saat ini
   try {
     await req.db.query(
         'UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1', 
         [userId]
     );
-    res.json({ success: true, message: "2FA berhasil dimatikan." });
+    res.json({ success: true, message: "Two-Factor Authentication deactivated." });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Gagal matikan 2FA." });
+    res.status(500).json({ success: false, message: "Failed to deactivate security protocol." });
   }
 };
