@@ -2,21 +2,11 @@ import express from 'express';
 const router = express.Router();
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import 'dotenv/config';
 
-// --- 1. SETUP NODEMAILER ---
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
-    }
-});
-
-// --- 2. HELPER: GENERATE JWT ---
+// --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -25,7 +15,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 3. GOOGLE AUTH (LOGIN & REGIS OTOMATIS) ---
+// --- 2. GOOGLE AUTH (LOGIN & REGIS OTOMATIS) ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -70,7 +60,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 4. REGISTER (MANUAL) ---
+// --- 3. REGISTER (MANUAL) ---
 router.post('/register', async (req, res) => {
     const { username, email, password, full_name } = req.body;
     if (!username || !email || !password) {
@@ -98,12 +88,12 @@ router.post('/register', async (req, res) => {
         
         res.status(201).json({ success: true, message: "Akun Sultan Berhasil Dibuat! 🚀", user: newUser });
     } catch (err) {
-        await req.db.query('ROLLBACK');
+        if (req.db) await req.db.query('ROLLBACK');
         res.status(500).json({ success: false, message: "Pendaftaran gagal, email/username mungkin sudah ada." });
     }
 });
 
-// --- 5. LOGIN (MANUAL) ---
+// --- 4. LOGIN (MANUAL) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -121,7 +111,7 @@ router.post('/login', async (req, res) => {
         if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
 
         if (user.is_two_fa_enabled) {
-            return res.json({ requiresTwoFA: true, userId: user.id, message: "Minta kode 2FA dari Authenticator lo!" });
+            return res.json({ requiresTwoFA: true, userId: user.id, message: "Minta kode 2FA!" });
         }
 
         res.json({ 
@@ -134,24 +124,21 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 6. SETUP & VERIFY 2FA (QR CODE TOTP) ---
+// --- 5. SETUP & VERIFY 2FA ---
 
-// Step A: Generate QR & Simpan Secret Permanen
+// Step A: Generate QR & Simpan Secret
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         const { rows } = await req.db.query("SELECT email FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
 
-        // Generate Secret TOTP
         const secret = speakeasy.generateSecret({
-            name: `SkuyGG (${rows[0].email})`
+            name: `SkuyGG (${rows[0].email})`,
+            issuer: "SkuyGG"
         });
 
-        // Simpan secret ke database Railway (kolom two_fa_secret)
         await req.db.query("UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2", [secret.base32, userId]);
-
-        // Generate QR Code untuk Frontend
         const qrCodeImageUrl = await qrcode.toDataURL(secret.otpauth_url);
 
         res.json({ 
@@ -166,7 +153,7 @@ router.post('/setup-2fa', async (req, res) => {
     }
 });
 
-// Step B: Verifikasi Token & Aktifkan Status is_two_fa_enabled
+// Step B: Verifikasi Token
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body; 
     try {
@@ -178,25 +165,23 @@ router.post('/verify-2fa', async (req, res) => {
             return res.status(400).json({ success: false, message: "Setup QR dulu baru verifikasi!" });
         }
 
-        // Cek apakah 6 digit token dari HP cocok dengan secret di DB
         const verified = speakeasy.totp.verify({
             secret: user.two_fa_secret,
             encoding: 'base32',
-            token: token
+            token: token.replace(/\s/g, ''), // Hapus spasi jika ada
+            window: 1 // Kompensasi delay waktu
         });
 
         if (verified) {
-            // Aktifkan kolom boolean di Railway
             await req.db.query("UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1", [userId]);
-            
             res.json({ 
                 success: true, 
-                message: "2FA Aktif! Akun lo sekarang makin Sultan dan Aman! 🛡️",
+                message: "2FA Aktif! 🛡️",
                 token: generateToken(user), 
                 user: { id: user.id, username: user.username, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "Kode OTP dari HP Salah atau Kadaluwarsa!" });
+            res.status(400).json({ success: false, message: "Kode OTP Salah atau Kadaluwarsa!" });
         }
     } catch (err) {
         console.error(err);

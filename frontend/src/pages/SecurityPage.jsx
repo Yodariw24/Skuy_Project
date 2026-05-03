@@ -15,10 +15,12 @@ const SecurityPage = () => {
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
-    console.log("🚀 Menghubungi Railway: /api/auth/setup-2fa"); // Debugging
+    
+    // Log ini wajib ada di console F12 buat buktiin kodingan baru jalan
+    console.log("🚀 Mengetok pintu baru: /api/auth/setup-2fa");
 
     try {
-      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa
+      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa sesuai backend
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -27,7 +29,7 @@ const SecurityPage = () => {
         Swal.fire({
           icon: 'success',
           title: 'QR CODE READY',
-          text: 'Scan pake Google Authenticator lo, Ri!',
+          text: 'Scan pake Google Authenticator lo sekarang, Ri!',
           customClass: {
             popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
           }
@@ -35,7 +37,7 @@ const SecurityPage = () => {
       }
     } catch (err) {
       console.error("Setup Error:", err);
-      Swal.fire('ERROR', 'Gagal generate security protocol.', 'error');
+      Swal.fire('ERROR', 'Gagal generate security protocol. Cek log Railway!', 'error');
     } finally { 
       setLoading(false); 
     }
@@ -46,6 +48,7 @@ const SecurityPage = () => {
     if (!otp) return;
     setLoading(true);
     try {
+      // ✅ SINKRON: Menggunakan endpoint /auth/verify-2fa
       const res = await api.post('/auth/verify-2fa', { 
         userId: user.id, 
         token: otp 
@@ -56,13 +59,13 @@ const SecurityPage = () => {
         Swal.fire({
           icon: 'success',
           title: '2FA AKTIF',
-          text: 'Akun sultan lo aman!',
+          text: 'Akun sultan lo sekarang makin aman! 🛡️',
         }).then(() => {
           window.location.reload(); 
         });
       }
     } catch (err) { 
-      Swal.fire('GAGAL', 'Kode OTP salah!', 'error');
+      Swal.fire('GAGAL', 'Kode OTP salah atau kadaluwarsa!', 'error');
     } finally { 
       setLoading(false); 
     }
@@ -81,7 +84,7 @@ const SecurityPage = () => {
           const res = await api.post('/auth/disable-2fa');
           if (res.data.success) window.location.reload();
         } catch (err) {
-          Swal.fire('ERROR', 'Gagal mematikan protokol.', 'error');
+          Swal.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
         }
       }
     });
