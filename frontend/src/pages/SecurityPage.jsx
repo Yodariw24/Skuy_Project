@@ -15,8 +15,10 @@ const SecurityPage = () => {
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
+    console.log("🚀 Memicu endpoint baru: /auth/setup-2fa"); 
+
     try {
-      // Pastikan endpoint ini sesuai dengan backend/index.js lo
+      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa sesuai backend
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -25,7 +27,7 @@ const SecurityPage = () => {
         Swal.fire({
           icon: 'success',
           title: 'QR CODE READY',
-          text: 'Scan pakai Google Authenticator lo, Ri!',
+          text: 'Scan pake Google Authenticator lo, Ri!',
           timer: 2000,
           showConfirmButton: false,
           customClass: {
@@ -65,13 +67,13 @@ const SecurityPage = () => {
         });
       }
     } catch (err) { 
-      Swal.fire('GAGAL', 'Kode OTP salah atau expired. Cek jam di HP lo!', 'error');
+      Swal.fire('GAGAL', 'Kode OTP salah atau expired!', 'error');
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 3. DISABLE 2FA (Fixing "a is not a function") ---
+  // --- 3. DISABLE 2FA ---
   const handleDisable2FA = async () => {
     Swal.fire({
       title: 'MATIKAN 2FA?',
@@ -106,7 +108,7 @@ const SecurityPage = () => {
           qrCode={qrCodeData}
           onGenerateQR={handleGenerateOTP}
           onVerify={handleVerifyOTP}
-          onDisable={handleDisable2FA} // ✅ Sekarang fungsi ini sudah ada
+          onDisable={handleDisable2FA}
         />
       </div>
     </div>
