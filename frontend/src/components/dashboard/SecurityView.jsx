@@ -1,17 +1,16 @@
 import React from 'react';
-import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, QrCode } from 'lucide-react';
+import { ShieldCheck, Lock, Loader2, CheckCircle2, Zap, Mail } from 'lucide-react'; // Ganti QrCode jadi Mail
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ 
   user, 
   otpSent, 
-  onGenerateQR, 
+  onGenerateQR, // Sekarang berfungsi sebagai Request Email OTP
   onVerify, 
   onDisable, 
   otp, 
   setOtp, 
-  loading, 
-  qrCode 
+  loading 
 }) => {
   const isEnabled = user?.is_two_fa_enabled;
 
@@ -55,14 +54,14 @@ const SecurityView = ({
             {!otpSent ? (
               <div className="space-y-6 text-center flex flex-col items-center">
                 <div className="p-5 bg-violet-50 rounded-3xl mb-2 text-violet-600 border-2 border-violet-100 shadow-inner">
-                  <QrCode size={40} />
+                  <Mail size={40} />
                 </div>
                 <div className="space-y-2">
                   <p className="text-slate-900 font-black text-lg uppercase italic tracking-tighter">
-                    Aktifkan 2FA Authenticator
+                    Aktifkan 2FA via Email
                   </p>
                   <p className="text-slate-400 font-bold text-[11px] uppercase leading-relaxed max-w-xs mx-auto">
-                    Gunakan Google Authenticator untuk mengunci akses akun sultan lo secara permanen.
+                    Gunakan kode verifikasi yang dikirim ke email untuk mengunci akses akun sultan lo secara permanen.
                   </p>
                 </div>
                 <button 
@@ -73,28 +72,18 @@ const SecurityView = ({
                     {loading ? (
                       <Loader2 className="animate-spin" size={20}/>
                     ) : (
-                      <>Generate QR Code <Zap size={18}/></>
+                      <>Kirim Kode ke Email <Zap size={18}/></>
                     )}
                 </button>
               </div>
             ) : (
               <div className="space-y-8 flex flex-col items-center">
                 <div className="bg-amber-50 p-6 rounded-3xl border-2 border-dashed border-amber-300 w-full text-center">
-                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Scan QR Code</p>
+                  <p className="text-xs font-black text-amber-600 uppercase italic mb-1">Step 1: Cek Email Lo</p>
                   <p className="text-[10px] text-amber-500 font-bold leading-tight uppercase">
-                    Buka Google Authenticator di HP, lalu scan gambar di bawah ini.
+                    Buka Gmail lo, salin 6 digit kode keamanan yang baru saja dikirim.
                   </p>
                 </div>
-
-                {qrCode && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0_0_#000]"
-                  >
-                    <img src={qrCode} alt="Scan QR" className="w-48 h-48" />
-                  </motion.div>
-                )}
 
                 <div className="max-w-xs mx-auto space-y-4 w-full">
                   <p className="text-xs font-black text-slate-900 uppercase italic">Step 2: Masukkan 6 Digit Kode</p>

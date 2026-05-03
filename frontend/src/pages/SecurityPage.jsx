@@ -9,63 +9,63 @@ const SecurityPage = () => {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
-  const [qrCodeData, setQrCodeData] = useState('');
 
-  // --- 1. GENERATE SETUP 2FA ---
-  const handleGenerateOTP = async () => {
+  // --- 1. REQUEST OTP KE EMAIL ---
+  const handleRequestEmailOTP = async () => {
     if (!user) return;
     setLoading(true);
     
-    // Log ini wajib ada di console F12 buat buktiin kodingan baru jalan
-    console.log("🚀 Mengetok pintu baru: /api/auth/setup-2fa");
+    // Verifikasi di console untuk memastikan rute /setup-2fa terpanggil
+    console.log(`🚀 Mengirim kode OTP ke: ${user.email}`);
 
     try {
-      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa sesuai backend
+      // Backend sekarang akan mengirim email, bukan gambar QR
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
-        setQrCodeData(res.data.qrCode);
-        setOtpSent(true);
+        setOtpSent(true); // Memunculkan input 6 digit di SecurityView
         Swal.fire({
           icon: 'success',
-          title: 'QR CODE READY',
-          text: 'Scan pake Google Authenticator lo sekarang, Ri!',
+          title: 'KODE TERKIRIM',
+          text: `Cek inbox Gmail lo (${user.email}). Kodenya udah meluncur! 🚀`,
+          confirmButtonColor: '#000',
           customClass: {
             popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
           }
         });
       }
     } catch (err) {
-      console.error("Setup Error:", err);
-      Swal.fire('ERROR', 'Gagal generate security protocol. Cek log Railway!', 'error');
+      console.error("Email OTP Error:", err);
+      Swal.fire('ERROR', 'Gagal kirim email. Pastiin EMAIL_USER di Railway udah bener!', 'error');
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 2. VERIFIKASI KODE OTP ---
+  // --- 2. VERIFIKASI KODE DARI EMAIL ---
   const handleVerifyOTP = async () => {
     if (!otp) return;
     setLoading(true);
     try {
-      // ✅ SINKRON: Menggunakan endpoint /auth/verify-2fa
       const res = await api.post('/auth/verify-2fa', { 
         userId: user.id, 
         token: otp 
       });
 
       if (res.data.success) {
-        setUser(res.data.user); 
+        // Update user state lokal agar tombol "Disable" muncul
+        setUser({ ...user, is_two_fa_enabled: true }); 
+        
         Swal.fire({
           icon: 'success',
           title: '2FA AKTIF',
-          text: 'Akun sultan lo sekarang makin aman! 🛡️',
+          text: 'Akun sultan lo sekarang aman banget! 🛡️',
         }).then(() => {
           window.location.reload(); 
         });
       }
     } catch (err) { 
-      Swal.fire('GAGAL', 'Kode OTP salah atau kadaluwarsa!', 'error');
+      Swal.fire('GAGAL', 'Kode OTP salah atau udah kadaluwarsa!', 'error');
     } finally { 
       setLoading(false); 
     }
@@ -74,15 +74,21 @@ const SecurityPage = () => {
   // --- 3. DISABLE 2FA ---
   const handleDisable2FA = async () => {
     Swal.fire({
-      title: 'MATIKAN 2FA?',
+      title: 'MATIKAN KEAMANAN?',
+      text: 'Akun lo bakal lebih berisiko tanpa 2FA, Ri!',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Ya, Matikan',
+      confirmButtonColor: '#d33',
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await api.post('/auth/disable-2fa');
-          if (res.data.success) window.location.reload();
+          const res = await api.post('/auth/disable-2fa', { userId: user.id });
+          if (res.data.success) {
+            Swal.fire('NONAKTIF', '2FA Berhasil dimatikan.', 'success').then(() => {
+              window.location.reload();
+            });
+          }
         } catch (err) {
           Swal.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
         }
@@ -93,14 +99,15 @@ const SecurityPage = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFF] pt-24 px-6 text-left">
       <div className="max-w-4xl mx-auto">
+        {/* qrCode dikirim kosong ('') karena kita sudah tidak pakai QR lagi */}
         <SecurityView 
           user={user}
           otpSent={otpSent}
           otp={otp}
           setOtp={setOtp}
           loading={loading}
-          qrCode={qrCodeData}
-          onGenerateQR={handleGenerateOTP}
+          qrCode={''} 
+          onGenerateQR={handleRequestEmailOTP}
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
         />
