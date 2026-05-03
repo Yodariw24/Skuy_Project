@@ -24,7 +24,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 2. CORS CONFIGURATION ---
+// --- 2. CORS CONFIGURATION (FIXED FOR VERCEL PREVIEW) ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
@@ -34,9 +34,11 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const cleanOrigin = origin.replace(/\/$/, "");
-    if (allowedOrigins.includes(cleanOrigin)) {
+    // Izinkan jika: 
+    // 1. Tidak ada origin (server-to-server)
+    // 2. Origin ada di whitelist
+    // 3. Origin berasal dari domain vercel.app (untuk handle URL preview lo)
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.includes(".vercel.app")) {
       callback(null, true);
     } else {
       callback(new Error('CORS Policy Blocked!'));
@@ -44,17 +46,23 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle Preflight semua rute
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- 3. SOCKET.IO SETUP ---
 const server = http.createServer(app);
-const io = new Server(server, { cors: corsOptions });
+const io = new Server(server, { 
+  cors: corsOptions,
+  transports: ['websocket', 'polling']
+});
 
 // Inject Context Middleware
 app.use((req, res, next) => {
@@ -63,16 +71,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 4. API ROUTES (FIXED ORDER) ---
+// --- 4. API ROUTES (PRIORITY ORDER) ---
 
-// A. Auth Routes (Handle /setup-2fa & /verify-2fa)
+// A. Auth - Handle login & 2FA
 app.use('/api/auth', authRoutes);
 
-// B. Wallet & History (Urutan eksklusif agar history tidak 404)
+// B. Wallet - Pastikan /history di atas agar tidak 404
 app.use('/api/wallet/history', streamerRoutes); 
 app.use('/api/wallet', streamerRoutes); 
 
-// C. User & Profiles
+// C. User & Profile
 app.use('/api/user', streamerRoutes); 
 app.use('/api/streamers', streamerRoutes); 
 
@@ -80,21 +88,26 @@ app.use('/api/streamers', streamerRoutes);
 app.use('/api/donations', donationRoutes);
 
 app.get('/', (req, res) => {
-  res.status(200).json({ status: "online", project: "SkuyGG Engine" });
+  res.status(200).json({ 
+    status: "online", 
+    project: "SkuyGG Engine",
+    message: "CORS and Routes Fixed!"
+  });
 });
 
-// --- 5. GLOBAL ERROR HANDLING ---
+// --- 5. ERROR HANDLING ---
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal Server Error',
-    error_code: statusCode
+    message: err.message || 'Server Error'
   });
 });
 
 // --- 6. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
+  console.log('-----------------------------------------');
+  console.log(`🚀 SKUYY.GG RUNNING ON PORT ${PORT}`);
+  console.log('-----------------------------------------');
 });
