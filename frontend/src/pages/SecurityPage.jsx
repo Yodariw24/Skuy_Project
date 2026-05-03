@@ -11,14 +11,14 @@ const SecurityPage = () => {
   const [otp, setOtp] = useState('');
   const [qrCodeData, setQrCodeData] = useState('');
 
+  // --- 1. GENERATE SETUP 2FA ---
   const handleGenerateOTP = async () => {
     if (!user) return;
     setLoading(true);
-    // DEBUG: Cek di F12, harus muncul teks di bawah ini!
-    console.log("🚀 Menghubungi Railway: /api/auth/setup-2fa"); 
+    console.log("🚀 Menghubungi Railway: /api/auth/setup-2fa"); // Debugging
 
     try {
-      // ✅ SINKRON: Menggunakan endpoint sesuai backend
+      // ✅ SINKRON: Menggunakan endpoint /auth/setup-2fa
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -41,6 +41,7 @@ const SecurityPage = () => {
     }
   };
 
+  // --- 2. VERIFIKASI KODE OTP ---
   const handleVerifyOTP = async () => {
     if (!otp) return;
     setLoading(true);
@@ -67,6 +68,7 @@ const SecurityPage = () => {
     }
   };
 
+  // --- 3. DISABLE 2FA ---
   const handleDisable2FA = async () => {
     Swal.fire({
       title: 'MATIKAN 2FA?',

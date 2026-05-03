@@ -63,12 +63,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 4. API ROUTES (FIXED & ALIGNED) ---
+// --- 4. API ROUTES (FIXED ORDER) ---
 
 // A. Auth Routes (Handle /setup-2fa & /verify-2fa)
 app.use('/api/auth', authRoutes);
 
-// B. Wallet & History (Urutan eksplisit agar tidak 404)
+// B. Wallet & History (Urutan eksklusif agar history tidak 404)
 app.use('/api/wallet/history', streamerRoutes); 
 app.use('/api/wallet', streamerRoutes); 
 
