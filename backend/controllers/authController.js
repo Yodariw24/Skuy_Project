@@ -1,13 +1,11 @@
-import speakeasy from 'speakeasy';
-import QRCode from 'qrcode';
 import jwt from 'jsonwebtoken';
+import axios from 'axios'; // Ganti speakeasy dengan axios untuk nembak Fonnte
 
 // --- 1. GOOGLE AUTH ---
 export const googleAuth = async (req, res) => {
   const { email, name, picture, sub } = req.body;
 
   try {
-    // 1. Cek user di tabel users JOIN streamers untuk dapet status 2FA
     const queryCheck = `
       SELECT u.*, s.is_two_fa_enabled, s.display_name 
       FROM users u 
@@ -18,37 +16,32 @@ export const googleAuth = async (req, res) => {
     let user = userResult.rows[0];
 
     if (!user) {
-      // 2. Jika USER BARU
       const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
-      
       const newUser = await req.db.query(
         'INSERT INTO users (username, email, role, google_id) VALUES ($1, $2, $3, $4) RETURNING *',
         [cleanUsername, email, 'creator', sub]
       );
       user = newUser.rows[0];
 
-      // 3. Setup Profil Streamer
       await req.db.query(
-        'INSERT INTO streamers (user_id, display_name, full_name, profile_picture) VALUES ($1, $2, $3, $4)',
+        'INSERT INTO streamers (user_id, display_name, full_name, profile_picture, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false)',
         [user.id, name, name, picture]
       );
-      
-      // 4. Inisialisasi Saldo
       await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [user.id]);
-      
-      user.is_two_fa_enabled = false; // Default untuk user baru
+      user.is_two_fa_enabled = false;
     }
 
-    // 5. Logic Login: Jika 2FA aktif, arahkan ke verifikasi dulu
+    // ✅ LOGIC LOGIN: Jika 2FA aktif, jangan kasih token dulu!
     if (user.is_two_fa_enabled) {
+        // Kirim OTP via WA secara otomatis saat login (opsional) atau suruh user klik "Kirim Kode" di FE
         return res.json({
             requiresTwoFA: true,
             userId: user.id,
-            message: "Sultan wajib verifikasi 2FA dulu!"
+            message: "Protokol WA-OTP Aktif! Verifikasi dulu, Ri."
         });
     }
 
-    // 6. Generate JWT Token
+    // Generate JWT jika 2FA mati
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role || 'creator' },
       process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026',
@@ -57,7 +50,6 @@ export const googleAuth = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Login Google Berhasil, Ri!",
       token,
       user: {
         id: user.id,
@@ -65,72 +57,60 @@ export const googleAuth = async (req, res) => {
         full_name: user.display_name || name,
         role: user.role || 'creator',
         profile_picture: picture,
-        is_two_fa_enabled: user.is_two_fa_enabled
+        is_two_fa_enabled: false
       }
     });
   } catch (err) {
     console.error("GOOGLE AUTH ERROR:", err);
-    res.status(500).json({ success: false, message: "Gagal login via Google, coba lagi Ri!" });
+    res.status(500).json({ success: false, message: "Gagal login via Google!" });
   }
 };
 
-// --- 2. SETUP 2FA ---
+// --- 2. SETUP 2FA (WHATSAPP VERSION) ---
 export const setup2FA = async (req, res) => {
-  const { id, email, username } = req.user; 
-  try {
-    // Generate Secret baru dengan label aplikasi kita
-    const secret = speakeasy.generateSecret({ 
-        name: `Skuy.GG (${email || username})`,
-        issuer: 'SkuyGG'
-    });
+  const { id } = req.user; 
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6 digit
 
-    // Simpan secret ke database Railway
+  try {
+    // Simpan OTP sementara ke DB
     await req.db.query(
-      'UPDATE streamers SET two_fa_secret = $1, is_two_fa_enabled = false WHERE user_id = $2', 
-      [secret.base32, id]
+      'UPDATE streamers SET two_fa_secret = $1 WHERE user_id = $2', 
+      [otp, id]
     );
 
-    // Kirim QR Code ke Frontend
-    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
-    res.json({ success: true, qrCode: qrCodeUrl });
+    // Kirim via Fonnte
+    await axios.post('https://api.fonnte.com/send', {
+        target: '6283148678039', // Pake nomor lo atau ambil dari user.phone
+        message: `KODE SKUY-GG: ${otp}. Jangan kasih tahu siapa-siapa, Ri!`,
+    }, {
+        headers: { Authorization: process.env.WA_TOKEN }
+    });
+
+    res.json({ success: true, message: "OTP Meluncur ke WA lo!" });
   } catch (err) {
-    console.error("SETUP 2FA ERROR:", err);
-    res.status(500).json({ success: false, message: "Gagal inisialisasi 2FA!" });
+    console.error("WA SETUP ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Gagal kirim WA OTP" });
   }
 };
 
-// --- 3. VERIFY & LOGIN ---
+// --- 3. VERIFY & LOGIN (WHATSAPP VERSION) ---
 export const verify2FA = async (req, res) => {
   const { userId, token } = req.body;
-  if (!token) return res.status(400).json({ message: "OTP wajib diisi!" });
-
+  
   try {
-    const query = `
-      SELECT u.id, u.username, u.role, s.two_fa_secret, s.full_name, s.profile_picture 
-      FROM users u
-      JOIN streamers s ON u.id = s.user_id 
-      WHERE u.id = $1
-    `;
+    const query = `SELECT s.two_fa_secret, u.username, u.role FROM streamers s JOIN users u ON s.user_id = u.id WHERE s.user_id = $1`;
     const result = await req.db.query(query, [userId]);
     
-    if (result.rows.length === 0) return res.status(404).json({ message: "Data Sultan gak sinkron!" });
+    if (result.rows.length === 0) return res.status(404).json({ message: "User gak sinkron!" });
 
     const user = result.rows[0];
 
-    // Verifikasi Token TOTP
-    const verified = speakeasy.totp.verify({
-      secret: user.two_fa_secret,
-      encoding: 'base32',
-      token: token.replace(/\s/g, ''), // Bersihkan spasi
-      window: 1 // Toleransi waktu 30 detik sebelum/sesudah
-    });
-
-    if (verified) {
-      // Aktifkan status 2FA secara permanen
-      await req.db.query('UPDATE streamers SET is_two_fa_enabled = true WHERE user_id = $1', [userId]);
+    // ✅ BANDINGKAN OTP WA (Bukan Speakeasy!)
+    if (user.two_fa_secret === token.trim()) {
+      await req.db.query('UPDATE streamers SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE user_id = $1', [userId]);
       
       const appToken = jwt.sign(
-        { id: user.id, username: user.username, role: user.role || 'creator' },
+        { id: userId, username: user.username, role: user.role },
         process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026',
         { expiresIn: '7d' }
       );
@@ -138,32 +118,26 @@ export const verify2FA = async (req, res) => {
       res.json({ 
         success: true, 
         token: appToken,
-        user: { 
-            id: user.id,
-            username: user.username,
-            full_name: user.full_name,
-            role: user.role || 'creator',
-            is_two_fa_enabled: true 
-        }
+        user: { id: userId, is_two_fa_enabled: true, role: user.role }
       });
     } else {
-      res.status(400).json({ success: false, message: "Kode OTP salah atau expired!" });
+      res.status(400).json({ success: false, message: "Kode OTP WA salah!" });
     }
   } catch (err) {
-    console.error("VERIFY 2FA ERROR:", err);
-    res.status(500).json({ success: false, message: "Terjadi gangguan keamanan." });
+    res.status(500).json({ success: false, message: "Error verifikasi." });
   }
 };
 
 // --- 4. DISABLE 2FA ---
 export const disable2FA = async (req, res) => {
+  const userId = req.user?.id || req.body.userId;
   try {
     await req.db.query(
         'UPDATE streamers SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE user_id = $1', 
-        [req.user.id]
+        [userId]
     );
     res.json({ success: true, message: "2FA berhasil dimatikan." });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Gagal mematikan protokol keamanan." });
+    res.status(500).json({ success: false, message: "Gagal matikan 2FA." });
   }
 };

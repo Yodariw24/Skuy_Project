@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import api from '../api/axios' 
-import { Loader2, ShieldCheck, Mail, Lock, User, CheckCircle2, ChevronRight, Sparkles } from 'lucide-react'
-import { GoogleLogin } from '@react-oauth/google'
-import { jwtDecode } from 'jwt-decode'
-import Swal from 'sweetalert2'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import api from '../api/axios'; 
+import { Loader2, ShieldCheck, Mail, Lock, User, CheckCircle2, ChevronRight, MessageSquare, Zap } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+import Swal from 'sweetalert2';
 
 const skuyAlert = (title, text, icon) => {
   Swal.fire({
@@ -31,7 +31,7 @@ function AuthPage() {
   
   const navigate = useNavigate();
 
-  // --- 1. HANDLE GOOGLE AUTH ---
+  // --- 1. HANDLE GOOGLE AUTH (SINKRON DENGAN 2FA) ---
   const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
     try {
@@ -43,47 +43,52 @@ function AuthPage() {
         sub: decoded.sub
       });
 
-      if (res.data.success) {
+      // ✅ FIX: Cek apakah Google Account ini butuh 2FA WA
+      if (res.data.requiresTwoFA) {
+        setTempUserId(res.data.userId);
+        setShow2FA(true);
+        skuyAlert("SECURITY", "Input kode yang mendarat di WA lo, Ri!", "info");
+      } else if (res.data.success) {
         localStorage.setItem('user_token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        skuyAlert("SINKRON", "Login Google Sukses!", "success");
         navigate('/dashboard/wallet');
       }
     } catch (err) {
-      skuyAlert("ERROR", "Gagal koneksi Google.", "error");
+      skuyAlert("ERROR", "Gagal koneksi Google Cloud.", "error");
     } finally { setLoading(false); }
   };
 
-  // --- 2. VERIFIKASI 2FA (LOGIN) ---
+  // --- 2. VERIFIKASI 2FA WA (LOGIN) ---
   const handleVerify2FALogin = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
     try {
-      // ✅ Mengirim token 6 digit dari Authenticator App
+      // ✅ FIX: Mengirim token yang dikirim via WhatsApp
       const res = await api.post('/auth/verify-2fa', { userId: tempUserId, token: otp });
       if (res.data.success) {
         localStorage.setItem('user_token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
+        skuyAlert("SUCCESS", "Akses Sultan Diterima! 🛡️", "success");
         navigate('/dashboard/wallet');
       }
     } catch (err) {
-      skuyAlert("KODE SALAH", "Kode Authenticator tidak valid atau expired.", "error");
+      skuyAlert("KODE SALAH", "Kode WA OTP salah atau sudah expired.", "error");
     } finally { setLoading(false); }
   };
 
   // --- 3. LOGIN / REGISTER MANUAL ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(false); // Biarkan fungsi async yang handle
     setLoading(true);
     try {
       if (isLogin) {
         const res = await api.post('/auth/login', { email: formData.identifier, password: formData.password });
         
         if (res.data.requiresTwoFA) {
-          // ✅ HANYA SET STATE, jangan panggil setup-2fa lagi di sini
-          // Karena secret sudah tersimpan permanen di DB Railway lo saat pertama setup.
           setTempUserId(res.data.userId);
           setShow2FA(true);
+          skuyAlert("VERIFIKASI", "Cek WhatsApp lo buat kode 6 digit!", "info");
         } else {
           localStorage.setItem('user_token', res.data.token);
           localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -108,7 +113,6 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F7FF] flex items-center justify-center p-6 font-sans relative overflow-hidden text-left">
-      {/* Background Ornaments */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-violet-200/40 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-200/40 blur-[120px] rounded-full" />
@@ -128,7 +132,7 @@ function AuthPage() {
               Empowering <br /> <span className="text-violet-500">Digital</span> Creators
             </h2>
             <div className="space-y-4">
-              {['Instant Payout via QRIS', 'Zero Hidden Fees', 'Advanced 2FA Security'].map((text, i) => (
+              {['Instant Payout via QRIS', 'Zero Hidden Fees', 'WhatsApp 2FA Security'].map((text, i) => (
                 <div key={i} className="flex items-center gap-3 text-slate-400 font-bold italic text-sm">
                   <CheckCircle2 size={18} className="text-violet-500" /> {text}
                 </div>
@@ -152,7 +156,7 @@ function AuthPage() {
 
                 {isLogin && (
                   <div className="mb-8">
-                    <div className="border-[3px] border-slate-950 rounded-2xl overflow-hidden hover:shadow-[6px_6px_0px_0px_rgba(109,40,217,1)] transition-all">
+                    <div className="border-[3px] border-slate-950 rounded-2xl overflow-hidden hover:shadow-[6px_6px_0_0_rgba(109,40,217,1)] transition-all">
                       <GoogleLogin onSuccess={handleGoogleSuccess} theme="filled_black" width="100%" shape="square" />
                     </div>
                     <div className="relative flex items-center justify-center mt-8">
@@ -191,21 +195,25 @@ function AuthPage() {
               </motion.div>
             ) : (
               <motion.form key="2fa" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} onSubmit={handleVerify2FALogin} className="space-y-8 py-4">
-                <div className="text-center space-y-4">
-                  <div className="w-20 h-20 bg-violet-100 text-violet-600 rounded-3xl mx-auto flex items-center justify-center border-4 border-violet-200">
-                    <ShieldCheck size={40} />
+                <div className="text-center space-y-6">
+                  <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl mx-auto flex items-center justify-center border-4 border-emerald-200">
+                    <MessageSquare size={40} />
                   </div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Authenticator Code Required</p>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 italic">WhatsApp OTP Verification</p>
+                    <h4 className="text-xl font-black italic uppercase tracking-tighter text-slate-900 mt-1">Cek WA Lo, Ri!</h4>
+                  </div>
                   <input 
-                    type="text" maxLength="6" placeholder="000000" required autoFocus
-                    className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-3xl text-center text-5xl font-black tracking-[0.4em] outline-none shadow-inner"
+                    type="text" maxLength="6" placeholder="••••••" required autoFocus
+                    className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-3xl text-center text-5xl font-black tracking-[0.4em] outline-none shadow-inner focus:bg-white transition-all"
                     value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   />
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Input the 6-digit code from your phone</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Masukkan 6 digit kode dari sistem Skuy.GG</p>
                 </div>
-                <button type="submit" className="w-full bg-slate-950 text-white py-6 rounded-3xl font-black uppercase italic tracking-widest border-4 border-slate-800 active:scale-95 transition-all">
-                  {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Authorize Identity'}
+                <button type="submit" className="w-full bg-emerald-600 text-white py-6 rounded-3xl font-black uppercase italic tracking-widest border-4 border-slate-950 shadow-[0_8px_0_0_#065f46] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2">
+                  {loading ? <Loader2 className="animate-spin" /> : <>Authorize Identity <Zap size={18}/></>}
                 </button>
+                <button type="button" onClick={() => setShow2FA(false)} className="w-full text-[10px] font-black uppercase text-slate-300 hover:text-slate-900 transition-all">Batal Verifikasi</button>
               </motion.form>
             )}
           </AnimatePresence>
