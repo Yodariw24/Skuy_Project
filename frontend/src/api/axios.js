@@ -5,11 +5,13 @@ import axios from 'axios';
  * Dibuat Sultan-Proof untuk handle Localhost & Production
  */
 const api = axios.create({
-  // ✅ FIX LOGIC: Pastiin baseURL bersih dan mengarah ke endpoint Railway lo
+  // ✅ FIX: Hapus slash di akhir URL biar gak double slash pas nembak endpoint (misal: /api//auth)
+  // Fallback URL mengarah langsung ke server Railway lo.
   baseURL: import.meta.env.VITE_API_URL 
     ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api` 
-    : 'https://skuy-project-backend-production.up.railway.app/api', 
+    : 'https://skuy-project-production.up.railway.app/api', 
   
+  // WAJIB ADA buat ngirim cookie/session lintas domain (Vercel <-> Railway)
   withCredentials: true, 
   headers: {
     'Content-Type': 'application/json'
@@ -18,7 +20,7 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR REQUEST
- * Nempelkan token JWT otomatis dari localStorage
+ * Nempelkan token JWT otomatis dari localStorage ke setiap request
  */
 api.interceptors.request.use(
   (config) => {
@@ -33,25 +35,26 @@ api.interceptors.request.use(
 
 /**
  * INTERCEPTOR RESPONSE
- * Handle error 401 dan 404 agar log-nya lebih informatif buat Sultan
+ * Penjaga gerbang kalau token Sultan kadaluwarsa atau server mati
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 🛡️ Handle Token Hangus
+    // 🛡️ Handle Token Hangus (Sesi Habis)
     if (error.response && error.response.status === 401) {
-      console.warn("⚠️ Sesi habis, Ri! Balik ke login dulu.");
+      console.warn("⚠️ Sesi habis, Ri! Otorisasi dicabut, balik ke login dulu.");
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       
+      // Tendang balik ke halaman auth biar nggak stuck
       if (window.location.pathname !== '/auth') {
-        window.location.href = '/auth'; // ✅ Sesuaikan dengan rute lo '/auth'
+        window.location.href = '/auth'; 
       }
     }
 
-    // 🕵️ Handle 404 (Biar lo tau kalau endpoint-nya emang gak ada)
+    // 🕵️ Handle 404 (Salah Jalur / Endpoint Gak Ada)
     if (error.response && error.response.status === 404) {
-      console.error("❌ Error 404: Endpoint gak ketemu. Cek routes di backend!");
+      console.error(`❌ Error 404 di URL: ${error.config.url} | Cek routes backend lo!`);
     }
 
     return Promise.reject(error);

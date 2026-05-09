@@ -47,21 +47,22 @@ const corsOptions = {
     'Content-Type', 
     'Authorization', 
     'Accept', 
-    'X-Requested-With', 
-    'Access-Control-Allow-Origin' // ✅ Tambahan biar browser makin tenang
+    'X-Requested-With'
+    // ❌ HAPUS 'Access-Control-Allow-Origin' di sini, karena itu response header, bukan request header.
   ],
   credentials: true,
   optionsSuccessStatus: 200
 };
 
-// Pasang middleware CORS di paling atas (Urutan itu krusial Ri!)
+// Pasang middleware CORS di paling atas
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // ✅ Wajib handle pre-flight OPTIONS
 
-// --- 3. SECURITY & UTILITY ---
+// --- 3. SECURITY & UTILITY (FIX GOOGLE AUTH POPUP) ---
 app.use((req, res, next) => {
+  // ✅ FIX UTAMA: require-corp diganti jadi credentialless biar Google Login gak ke-blok!
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
   next();
 });
 
@@ -76,7 +77,7 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
-// Inject Pool & IO ke Request
+// Context Injection
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
@@ -95,7 +96,7 @@ app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    version: "2.1.1-Sultan-Fixed"
+    version: "2.1.2-CORS-Google-Fixed"
   });
 });
 
@@ -110,6 +111,10 @@ app.use((req, res) => {
 // --- 7. GLOBAL ERROR HANDLING ---
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Error: ${err.message}`);
+  // Kalau errornya dari CORS, kasih status 403 Forbidden
+  if (err.message.includes('CORS')) {
+      return res.status(403).json({ success: false, message: err.message });
+  }
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error'
