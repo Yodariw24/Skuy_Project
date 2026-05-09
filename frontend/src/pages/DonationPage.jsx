@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import axios from 'axios' // GANTI: Pakai axios buat koneksi ke Railway
+// ✅ FIX UTAMA 1: Import instance api lo yang udah disetting canggih!
+import api from '../api/axios' 
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
   History, Skull, Heart, Info, Mail, User, Clock 
@@ -35,8 +36,8 @@ function DonationPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // GANTI: Nanti URL ini pakai domain backend Railway lo
-      const res = await axios.get(`https://backend-lo.railway.app/api/streamers/${username}`);
+      // ✅ FIX UTAMA 2: Pake api.get(), URL-nya otomatis nyambung ke Railway asli
+      const res = await api.get(`/streamers/public/${username}`);
       
       if (res.data) {
         setStreamer(res.data.profile);
@@ -45,8 +46,8 @@ function DonationPage() {
       }
       setLoading(false);
     } catch (err) { 
-      console.warn("Backend belum siap, menggunakan data simulasi.");
-      // DATA DUMMY BIAR UI TETAP KEREN PAS PENGEMBANGAN
+      console.warn("Backend gagal ditarik, cek URL atau Database lo, Ri!");
+      // DATA DUMMY TETAP ADA BUAT FALLBACK KALO SERVER MATI
       setStreamer({ 
         id: '1', username: username, full_name: 'Skuy Creator', 
         bio: 'Dukung terus karya saya lewat energi saweran paling gacor!',
@@ -68,8 +69,8 @@ function DonationPage() {
     if (!formData.amount || formData.amount < 1000) return alert("Minimal dukungan adalah Rp 1.000");
     
     try {
-      // GANTI: Kirim ke API Backend lo untuk generate QRIS/Invoice
-      const res = await axios.post('https://backend-lo.railway.app/api/donations', {
+      // ✅ FIX UTAMA 3: Pake api.post() tanpa perlu nulis baseURL panjang-panjang
+      const res = await api.post('/donations', {
         ...formData,
         streamer_id: streamer.id
       });
