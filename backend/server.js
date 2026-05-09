@@ -82,9 +82,9 @@ app.use((req, res, next) => {
 // --- 🛡️ 4. API ROUTES (HIERARKI SULTAN V2.3.0) ---
 
 // Jalur Utama: Auth, User, & Donation
-app.use('/api/auth', authRoutes); 
-app.use('/api/user', userRoutes);
-app.use('/api/donations', donationRoutes);
+app.use('/auth', authRoutes); 
+app.use('/user', userRoutes);
+app.use('/donations', donationRoutes);
 
 // Fallback legacy routes (opsional jika frontend lama belum update)
 app.use('/auth', authRoutes); 
