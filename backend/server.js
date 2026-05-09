@@ -25,7 +25,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// --- CORS FIX ---
+// --- 2. CORS CONFIG ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
@@ -47,7 +47,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Inject DB & Headers
+// --- 3. MIDDLEWARE STACK ---
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
@@ -61,35 +61,47 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 app.use((req, res, next) => { req.io = io; next(); });
 
-// --- 🛡️ API ROUTES (THE REAL FIX) ---
+// --- 🛡️ 4. API ROUTES (HIERARKI SULTAN) ---
 
-// Paksa Express buat ngenalin rute ini sebelum lari ke 404
+// A. AUTH (Paling Utama)
 app.use('/auth', authRoutes);      
 app.use('/api/auth', authRoutes);  
 
-app.use('/user', userRoutes);
-app.use('/api/user', userRoutes);
-
-app.use('/donations', donationRoutes);
-app.use('/api/donations', donationRoutes);
-
-app.use('/wallet', userRoutes);
+// B. RUTE SPESIFIK (HARUS DI ATAS /api/user)
+// Biar gak dikira sebagai ID user
+app.use('/api/streamers', userRoutes); 
 app.use('/api/wallet', userRoutes);
 
+// C. RUTE UMUM
+app.use('/user', userRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/donations', donationRoutes);
+
 app.get('/', (req, res) => {
-  res.status(200).json({ status: "online", project: "SkuyGG Engine" });
+  res.status(200).json({ status: "online", project: "SkuyGG Engine", version: "2.1.9" });
 });
 
-// --- 🕵️ 404 HANDLER (TARUH PALING BAWAH!) ---
+// --- 🕵️ 5. 404 HANDLER (WAJIB PALING BAWAH!) ---
 app.use((req, res) => {
-  console.warn(`❌ Nyasar Ri: [${req.method}] ${req.url}`);
+  if (!req.url.startsWith('/uploads/')) {
+    console.warn(`❌ Nyasar Ri: [${req.method}] ${req.url}`);
+  }
   res.status(404).json({
     success: false,
     message: `Rute [${req.method}] ${req.url} Gak Ada di Backend!`
   });
 });
 
+// --- 6. ERROR HANDLER ---
+app.use((err, req, res, next) => {
+  console.error(`🔥 Engine Error: ${err.message}`);
+  res.status(err.status || 500).json({ success: false, message: err.message });
+});
+
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
+  console.log('-----------------------------------------');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
+  console.log(`🕒 TIMEZONE: ${process.env.TZ}`);
+  console.log('-----------------------------------------');
 });

