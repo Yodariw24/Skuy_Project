@@ -1,9 +1,8 @@
-// 1. Update Setting (Deploy Protocol dari Dashboard)
+// --- 1. UPDATE SETTINGS (Deploy Protocol dari Dashboard) ---
 export const updateSettings = async (req, res) => {
-    // Destructuring dengan default value agar aman
+    // Destructuring dengan default value agar aman Ri
     const { userId, widgetType, colors = {}, config = {} } = req.body;
 
-    // Proteksi: Pastikan data esensial ada
     if (!userId || !widgetType) {
         return res.status(400).json({ success: false, message: "Missing userId or widgetType" });
     }
@@ -27,26 +26,24 @@ export const updateSettings = async (req, res) => {
             RETURNING *;
         `;
         
-        // Gunakan fallback agar data di Railway tetap konsisten
         const values = [
             userId, 
             widgetType, 
-            colors.primary || '#6366f1', 
-            colors.accent || '#fbbf24', 
+            colors.primary || '#7C3AED', // Sultan Violet Default
+            colors.accent || '#FF1493', 
             colors.text || '#ffffff', 
-            colors.glow || '#818cf8', 
+            colors.glow || '#7C3AED', 
             config.min_tip || 10000, 
             config.duration || 8,
-            config.goal_title || 'EVOLVE STREAM SETUP', 
-            config.goal_target || 15000000
+            config.goal_title || 'SULTAN GOAL', 
+            config.goal_target || 1000000
         ];
         
         const result = await req.db.query(query, values);
 
-        // KIRIM SINYAL UPDATE KE WIDGET (Real-time via Socket.io)
-        // Cek apakah req.io sudah di-inject dari server.js
+        // 🚀 REAL-TIME SYNC: Kirim sinyal update ke OBS via Socket.io
         if (req.io) {
-            req.io.to(`streamer_${userId}`).emit('widget-update', {
+            req.io.emit(`widget-update-${userId}`, {
                 type: widgetType,
                 settings: result.rows[0]
             });
@@ -54,51 +51,50 @@ export const updateSettings = async (req, res) => {
 
         res.status(200).json({ 
             success: true, 
-            message: "Protocol deployed to Railway Cloud! 🚀",
+            message: "Visual Protocol Deployed! 🚀",
             data: result.rows[0] 
         });
     } catch (err) {
-        console.error("🔥 Error updateSettings:", err.message);
-        res.status(500).json({ success: false, message: "Gagal deploy protokol visual" });
+        console.error("🔥 Widget Sync Error:", err.message);
+        res.status(500).json({ success: false, message: "Gagal deploy visual" });
     }
 };
 
-// 2. Get Setting (Dipanggil oleh Browser Source OBS)
+// --- 2. GET SETTINGS (Dipanggil oleh Browser Source OBS) ---
 export const getSettings = async (req, res) => {
-    const { streamKey, widgetType } = req.params;
+    const { streamKey, widgetType } = req.params; // streamKey biasanya username
     
     try {
-        // Menggunakan ILIKE agar pencarian username tidak sensitif huruf besar/kecil
         const query = `
-            SELECT ws.* 
+            SELECT ws.*, s.id as streamer_id
             FROM widget_settings ws
-            JOIN streamers s ON s.id = ws.user_id
-            WHERE s.username ILIKE $1 AND ws.widget_type = $2;
+            JOIN streamers s ON s.user_id = ws.user_id
+            WHERE LOWER(s.username) = LOWER($1) AND ws.widget_type = $2;
         `;
         
         const result = await req.db.query(query, [streamKey, widgetType]);
         
-        // DATA DEFAULT: Biar OBS nggak blank pas pertama pasang
+        // DATA FALLBACK: Biar OBS nggak item pas dipasang pertama kali
         if (result.rows.length === 0) {
             return res.status(200).json({ 
                 success: true, 
                 isDefault: true,
                 data: {
-                    primary_color: '#6366f1',
-                    accent_color: '#fbbf24',
+                    primary_color: '#7C3AED',
+                    accent_color: '#FF1493',
                     text_color: '#ffffff',
-                    glow_color: '#818cf8',
+                    glow_color: '#7C3AED',
                     duration: 8,
                     min_tip: 10000,
-                    goal_title: 'Support My Journey!',
-                    goal_target: 10000000
+                    goal_title: 'Support My Stream!',
+                    goal_target: 500000
                 } 
             });
         }
         
         res.status(200).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        console.error("🔥 Error getSettings:", err.message);
+        console.error("🔥 OBS Fetch Error:", err.message);
         res.status(500).json({ success: false, message: "Error fetching Skuy Engine settings" });
       }
 };

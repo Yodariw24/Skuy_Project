@@ -5,69 +5,69 @@ import jwt from 'jsonwebtoken';
  * Memastikan setiap request ke route sensitif memiliki token valid.
  */
 export const protect = async (req, res, next) => {
-  let token;
+    let token;
 
-  // 1. Cek apakah ada token di Header Authorization (Format: Bearer <token>)
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    try {
-      // Ambil tokennya
-      token = req.headers.authorization.split(' ')[1];
+    // 🛡️ 1. Cek apakah ada token di Header Authorization
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            // Ambil tokennya
+            token = req.headers.authorization.split(' ')[1];
 
-      // 2. Verifikasi Token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026');
+            // 🛡️ 2. Verifikasi Token (Gunakan secret yang sama dengan authRoutes)
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'RAHASIA_SULTAN_SKUYGG');
 
-      /**
-       * 3. Ambil data user terbaru dari DB Railway.
-       * ✅ FIX: Ambil juga profile_picture agar sinkron saat ganti avatar!
-       */
-      const query = `
-        SELECT id, username, email, role, is_two_fa_enabled, profile_picture 
-        FROM users 
-        WHERE id = $1
-      `;
-      
-      const { rows } = await req.db.query(query, [decoded.id]);
+            /**
+             * 🛡️ 3. Sync Database: Ambil data user paling seger!
+             * Kita ambil juga phone_number buat validasi 2FA di middleware jika butuh.
+             */
+            const query = `
+                SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, u.profile_picture, s.phone_number 
+                FROM users u
+                LEFT JOIN streamers s ON u.id = s.user_id
+                WHERE u.id = $1
+            `;
+            
+            const { rows } = await req.db.query(query, [decoded.id]);
 
-      if (rows.length === 0) {
-        return res.status(401).json({ 
-          success: false, 
-          message: "User sudah tidak terdaftar di sistem SkuyGG." 
-        });
-      }
+            if (rows.length === 0) {
+                return res.status(401).json({ 
+                    success: false, 
+                    message: "User tak terdaftar di sistem SkuyGG!" 
+                });
+            }
 
-      // 4. Simpan data user ke objek req supaya bisa dipake di controller mana aja
-      req.user = rows[0];
-      next();
-    } catch (err) {
-      console.error("🔥 JWT ERROR:", err.message);
-      // Status 401 akan memicu auto-logout di frontend Axios lo
-      return res.status(401).json({ 
-        success: false, 
-        message: "Token expired atau tidak valid, silakan login kembali!" 
-      });
+            // 🛡️ 4. Injeksi data ke req.user
+            req.user = rows[0];
+            next();
+        } catch (err) {
+            console.error("🔥 SHIELD_BREAK_ERROR:", err.message);
+            return res.status(401).json({ 
+                success: false, 
+                message: "Sesi expired, Ri! Login ulang dulu ya." 
+            });
+        }
     }
-  }
 
-  if (!token) {
-    return res.status(401).json({ 
-      success: false, 
-      message: "Akses ditolak, lo belum login!" 
-    });
-  }
+    if (!token) {
+        return res.status(401).json({ 
+            success: false, 
+            message: "Akses ditolak, lo belum login Sultan!" 
+        });
+    }
 };
 
 /**
  * 2. AUTHORIZE: Cek Role (Admin, Creator, dsb)
  */
 export const authorize = (...roles) => {
-  return (req, res, next) => {
-    // Pastikan req.user sudah ada (hasil dari middleware protect)
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: `Role [${req.user?.role || 'Guest'}] tidak diizinkan akses fitur ini!` 
-      });
-    }
-    next();
-  };
+    return (req, res, next) => {
+        // Pastikan role user masuk dalam daftar izin
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({ 
+                success: false, 
+                message: `Level lo [${req.user?.role || 'Guest'}] belum cukup buat akses ini!` 
+            });
+        }
+        next();
+    };
 };

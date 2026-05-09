@@ -1,7 +1,74 @@
 import fs from 'fs';
 import path from 'path';
 
-// 1. Ambil SEMUA Streamer (Sinkronisasi Elit Kreator di Homepage)
+// --- 4. UPDATE PROFILE & THEME (SULTAN SYNC + PHONE FOR 2FA) ---
+export const updateProfileInfo = async (req, res) => {
+    // Ambil data dari body (pastiin frontend kirim userId)
+    const { userId, display_name, username, bio, instagram, tiktok, youtube, theme_color, phone_number } = req.body;
+    
+    // Fallback ID
+    const targetId = userId || req.params.id;
+
+    if (!targetId) {
+        return res.status(400).json({ success: false, message: "User ID tidak terdeteksi, Ri!" });
+    }
+
+    try {
+        await req.db.query('BEGIN');
+
+        // Bersihkan format nomor HP (Hanya angka biar Fonnte gak bingung)
+        const cleanPhone = phone_number ? phone_number.toString().replace(/\D/g, '') : null;
+
+        // A. Update Tabel Streamers
+        // Pastikan kolom phone_number sudah lo buat via: ALTER TABLE streamers ADD COLUMN phone_number VARCHAR(20);
+        const streamerResult = await req.db.query(
+            `UPDATE streamers 
+             SET display_name = $1, bio = $2, instagram = $3, tiktok = $4, youtube = $5, theme_color = $6, phone_number = $7
+             WHERE user_id = $8 RETURNING *`,
+            [display_name, bio, instagram, tiktok, youtube, theme_color || 'violet', cleanPhone, targetId]
+        );
+
+        if (streamerResult.rowCount === 0) {
+            await req.db.query('ROLLBACK');
+            return res.status(404).json({ success: false, message: "Data kreator tidak ditemukan!" });
+        }
+
+        // B. Sinkronisasi Username ke Tabel Users (Penting buat login)
+        if (username) {
+            const cleanUsername = username.toLowerCase().replace(/\s+/g, '');
+            // Update tabel users
+            await req.db.query(
+                `UPDATE users SET username = $1 WHERE id = $2`,
+                [cleanUsername, targetId]
+            );
+            // Update tabel streamers (redundancy sync username)
+            await req.db.query(
+                `UPDATE streamers SET username = $1 WHERE user_id = $2`,
+                [cleanUsername, targetId]
+            );
+        }
+
+        await req.db.query('COMMIT');
+
+        // Balikin data user yang sudah di-update supaya frontend bisa langsung pakai
+        res.json({ 
+            success: true, 
+            message: "Profil & WhatsApp Berhasil Disinkronkan! ✨", 
+            user: streamerResult.rows[0] 
+        });
+
+    } catch (err) {
+        if (req.db) await req.db.query('ROLLBACK');
+        console.error("🔥 UPDATE_PROFILE_ERROR:", err.message);
+        
+        if (err.code === '23505') {
+            return res.status(400).json({ success: false, message: "Username sudah dipakai sultan lain, Ri!" });
+        }
+        res.status(500).json({ success: false, error: "Gagal sinkronisasi data profil." });
+    }
+};
+
+// --- FUNGSI LAINNYA (GetAll, GetByUsername, Photo Ops) TETAP SAMA ---
 export const getAllStreamers = async (req, res) => {
     try {
         const query = `
@@ -14,12 +81,10 @@ export const getAllStreamers = async (req, res) => {
         const result = await req.db.query(query);
         res.json(result.rows || []); 
     } catch (err) {
-        console.error("🔥 Error GET ELIT KREATOR:", err.message);
         res.status(500).json([]); 
     }
 };
 
-// 2. Ambil SATU Streamer (Dibutuhkan untuk Profile & 2FA Check)
 export const getStreamerByUsername = async (req, res) => {
     const { username } = req.params;
     try {
@@ -32,18 +97,13 @@ export const getStreamerByUsername = async (req, res) => {
             WHERE LOWER(u.username) = LOWER($1)
         `;
         const result = await req.db.query(query, [username]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "Kreator tidak ditemukan" });
-        }
-        
+        if (result.rows.length === 0) return res.status(404).json({ success: false, message: "Kreator tidak ditemukan" });
         res.json({ success: true, data: result.rows[0] });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 };
 
-// 3. Update Informasi Rekening
 export const updateBankInfo = async (req, res) => {
     const { id } = req.params; 
     const { bank_name, account_number, account_name } = req.body;
@@ -59,114 +119,34 @@ export const updateBankInfo = async (req, res) => {
     }
 };
 
-// 4. Update Profile & Theme (SULTAN SYNC + PHONE FOR 2FA)
-export const updateProfileInfo = async (req, res) => {
-    const { id } = req.params; // user_id dari params
-    const { 
-        display_name, 
-        username, 
-        bio, 
-        instagram, 
-        tiktok, 
-        youtube, 
-        theme_color, 
-        phone_number 
-    } = req.body;
-
-    try {
-        await req.db.query('BEGIN'); // Transaksi biar aman Ri
-
-        // Bersihkan format nomor HP (Hanya angka biar Fonnte gak bingung)
-        const cleanPhone = phone_number ? phone_number.replace(/\D/g, '') : null;
-
-        // A. Update Tabel Streamers
-        const streamerResult = await req.db.query(
-            `UPDATE streamers 
-             SET display_name = $1, bio = $2, instagram = $3, tiktok = $4, youtube = $5, theme_color = $6, phone_number = $7
-             WHERE user_id = $8 RETURNING *`,
-            [display_name, bio, instagram, tiktok, youtube, theme_color || 'violet', cleanPhone, id]
-        );
-
-        if (streamerResult.rowCount === 0) {
-            await req.db.query('ROLLBACK');
-            return res.status(404).json({ success: false, message: "User tidak ditemukan!" });
-        }
-
-        // B. Sinkronisasi Username ke Tabel Users (Penting buat Login)
-        if (username) {
-            const cleanUsername = username.toLowerCase().replace(/\s+/g, '');
-            await req.db.query(
-                `UPDATE users SET username = $1 WHERE id = $2`,
-                [cleanUsername, id]
-            );
-            // Samakan username di tabel streamers juga
-            await req.db.query(
-                `UPDATE streamers SET username = $1 WHERE user_id = $2`,
-                [cleanUsername, id]
-            );
-        }
-
-        await req.db.query('COMMIT');
-
-        res.json({ 
-            success: true, 
-            message: "Profil, Username & WhatsApp Berhasil Disinkronkan! ✨", 
-            data: streamerResult.rows[0] 
-        });
-
-    } catch (err) {
-        await req.db.query('ROLLBACK');
-        console.error("🔥 UPDATE_PROFILE_ERROR:", err.message);
-        if (err.code === '23505') {
-            return res.status(400).json({ success: false, message: "Username sudah dipakai sultan lain, Ri!" });
-        }
-        res.status(500).json({ success: false, error: "Gagal sinkronisasi data profil." });
-    }
-};
-
-// 5. Update Foto Profil (Sinkron ke dua tabel)
 export const updateProfilePhoto = async (req, res) => {
     const { id } = req.params;
     try {
         if (!req.file) return res.status(400).json({ success: false, message: "Mana gambarnya Ri?" });
-
         const newFileName = req.file.filename;
-
-        // Hapus file lama kalau ada
         const oldData = await req.db.query('SELECT profile_picture FROM streamers WHERE user_id = $1', [id]);
         const oldFile = oldData.rows[0]?.profile_picture;
-
         if (oldFile) {
             const oldPath = path.resolve(process.cwd(), 'uploads', oldFile);
-            if (fs.existsSync(oldPath)) {
-                try { fs.unlinkSync(oldPath); } catch (e) { console.warn("Hapus file gagal"); }
-            }
+            if (fs.existsSync(oldPath)) { try { fs.unlinkSync(oldPath); } catch (e) {} }
         }
-
-        // Update di kedua tabel (Sync Sultan)
         await req.db.query("UPDATE streamers SET profile_picture = $1 WHERE user_id = $2", [newFileName, id]);
         await req.db.query("UPDATE users SET profile_picture = $1 WHERE id = $2", [newFileName, id]);
-
         res.json({ success: true, filename: newFileName, message: "Avatar Sultan Meledak! 🔥" });
     } catch (err) {
         res.status(500).json({ success: false, message: "Gagal memproses gambar" });
     }
 };
 
-// 6. Hapus Foto Profil
 export const deleteProfilePhoto = async (req, res) => {
     const { id } = req.params;
     try {
         const data = await req.db.query('SELECT profile_picture FROM streamers WHERE user_id = $1', [id]);
         const fileToDelete = data.rows[0]?.profile_picture;
-
         if (fileToDelete) {
             const filePath = path.resolve(process.cwd(), 'uploads', fileToDelete);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+            if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
         }
-
         await req.db.query("UPDATE streamers SET profile_picture = NULL WHERE user_id = $1", [id]);
         await req.db.query("UPDATE users SET profile_picture = NULL WHERE id = $1", [id]);
         res.json({ success: true, message: "Kembali ke identitas default avatar." });

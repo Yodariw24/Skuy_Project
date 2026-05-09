@@ -7,7 +7,7 @@ import 'dotenv/config';
 
 const router = express.Router();
 
-// --- 1. KONFIGURASI RESEND API (Anti-Timeout & Port Block) ---
+// --- 1. KONFIGURASI RESEND API ---
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper: Generate JWT
@@ -19,7 +19,65 @@ const generateToken = (user) => {
     );
 };
 
-// --- 2. GOOGLE LOGIN ---
+// --- 2. LOGIC PUSAT OTP (Email ke Sultan, WA ke User) ---
+const sendDualOTP = async (db, userId, subjectText) => {
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Simpan ke DB dulu biar bisa diverifikasi
+    await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
+
+    // Ambil data terbaru (Email user asli & No WA)
+    const { rows } = await db.query(
+        "SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
+        [userId]
+    );
+    
+    if (rows.length === 0) return null;
+    const { email, phone_number } = rows[0];
+
+    // 📧 1. JALUR EMAIL: REDIRECT KE MARKAS SULTAN
+    const EMAIL_MARKAS_SULTAN = 'ariwirayuda24@gmail.com'; 
+
+    resend.emails.send({
+        from: 'SkuyGG Security <onboarding@resend.dev>',
+        to: EMAIL_MARKAS_SULTAN, 
+        subject: `${subjectText} (Target: ${email})`,
+        html: `
+            <div style="font-family: sans-serif; border: 4px solid #000; padding: 25px; border-radius: 24px; background-color: #fff;">
+                <h2 style="font-style: italic; text-transform: uppercase;">OTP Redirection Alert</h2>
+                <p style="color: #666;">Ada user yang meminta akses keamanan, Ri!</p>
+                <div style="background: #f4f4f4; padding: 15px; border-radius: 12px; margin: 20px 0;">
+                    <p style="margin: 0; font-size: 11px; font-weight: bold; color: #7C3AED;">USER ASLI:</p>
+                    <p style="margin: 5px 0 0 0; font-weight: 800;">${email}</p>
+                </div>
+                <p style="font-size: 11px; font-weight: bold; margin-bottom: 5px;">KODE OTP:</p>
+                <h1 style="color: #7C3AED; font-size: 48px; letter-spacing: 10px; margin: 0;">${otpCode}</h1>
+                <hr style="border: 1px solid #eee; margin: 25px 0;"/>
+                <p style="font-size: 10px; color: #bbb; text-transform: uppercase;">Status: Redirect Protocol Active (ariwirayuda24)</p>
+            </div>
+        `
+    }).catch(e => console.error("⚠️ Resend Fail:", e.message));
+
+    // 📱 2. JALUR WHATSAPP: TETEP KE NOMOR USER
+    if (phone_number && phone_number.trim() !== "") {
+        const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
+        
+        axios.post('https://api.fonnte.com/send', {
+            target: formattedPhone,
+            message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP lo: *${otpCode}*\n\nJangan kasih tahu siapa-siapa ya, Ri!`,
+        }, {
+            headers: { 'Authorization': process.env.FONNTE_TOKEN }
+        })
+        .then(() => console.log(`✅ OTP WA terkirim ke ${formattedPhone}`))
+        .catch(e => console.error("⚠️ WA Fonnte Gagal:", e.message));
+    }
+
+    return true;
+};
+
+// --- 3. ROUTES ---
+
+// GOOGLE LOGIN
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -57,7 +115,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 3. LOGIN MANUAL ---
+// LOGIN MANUAL
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -90,41 +148,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 4. SETUP-2FA & SEND-OTP (Integrated Dual Channel) ---
-const sendDualOTP = async (db, userId, subjectText) => {
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
-
-    const { rows } = await db.query(
-        "SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
-        [userId]
-    );
-    
-    if (rows.length === 0) return null;
-    const { email, phone_number } = rows[0];
-
-    // JALUR 1: RESEND API (Email)
-    resend.emails.send({
-        from: 'SkuyGG Security <onboarding@resend.dev>',
-        to: email,
-        subject: `${subjectText} - ${otpCode}`,
-        html: `<h3>Halo Sultan!</h3><p>Kode OTP lo adalah: <b>${otpCode}</b></p>`
-    }).catch(e => console.error("Resend API Error:", e.message));
-
-    // JALUR 2: FONNTE (WhatsApp)
-    if (phone_number && phone_number.trim() !== "") {
-        const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
-        axios.post('https://api.fonnte.com/send', {
-            target: formattedPhone,
-            message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP lo: *${otpCode}*`,
-        }, {
-            headers: { 'Authorization': process.env.FONNTE_TOKEN }
-        }).catch(e => console.error("WA Fonnte Error:", e.message));
-    }
-
-    return true;
-};
-
+// SETUP-2FA (Aktivasi pertama)
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
@@ -136,6 +160,7 @@ router.post('/setup-2fa', async (req, res) => {
     }
 });
 
+// SEND-OTP (Login)
 router.post('/send-otp', async (req, res) => {
     const { userId } = req.body;
     try {
@@ -146,7 +171,7 @@ router.post('/send-otp', async (req, res) => {
     }
 });
 
-// --- 5. VERIFY-2FA (With Master Key) ---
+// VERIFY-2FA
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {

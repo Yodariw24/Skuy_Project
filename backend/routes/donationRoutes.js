@@ -1,59 +1,69 @@
 import express from 'express';
 const router = express.Router();
 
-// WAJIB pakai akhiran .js agar terbaca oleh Node.js ESM
 import { 
-  createDonation, 
-  getDonationsByStreamer, 
-  updateDonationStatus, 
-  getStreamerBalance,
-  getPublicHistory,
-  getWalletHistory,
-  withdrawBalance
+    createDonation, 
+    getDonationsByStreamer, 
+    updateDonationStatus, 
+    getStreamerBalance,
+    getPublicHistory,
+    getWalletHistory,
+    withdrawBalance
 } from '../controllers/donationController.js';
 
 import { validateDonation } from '../middleware/validator.js';
+import { protect } from '../middleware/authMiddleware.js';
 
-// --- 1. PROFIL PROTOCOL (Dinamis via Username) ---
+// --- 1. PUBLIC PROFILE PROTOCOL ---
+// Dipakai di halaman donasi (No Auth Needed)
 router.get('/profile/:username', async (req, res) => {
-  const { username } = req.params;
-  
-  // Proteksi dasar: jika username kosong atau tidak valid
-  if (!username) {
-    return res.status(400).json({ success: false, message: "Username harus diisi!" });
-  }
+    const { username } = req.params;
+    if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
 
-  try {
-    // ILIKE sudah bagus agar case-insensitive (Ari atau ari tetap ketemu)
-    const result = await req.db.query(
-      "SELECT id, username, display_name, full_name, bio, theme_color, profile_picture FROM streamers WHERE username ILIKE $1",
-      [username]
-    );
+    try {
+        const result = await req.db.query(
+            `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
+             FROM streamers s 
+             JOIN users u ON s.user_id = u.id 
+             WHERE s.username ILIKE $1`,
+            [username]
+        );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Sultan tidak ditemukan di database Railway!" });
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Sultan tidak terdeteksi!" });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Database Ngadat!" });
     }
-
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error("🔥 DATABASE PROFILE ERROR:", err.message);
-    res.status(500).json({ success: false, message: "Terjadi gangguan saat mengambil data profil." });
-  }
 });
 
-// --- 2. TRANSACTIONAL ROUTES ---
-// Pastikan kedepannya ini diproteksi middleware auth (misal: verifyToken)
-router.post('/withdraw', withdrawBalance); 
+// --- 2. SULTAN PRIVACY ROUTES (Auth Required) ---
+// Dipakai di Dashboard (Butuh Login)
+router.post('/withdraw', protect, withdrawBalance); 
+router.get('/history/:id', protect, getWalletHistory); 
+router.get('/balance/:id', protect, getStreamerBalance);
+router.get('/activity-feed', protect, async (req, res) => {
+    // Rute instan buat feed di dashboard tanpa ribet passing ID di URL
+    try {
+        const result = await req.db.query(
+            "SELECT * FROM donations WHERE streamer_id = $1 AND status = 'SUCCESS' ORDER BY created_date DESC LIMIT 10",
+            [req.user.id]
+        );
+        res.json({ success: true, donations: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, donations: [] });
+    }
+});
 
-// --- 3. STREAMER SPECIFIC DATA (Via ID) ---
-// Menggunakan regex (:id(\\d+)) opsional jika ID kamu bertipe integer agar rute tidak bentrok
-router.get('/:id/balance', getStreamerBalance);
-router.get('/:id/wallet-history', getWalletHistory); 
-router.get('/:id/history', getPublicHistory); 
-router.get('/:id', getDonationsByStreamer);
+// --- 3. PUBLIC HISTORY (For Profile Page) ---
+router.get('/public-history/:id', getPublicHistory); 
 
-// --- 4. DONATION ACTION ---
-router.post('/', validateDonation, createDonation); 
-router.put('/:id/status', updateDonationStatus); 
+// --- 4. DONATION ENGINE ---
+router.post('/create', validateDonation, createDonation); 
+router.put('/status/:id', updateDonationStatus); 
+
+// Fallback buat narik semua data donasi (Admin/Dev only)
+router.get('/list/:id', protect, getDonationsByStreamer);
 
 export default router;

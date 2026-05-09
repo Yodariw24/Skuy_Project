@@ -5,31 +5,31 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import pkg from 'pg';
-import helmet from 'helmet'; // 🛡️ Keamanan Tambahan
+import helmet from 'helmet';
 import 'dotenv/config';
 
-// 🛡️ FIX 1: Sinkronisasi Waktu
+// 🛡️ SYNC 1: Timezone & Paths
 process.env.TZ = 'Asia/Jakarta'; 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Import Sultan Routes
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js'; 
 import donationRoutes from './routes/donationRoutes.js';
 
 const { Pool } = pkg;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 
-// --- 1. DATABASE CONNECTION ---
+// --- 1. DATABASE CLOUD CONNECTION ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 2. SECURITY & CORS ---
+// --- 2. SECURITY & CORS PROTOCOL ---
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Biar gambar di /uploads tetep bisa diakses frontend
+  crossOriginResourcePolicy: false, // Biar avatar user tetap bisa tampil di FE
 }));
 
 const allowedOrigins = [
@@ -41,10 +41,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Jalur ekspres buat lokal & Vercel
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
-      callback(new Error('CORS Policy Blocked!'));
+      callback(new Error('CORS Protocol Blocked by SkuyGG Shield!'));
     }
   },
   credentials: true
@@ -53,15 +54,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- 3. MIDDLEWARE STACK ---
-app.use((req, res, next) => {
-  // Header khusus buat Google Auth & Popup
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  req.db = pool; // Inject pool ke setiap request
-  next();
-});
-
-// Static folder untuk avatar/gambar
+// --- 3. MIDDLEWARE INJECTION (DB & SOCKET) ---
+// Static folder buat simpen gambar avatar
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
@@ -69,60 +63,64 @@ const io = new Server(server, {
   cors: { origin: allowedOrigins, credentials: true } 
 });
 
-// Inject Socket.io ke request
-app.use((req, res, next) => { 
-  req.io = io; 
-  next(); 
+// Inject Pool DB & Socket.io ke setiap request
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  req.db = pool;
+  req.io = io;
+  next();
 });
 
-// --- 🛡️ 4. API ROUTES (HIERARKI SULTAN) ---
+// --- 🛡️ 4. API ROUTES (HIERARKI SULTAN V2.3.0) ---
 
-// A. AUTH (Pusat Keamanan: Resend API & Fonnte)
+// A. AUTH - Jalur Dual-OTP (WA & Email Markas Sultan)
 app.use('/api/auth', authRoutes); 
-app.use('/auth', authRoutes); // Fallback buat rute lama
+app.use('/auth', authRoutes); 
 
-// B. RUTE SPESIFIK (Mencegah salah baca ID User)
-app.use('/api/streamers', userRoutes); 
-app.use('/api/wallet', userRoutes);
-
-// C. RUTE UMUM
+// B. USER - Jalur Sinkronisasi Profil & No WA
 app.use('/api/user', userRoutes);
+app.use('/user', userRoutes);
+app.use('/api/streamers', userRoutes); 
+
+// C. DONATION - Jalur Cuan & Activity Feed
 app.use('/api/donations', donationRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
-    project: "SkuyGG Engine", 
-    version: "2.2.0", // Update versi Sultan
-    engine: "Resend-API Ready" 
+    engine: "SkuyGG Sultan Engine", 
+    version: "2.3.0", 
+    security: "Dual-OTP Redirect Active",
+    markas_pusat: "ariwirayuda24@gmail.com"
   });
 });
 
-// --- 🕵️ 5. 404 HANDLER (ANTI NYASAR) ---
+// --- 🕵️ 5. 404 & ERROR HANDLER ---
 app.use((req, res) => {
   if (!req.url.startsWith('/uploads/')) {
-    console.warn(`❌ Nyasar Ri: [${req.method}] ${req.url}`);
+    console.warn(`❌ Jalur Ilegal: [${req.method}] ${req.url}`);
   }
   res.status(404).json({
     success: false,
-    message: `Rute [${req.method}] ${req.url} Gak Ada di SkuyGG Engine!`
+    message: `Rute [${req.method}] ${req.url} tidak terdaftar di SkuyGG Engine!`
   });
 });
 
-// --- 6. ERROR HANDLER ---
 app.use((err, req, res, next) => {
-  console.error(`🔥 Engine Error: ${err.message}`);
+  console.error(`🔥 Engine Crash: ${err.message}`);
   res.status(err.status || 500).json({ 
     success: false, 
-    message: "Terjadi gangguan pada engine SkuyGG!" 
+    message: "Engine SkuyGG ngadat, Ri! Cek log Railway secepatnya." 
   });
 });
 
+// --- 🚀 6. LAUNCH ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('-----------------------------------------');
+  console.log('=========================================');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
-  console.log(`🕒 TIMEZONE: ${process.env.TZ}`);
-  console.log(`🛡️ SECURITY: Helmet Enabled`);
-  console.log('-----------------------------------------');
+  console.log(`🕒 ZONE: ${process.env.TZ}`);
+  console.log(`🛡️ SECURITY: Dual-OTP Filter Enabled`);
+  console.log(`📧 MARKAS: ariwirayuda24@gmail.com`);
+  console.log('=========================================');
 });
