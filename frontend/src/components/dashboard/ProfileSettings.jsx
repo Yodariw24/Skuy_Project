@@ -47,21 +47,22 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // ✅ CONFIG: Base URL untuk akses file statis (Uploads)
+  // ✅ CONFIG: Base URL bersih untuk akses file statis
   const API_BASE = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.replace(/\/$/, "").replace("/api", "") 
     : 'https://skuyproject-production.up.railway.app';
 
-  // ✅ LOGIKA PENAMPIL FOTO (ANTI-NYASAR)
+  // ✅ LOGIKA PENAMPIL FOTO (FIXED SULTAN NYASAR)
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
     
-    // Jika path diawali http (Foto Google/URL Luar), jangan tambahkan prefix uploads!
+    // Gunakan Regex untuk deteksi HTTP/HTTPS di awal string
+    // Jika deteksi URL luar, langsung kembalikan tanpa prefix
     if (/^(http|https):\/\//.test(photoPath)) {
       return photoPath;
     }
     
-    // Jika hanya nama file, baru arahkan ke folder uploads Railway
+    // Jika hanya nama file (upload manual), baru arahkan ke folder uploads Railway
     return `${API_BASE}/uploads/${photoPath}`;
   };
 
