@@ -47,7 +47,7 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // ✅ REFINED CONFIG: Handle base URL lebih aman
+  // ✅ REFINED CONFIG: Handle base URL lebih aman dengan split '/api'
   const API_BASE = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.split('/api')[0].replace(/\/$/, "")
     : 'https://skuyproject-production.up.railway.app';
@@ -83,6 +83,7 @@ export default function ProfileSettings({ user, setUser }) {
       });
 
       if (res.data.success) {
+        // Update state lokal dan global
         const updatedUser = { ...user, profile_picture: res.data.filename };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -124,7 +125,7 @@ export default function ProfileSettings({ user, setUser }) {
       });
 
       if (res.data.success) {
-        // Gabungkan data lama dengan data baru dari server
+        // Spread data user terbaru dari server untuk memastikan sinkronisasi
         const updatedUser = { ...user, ...res.data.user };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
