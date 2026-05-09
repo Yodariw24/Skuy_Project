@@ -43,6 +43,7 @@ router.post('/google', async (req, res) => {
             await req.db.query('COMMIT');
         }
 
+        // Cek apakah Sultan butuh 2FA
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
         }
@@ -104,70 +105,71 @@ router.post('/login', async (req, res) => {
 
 // --- 4. QR-CODE TOTP PROTOCOL ---
 
-// ✅ RUTE SETUP (PASTIKAN FRONTEND PAKAI POST)
+// ✅ RUTE SETUP: Nge-generate secret baru dan QR Code
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    console.log("Incoming setup-2fa request for ID:", userId); // Debugging Log
+    console.log("🛠️ Setup-2FA Request masuk untuk ID:", userId);
 
-    if (!userId) return res.status(400).json({ message: "userId is required!" });
+    if (!userId) return res.status(400).json({ success: false, message: "User ID wajib ada!" });
 
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ message: "User not found" });
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "Sultan tidak ditemukan!" });
 
         const secret = authenticator.generateSecret();
         const otpauth = authenticator.keyuri(rows[0].username, 'Skuy.GG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-        // Update secret ke database
-        await req.db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [secret, userId]);
+        // Update secret tapi JANGAN aktifkan status 2FA dulu (tunggu verifikasi)
+        await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
-        console.error("SETUP_2FA_ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal setup QR Protocol: " + err.message });
+        console.error("❌ SETUP_2FA_ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal generate QR: " + err.message });
     }
 });
 
-// ✅ RUTE VERIFY
+// ✅ RUTE VERIFY: Buat mastiin kode OTP bener sebelum benar-benar diaktifin
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) return res.status(400).json({ message: "Secret missing!" });
+        if (!user || !user.two_fa_secret) {
+            return res.status(400).json({ success: false, message: "Secret belum di-setup!" });
+        }
 
         const isValid = authenticator.check(token.trim(), user.two_fa_secret);
 
         if (isValid) {
+            // ✅ Aktifkan status 2FA secara permanen
             await req.db.query("UPDATE users SET is_two_fa_enabled = true WHERE id = $1", [userId]);
+            
             res.json({ 
                 success: true, 
+                message: "2FA Berhasil Diaktifkan!",
                 token: generateToken(user),
-                user: { 
-                    id: user.id, 
-                    username: user.username, 
-                    is_two_fa_enabled: true,
-                    role: user.role
-                } 
+                user: { id: user.id, username: user.username, is_two_fa_enabled: true, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "Kode OTP Salah!" });
+            res.status(400).json({ success: false, message: "Kode OTP Salah, Ri! Cek Google Auth lo." });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Verifikasi gagal" });
+        console.error("❌ VERIFY_2FA_ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal verifikasi kode." });
     }
 });
 
-// ✅ RUTE DISABLE
+// ✅ RUTE DISABLE: Matikan 2FA (Reset ke awal)
 router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
         res.json({ success: true, message: "Keamanan dicabut." });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal matikan 2FA" });
+        res.status(500).json({ success: false, message: "Gagal mematikan 2FA." });
     }
 });
 
