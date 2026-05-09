@@ -7,7 +7,9 @@ import 'dotenv/config';
 
 const router = express.Router();
 
-// --- 1. HELPER: GENERATE JWT ---
+// ✅ KONFIGURASI SULTAN: Pastikan otplib toleran sama sinkronisasi waktu
+authenticator.options = { window: 2, step: 30 };
+
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -59,6 +61,7 @@ router.post('/google', async (req, res) => {
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
+        console.error("🔥 GOOGLE ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal login Google." });
     }
 });
@@ -77,8 +80,13 @@ router.post('/login', async (req, res) => {
         if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
 
         const user = rows[0];
+
+        // 🛡️ PROTEKSI: Jika user hasil Google Login (password kosong), jangan biarkan login manual crash
         if (!user.password) {
-            return res.status(400).json({ success: false, message: "Akun terdaftar via Google. Silakan Login Google!" });
+            return res.status(400).json({ 
+                success: false, 
+                message: "Akun Sultan ini terdaftar via Google. Silakan Login Google, Ri!" 
+            });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -94,7 +102,8 @@ router.post('/login', async (req, res) => {
             user: { id: user.id, username: user.username, role: user.role, profile_picture: user.final_picture } 
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Server Error." });
+        console.error("🔥 LOGIN ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Server Error saat login." });
     }
 });
 
@@ -102,14 +111,15 @@ router.post('/login', async (req, res) => {
 
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: "User ID wajib ada!" });
+    if (!userId) return res.status(400).json({ success: false, message: "ID Sultan wajib ada!" });
 
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: "User tidak ditemukan!" });
 
+        // Paksa secret jadi uppercase agar sinkron dengan Google Authenticator
         const secret = authenticator.generateSecret().toUpperCase(); 
-        const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
+        const otpauth = authenticator.keyuri(rows[0].username, 'Skuy.GG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
         await req.db.query(
@@ -119,6 +129,7 @@ router.post('/setup-2fa', async (req, res) => {
 
         res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
+        console.error("🔥 SETUP 2FA ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal generate QR." });
     }
 });
@@ -129,9 +140,10 @@ router.post('/verify-2fa', async (req, res) => {
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup dulu, Ri!" });
+        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup 2FA dulu, Ri!" });
 
-        // ✅ VERIFIKASI DENGAN TOLERANSI WINDOW 2 (Lebih Kuat)
+        // ✅ VERIFIKASI DENGAN TOLERANSI WINDOW 2
+        // Artinya kita ngecek kode sekarang, 30 detik yang lalu, dan 30 detik kedepan.
         const isValid = authenticator.verify({
             token: token.trim(),
             secret: user.two_fa_secret.toUpperCase(),
@@ -139,28 +151,28 @@ router.post('/verify-2fa', async (req, res) => {
         });
 
         if (isValid) {
-            // ✅ UPDATE DATABASE JADI TRUE SECARA PERMANEN
-            const result = await req.db.query(
-                "UPDATE users SET is_two_fa_enabled = true WHERE id = $1 RETURNING *", 
+            await req.db.query(
+                "UPDATE users SET is_two_fa_enabled = true WHERE id = $1", 
                 [userId]
             );
             
-            const updatedUser = result.rows[0];
             res.json({ 
                 success: true, 
-                token: generateToken(updatedUser),
+                token: generateToken(user),
                 user: { 
-                    id: updatedUser.id, 
-                    username: updatedUser.username, 
+                    id: user.id, 
+                    username: user.username, 
                     is_two_fa_enabled: true, 
-                    role: updatedUser.role 
+                    role: user.role 
                 } 
             });
         } else {
-            res.status(400).json({ success: false, message: "Kode OTP Salah/Expired!" });
+            console.warn(`🕵️ OTP Mismatch ID ${userId}: ${token.trim()}`);
+            res.status(400).json({ success: false, message: "Kode OTP Salah, Ri! Sinkronkan Jam HP lo!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Server Error." });
+        console.error("🔥 VERIFY 2FA ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Server Error saat verifikasi." });
     }
 });
 
@@ -168,7 +180,7 @@ router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
-        res.json({ success: true, message: "2FA Dimatikan." });
+        res.json({ success: true, message: "Proteksi 2FA dicabut." });
     } catch (err) {
         res.status(500).json({ success: false, message: "Gagal." });
     }
