@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-// ✅ GANTI: Gunakan instance api sentral
 import api from '../../api/axios' 
 import * as Icon from 'lucide-react' 
 
@@ -48,14 +47,17 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // Ambil URL Backend dari environment variabel lewat import.meta.env
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  // ✅ FIX: Arahkan fallback langsung ke domain Railway lo (TANPA /api di ujungnya)
+  const API_BASE = import.meta.env.VITE_API_URL 
+    ? import.meta.env.VITE_API_URL.replace(/\/$/, "") 
+    : 'https://skuyproject-production.up.railway.app';
 
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
     if (photoPath.startsWith('http')) return photoPath;
-    // ✅ Mengarah ke folder uploads di backend Railway
-    return `${API_URL}/uploads/${photoPath}`;
+    
+    // ✅ Mengarah tepat ke folder uploads di backend Railway
+    return `${API_BASE}/uploads/${photoPath}`;
   };
 
   // --- 1. LOGIKA UPLOAD (SINKRON RAILWAY) ---
@@ -71,7 +73,6 @@ export default function ProfileSettings({ user, setUser }) {
     setStatus({ type: 'success', message: 'Sinkronisasi Cloud...' });
 
     try {
-      // ✅ Tidak perlu manual header token, sudah diurus api instance
       const res = await api.post('/user/upload-avatar', uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
