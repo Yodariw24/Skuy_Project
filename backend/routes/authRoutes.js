@@ -1,10 +1,11 @@
 import express from 'express';
-const router = express.Router();
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
+import { authenticator } from '@otplib/preset-default'; // ✅ FIX: Gunakan preset-default buat ESM
 import QRCode from 'qrcode';
 import 'dotenv/config';
+
+const router = express.Router();
 
 // --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
@@ -19,7 +20,8 @@ const generateToken = (user) => {
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
-        let userResult = await req.db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const queryCheck = 'SELECT * FROM users WHERE email = $1';
+        const userResult = await req.db.query(queryCheck, [email]);
         let user = userResult.rows[0];
 
         if (!user) {
@@ -27,7 +29,7 @@ router.post('/google', async (req, res) => {
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
             
             const newUserRes = await req.db.query(
-                'INSERT INTO users (username, email, role, google_id) VALUES ($1, $2, $3, $4) RETURNING *',
+                'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
                 [cleanUsername, email, 'creator', sub]
             );
             user = newUserRes.rows[0];
@@ -41,7 +43,7 @@ router.post('/google', async (req, res) => {
             await req.db.query('COMMIT');
         }
 
-        // ✅ CEK 2FA PADA LOGIN GOOGLE
+        // ✅ Check if Sultan has 2FA enabled
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
         }
@@ -49,10 +51,17 @@ router.post('/google', async (req, res) => {
         res.json({
             success: true,
             token: generateToken(user),
-            user: { id: user.id, username: user.username, role: user.role || 'creator', full_name: name, profile_picture: picture }
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                role: user.role || 'creator', 
+                full_name: name, 
+                profile_picture: picture 
+            }
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
+        console.error("GOOGLE_AUTH_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal login Google." });
     }
 });
@@ -74,26 +83,30 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
 
-        // ✅ JIKA 2FA AKTIF, TAHAN LOGIN
         if (user.is_two_fa_enabled) {
-            return res.json({ requiresTwoFA: true, userId: user.id, message: "Input kode Authenticator lo!" });
+            return res.json({ requiresTwoFA: true, userId: user.id });
         }
 
         res.json({ 
             success: true, 
             token: generateToken(user), 
-            user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, profile_picture: user.profile_picture } 
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                role: user.role, 
+                full_name: user.full_name, 
+                profile_picture: user.profile_picture 
+            } 
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Server Error" });
+        res.status(500).json({ success: false, message: "Server Error saat login." });
     }
 });
 
 // --- 4. QR-CODE TOTP PROTOCOL ---
 
-// STEP A: Generate Secret & QR Code
 router.post('/setup-2fa', async (req, res) => {
-    const { userId } = req.body; // Bisa ambil dari req.user jika pake middleware auth
+    const { userId } = req.body;
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User not found" });
@@ -102,16 +115,15 @@ router.post('/setup-2fa', async (req, res) => {
         const otpauth = authenticator.keyuri(rows[0].username, 'Skuy.GG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-        // Simpan secret di DB (streamers/users table)
         await req.db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
+        console.error("SETUP_2FA_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal setup QR Protocol" });
     }
 });
 
-// STEP B: Verifikasi & Aktifkan Permanen
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
@@ -120,7 +132,7 @@ router.post('/verify-2fa', async (req, res) => {
 
         if (!user || !user.two_fa_secret) return res.status(400).json({ message: "Secret missing!" });
 
-        // ✅ VERIFIKASI PAKAI ALGORITMA TOTP
+        // ✅ TOTP Verification
         const isValid = authenticator.check(token.trim(), user.two_fa_secret);
 
         if (isValid) {
@@ -128,7 +140,12 @@ router.post('/verify-2fa', async (req, res) => {
             res.json({ 
                 success: true, 
                 token: generateToken(user),
-                user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
+                user: { 
+                    id: user.id, 
+                    username: user.username, 
+                    is_two_fa_enabled: true,
+                    role: user.role
+                } 
             });
         } else {
             res.status(400).json({ success: false, message: "Kode OTP Salah!" });
@@ -138,7 +155,6 @@ router.post('/verify-2fa', async (req, res) => {
     }
 });
 
-// STEP C: Disable 2FA
 router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {

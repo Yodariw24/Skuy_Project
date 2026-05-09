@@ -8,6 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@otplib/preset-default": "^12.0.1",
     "axios": "^1.16.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
