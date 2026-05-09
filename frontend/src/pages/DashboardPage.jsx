@@ -10,9 +10,10 @@ import Swal from 'sweetalert2'
 
 const skuyAlert = Swal.mixin({
   customClass: {
-    popup: 'skuy-popup rounded-[2rem] p-10 border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+    popup: 'skuy-popup rounded-[3rem] p-10 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]',
     title: 'skuy-title text-3xl text-slate-950 font-black italic uppercase tracking-tighter',
-    confirmButton: 'bg-violet-600 text-white px-10 py-4 rounded-xl font-black text-[11px] uppercase italic tracking-[0.2em] mx-2 transition-all hover:bg-slate-950',
+    confirmButton: 'bg-[#7C3AED] text-white px-10 py-4 rounded-xl font-black text-[11px] uppercase italic tracking-[0.2em] mx-2 transition-all hover:bg-slate-950',
+    cancelButton: 'bg-slate-200 text-slate-500 px-10 py-4 rounded-xl font-black text-[11px] uppercase italic tracking-[0.2em] mx-2 transition-all hover:bg-slate-300',
   },
   buttonsStyling: false,
 });
@@ -22,7 +23,7 @@ function DashboardPage() {
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
   const [otp, setOtp] = useState('')
-  const [otpSent, setOtpSent] = useState(false)
+  const [qrCodeUrl, setQrCodeUrl] = useState(null) // ✅ State baru buat simpan gambar QR
   const [loading2FA, setLoading2FA] = useState(false)
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -60,51 +61,57 @@ function DashboardPage() {
     }
   }, [navigate]);
 
-  // --- 2. LOGIKA 2FA WHATSAPP ---
-  const handleGenerateWA = async () => {
+  // --- 2. LOGIKA QR CODE TOTP (GANTI WHATSAPP) ---
+  const handleGenerateQR = async () => {
     setLoading2FA(true);
     try {
-      const res = await api.post('/auth/setup-2fa', { userId: user.id });
+      // Menembak setup-2fa yang sekarang generate QR Code
+      const res = await api.post('/auth/setup-2fa');
       if (res.data.success) {
-        setOtpSent(true);
+        setQrCodeUrl(res.data.qrCode); // Simpan URL gambar QR
         skuyAlert.fire({ 
-          title: 'OTP TERKIRIM 📱', 
-          text: 'Protokol enkripsi dikirim ke WhatsApp lo, Ri. Cek sekarang!', 
+          title: 'PROTOCOL READY 🛡️', 
+          text: 'Scan QR Code di layar pakai Google Authenticator atau Authy lo, Ri!', 
           icon: 'info' 
         });
       }
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal kirim WA. Pastikan server Railway aktif!', 'error');
+      skuyAlert.fire('ERROR', 'Gagal generate QR Protocol. Cek server Railway lo!', 'error');
     } finally {
       setLoading2FA(false);
     }
   };
 
-  const handleVerify2FA = async () => {
-    if (!otp || otp.length < 6) return;
+  const handleVerify2FA = async (otpInput) => {
+    const tokenToVerify = otpInput || otp;
+    if (!tokenToVerify || tokenToVerify.length < 6) return;
+    
     setLoading2FA(true);
     try {
-      const res = await api.post('/auth/verify-2fa', { userId: user.id, token: otp });
+      const res = await api.post('/auth/verify-2fa', { 
+        userId: user.id, 
+        token: tokenToVerify 
+      });
+
       if (res.data.success) {
-        // ✅ STEP 1: Update State Lokal & LocalStorage secara instan
         const updatedUser = { ...user, is_two_fa_enabled: true };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        setOtpSent(false); // Reset view input
+        localStorage.setItem('user_token', res.data.token); // Simpan token baru hasil verify
+        
+        setQrCodeUrl(null); 
         setOtp('');
 
-        // ✅ STEP 2: Notifikasi Sukses
         skuyAlert.fire({ 
-          title: 'SECURED! 🛡️', 
-          text: 'Akun Sultan resmi terproteksi. Login berikutnya wajib pakai WA!', 
+          title: 'GACOR TOTAL! 🛡️', 
+          text: 'Protokol QR-Code Aktif. Akun lo sekarang setara benteng besi!', 
           icon: 'success' 
         }).then(() => {
-            // Optional: Reload hanya jika perlu sinkronisasi ulang tema/role berat
             window.location.reload(); 
         });
       }
     } catch (err) {
-      skuyAlert.fire({ title: 'FAILED', text: 'Kode verifikasi salah atau kadaluwarsa!', icon: 'error' });
+      skuyAlert.fire({ title: 'KODE SALAH', text: 'OTP dari app lo nggak cocok atau udah expired!', icon: 'error' });
     } finally {
       setLoading2FA(false);
     }
@@ -112,24 +119,24 @@ function DashboardPage() {
 
   const handleDisable2FA = async () => {
     const confirm = await skuyAlert.fire({
-        title: 'NONAKTIFKAN?',
-        text: 'Akun lo bakal jadi rentan kalo protokol keamanan dicabut, Ri!',
+        title: 'COPOT PROTEKSI?',
+        text: 'Yakin mau cabut protokol keamanan QR? Akun lo jadi rentan lho, Ri!',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'IYA, COPOT AJA',
+        confirmButtonText: 'IYA, CABUT AJA',
         cancelButtonText: 'BATAL'
     });
 
     if (!confirm.isConfirmed) return;
 
     try {
-      const res = await api.post('/auth/disable-2fa', { userId: user.id });
+      const res = await api.post('/auth/disable-2fa');
       if (res.data.success) {
         const updatedUser = { ...user, is_two_fa_enabled: false };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
-        skuyAlert.fire('STATUS: OPEN', 'Protokol keamanan dicabut.', 'info').then(() => {
+        skuyAlert.fire('PROTECTION OFF', 'Sistem keamanan diturunkan ke standar.', 'info').then(() => {
           window.location.reload();
         });
       }
@@ -140,29 +147,28 @@ function DashboardPage() {
 
   if (isInitialLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F7FF] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="font-black italic uppercase tracking-tighter text-slate-900">Synchronizing Sultan Data...</p>
+          <div className="w-16 h-16 border-4 border-[#7C3AED] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="font-black italic uppercase tracking-tighter text-slate-900">Syncing Sultan Protocol...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left">
-      {/* Sidebar otomatis baca status user.is_two_fa_enabled dari state */}
+    <div className="min-h-screen bg-[#F4F7FF] flex font-sans text-left">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={user} navigate={navigate} />
       
       <main className="flex-1 p-8 overflow-y-auto">
-        <header className="mb-8 flex justify-between items-center border-b border-slate-100 pb-5">
+        <header className="mb-8 flex justify-between items-center border-b-2 border-slate-100 pb-5">
           <div>
-            <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">Skuy Cloud Hub</h1>
+            <h1 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900">Skuy Control Center</h1>
             <div className="flex items-center gap-2 mt-1">
-                <div className={`w-2 h-2 rounded-full ${user?.is_two_fa_enabled ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                   Status: <span className={user?.is_two_fa_enabled ? 'text-emerald-500' : 'text-amber-500'}>
-                        {user?.is_two_fa_enabled ? 'Double Encrypted' : 'Standard Protection'}
+                <div className={`w-2 h-2 rounded-full ${user?.is_two_fa_enabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
+                   Security Level: <span className={user?.is_two_fa_enabled ? 'text-emerald-500' : 'text-amber-500'}>
+                        {user?.is_two_fa_enabled ? 'ULTRA SECURE (QR-TOTP)' : 'STANDARD PROTECTION'}
                    </span>
                 </p>
             </div>
@@ -170,15 +176,15 @@ function DashboardPage() {
         </header>
 
         {/* --- DYNAMIC VIEW --- */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
             {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
             {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
             {activeMenu === 'security' && (
               <SecurityView 
                 user={user} 
-                otpSent={otpSent}
-                onGenerateQR={handleGenerateWA} 
+                qrCodeUrl={qrCodeUrl} // ✅ Kirim gambar QR ke View
+                onGenerateQR={handleGenerateQR} 
                 onVerify={handleVerify2FA} 
                 onDisable={handleDisable2FA} 
                 otp={otp} 

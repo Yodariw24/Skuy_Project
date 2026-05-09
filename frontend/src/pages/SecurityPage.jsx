@@ -4,78 +4,85 @@ import SecurityView from '../components/dashboard/SecurityView';
 import { useAuth } from '../context/AuthContext'; 
 import Swal from 'sweetalert2';
 
+// Custom Alert Sultan Skuy.GG
+const skuyAlert = Swal.mixin({
+  customClass: {
+    popup: 'skuy-popup rounded-[2rem] p-10 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]',
+    title: 'skuy-title text-3xl text-slate-950 font-black italic uppercase tracking-tighter',
+    confirmButton: 'bg-[#7C3AED] text-white px-10 py-4 rounded-xl font-black text-[11px] uppercase italic tracking-[0.2em] mx-2 transition-all hover:bg-slate-950',
+    cancelButton: 'bg-slate-100 text-slate-500 px-10 py-4 rounded-xl font-black text-[11px] uppercase italic tracking-[0.2em] mx-2 transition-all hover:bg-slate-200',
+  },
+  buttonsStyling: false,
+});
+
 const SecurityPage = () => {
   const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState(''); // ✅ State untuk menampung gambar QR
   const [otp, setOtp] = useState('');
 
-  // --- 1. REQUEST OTP KE WHATSAPP ---
-  const handleRequestWAOTP = async () => {
+  // --- 1. GENERATE QR CODE (PENGGANTI WA OTP) ---
+  const handleGenerateQR = async () => {
     if (!user) return;
     setLoading(true);
     
-    // Verifikasi di console untuk memastikan rute /setup-2fa terpanggil
-    console.log(`🚀 Mengirim kode OTP via WhatsApp ke nomor lo`);
+    console.log(`🚀 Menginisialisasi Protokol QR Authenticator...`);
 
     try {
-      // Sekarang kita nembak Backend yang sudah pake API Fonnte
-      const res = await api.post('/auth/setup-2fa', { userId: user.id });
+      // Nembak backend yang sudah pakai otplib & qrcode
+      const res = await api.post('/auth/setup-2fa');
       
       if (res.data.success) {
-        setOtpSent(true); // Memunculkan input 6 digit di SecurityView
-        Swal.fire({
-          icon: 'success',
-          title: 'OTP MELUNCUR 📱',
-          text: `Cek WhatsApp lo, Ri! Kodenya udah dikirim via WA. 🚀`,
-          confirmButtonColor: '#000',
-          customClass: {
-            popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]'
-          }
+        setQrCodeUrl(res.data.qrCode); // Simpan gambar QR Base64
+        skuyAlert.fire({
+          icon: 'info',
+          title: 'PROTOCOL READY 🛡️',
+          text: 'Scan QR Code di layar pakai Google Authenticator atau Authy lo, Ri!',
         });
       }
     } catch (err) {
-      console.error("WA OTP Error:", err);
-      Swal.fire({
+      console.error("QR Setup Error:", err);
+      skuyAlert.fire({
         icon: 'error',
-        title: 'ERROR KONEKSI',
-        text: 'Gagal kirim WA. Pastiin WA_TOKEN di Railway udah bener dan status Fonnte lo CONNECTED!',
-        confirmButtonColor: '#000'
+        title: 'ERROR SISTEM',
+        text: 'Gagal generate QR Code. Pastikan server Railway lo aman, Ri!',
       });
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 2. VERIFIKASI KODE DARI WHATSAPP ---
+  // --- 2. VERIFIKASI KODE DARI APP AUTHENTICATOR ---
   const handleVerifyOTP = async () => {
-    if (!otp) return;
+    if (!otp || otp.length < 6) return;
     setLoading(true);
     try {
+      // Backend sekarang verifikasi pake authenticator.check()
       const res = await api.post('/auth/verify-2fa', { 
         userId: user.id, 
         token: otp 
       });
 
       if (res.data.success) {
-        // Update user state lokal agar tombol "Disable" muncul
-        setUser({ ...user, is_two_fa_enabled: true }); 
+        // Update user state lokal & localStorage agar sinkron total
+        const updatedUser = { ...user, is_two_fa_enabled: true };
+        setUser(updatedUser); 
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('user_token', res.data.token);
         
-        Swal.fire({
+        skuyAlert.fire({
           icon: 'success',
-          title: '2FA AKTIF',
-          text: 'Protokol keamanan WhatsApp berhasil diaktifkan! Akun lo aman banget! 🛡️',
-          confirmButtonColor: '#000'
+          title: 'GACOR TOTAL! 🛡️',
+          text: 'Protokol QR-Code Aktif. Akun lo sekarang setara benteng besi!',
         }).then(() => {
-          window.location.reload(); 
+          window.location.reload(); // Refresh untuk re-sync sidebar & navbar
         });
       }
     } catch (err) { 
-      Swal.fire({
+      skuyAlert.fire({
         icon: 'error',
         title: 'KODE SALAH',
-        text: 'Kode OTP WA lo salah atau udah basi! Coba kirim ulang, Ri.',
-        confirmButtonColor: '#000'
+        text: 'OTP dari app lo nggak cocok atau udah expired! Cek lagi HP lo.',
       });
     } finally { 
       setLoading(false); 
@@ -84,46 +91,50 @@ const SecurityPage = () => {
 
   // --- 3. DISABLE 2FA ---
   const handleDisable2FA = async () => {
-    Swal.fire({
-      title: 'MATIKAN KEAMANAN?',
-      text: 'Akun lo bakal lebih berisiko tanpa perlindungan WhatsApp, Ri!',
+    skuyAlert.fire({
+      title: 'COPOT PROTEKSI?',
+      text: 'Yakin mau cabut protokol keamanan QR? Akun lo jadi rentan lho, Ri!',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Ya, Matikan',
-      confirmButtonColor: '#d33',
+      confirmButtonText: 'IYA, CABUT AJA',
+      cancelButtonText: 'BATAL'
     }).then(async (result) => {
       if (result.isConfirmed) {
+        setLoading(true);
         try {
-          const res = await api.post('/auth/disable-2fa', { userId: user.id });
+          const res = await api.post('/auth/disable-2fa');
           if (res.data.success) {
-            Swal.fire({
+            const updatedUser = { ...user, is_two_fa_enabled: false };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            
+            skuyAlert.fire({
               icon: 'success',
-              title: 'NONAKTIF',
-              text: 'Protokol 2FA berhasil dimatikan.',
-              confirmButtonColor: '#000'
+              title: 'PROTECTION OFF',
+              text: 'Sistem keamanan diturunkan ke standar.',
             }).then(() => {
               window.location.reload();
             });
           }
         } catch (err) {
-          Swal.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
+          skuyAlert.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
+        } finally {
+          setLoading(false);
         }
       }
     });
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] pt-24 px-6 text-left">
+    <div className="min-h-screen bg-[#F4F7FF] pt-24 px-6 text-left">
       <div className="max-w-4xl mx-auto">
-        {/* qrCode dikirim kosong ('') karena kita sudah pindah ke WhatsApp OTP */}
         <SecurityView 
           user={user}
-          otpSent={otpSent}
+          qrCodeUrl={qrCodeUrl} // ✅ Kirim URL gambar QR ke SecurityView
           otp={otp}
           setOtp={setOtp}
           loading={loading}
-          qrCode={''} 
-          onGenerateQR={handleRequestWAOTP} // Nama fungsi di SecurityView tetep sama tapi isinya udah WA
+          onGenerateQR={handleGenerateQR} // Sekarang fungsinya generate QR
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
         />

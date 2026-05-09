@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette } from 'lucide-react';
+import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
@@ -7,20 +7,17 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
   // Logic Role
   const role = user?.role?.toLowerCase();
   const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
+  const isSecured = user?.is_two_fa_enabled; // ✅ Cek status QR-Auth
   
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
 
-  useEffect(() => {
-    console.log("Current User Role in Sidebar:", user?.role);
-  }, [user]);
-
   const handleShowTips = () => {
     const tipsData = [
-      "🛡️ <b>Protokol 2FA:</b> Jaga saldo dari pembajakan sekarang.",
-      "💰 <b>Strategi Cuan:</b> Pasang link donasi di deskripsi stream.",
-      "⏰ <b>Jam Otomatis:</b> Mode 'Otomatis' agar OTP tidak error.",
-      "🏦 <b>Withdrawal:</b> Pencairan dana 1-3 hari kerja."
+      "🛡️ <b>Protokol QR:</b> Pakai Google Authenticator biar akun anti-bobol.",
+      "💰 <b>Strategi Cuan:</b> Pasang link donasi di deskripsi stream lo.",
+      "🎨 <b>Appearance:</b> Ganti tema ke Violet-Pink biar makin Sultan.",
+      "🏦 <b>Withdrawal:</b> Proses pencairan dana sekarang lebih kilat!"
     ];
     const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
     
@@ -29,7 +26,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       html: `<div class="text-left font-bold italic text-slate-600">${randomTip}</div>`,
       icon: 'info',
       customClass: {
-        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]',
         confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black uppercase italic'
       },
       buttonsStyling: false
@@ -46,7 +43,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       cancelButtonText: 'BATAL',
       buttonsStyling: false,
       customClass: {
-        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]',
+        popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#FF1493]',
         title: 'text-xl font-black italic uppercase tracking-tighter',
         confirmButton: 'bg-red-500 text-white text-[10px] font-black px-8 py-3 rounded-xl mx-2 uppercase italic',
         cancelButton: 'bg-slate-100 text-slate-400 text-[10px] font-black px-8 py-3 rounded-xl mx-2 uppercase italic'
@@ -67,13 +64,9 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       <button 
         type="button"
         onClick={() => {
-          if (isLocked) {
-             console.warn(`Akses ditolak untuk menu ${label}. Role lo: ${user?.role}`);
-             return;
-          }
+          if (isLocked) return;
           if (onClickCustom) onClickCustom();
           else {
-            // ✅ FIX: Pastikan ini memicu setActiveMenu yang dikirim dari DashboardPage
             if (isSub) setActiveSubMenu(id);
             else setActiveMenu(id);
           }
@@ -83,7 +76,7 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         } ${
           isActive 
             ? 'text-violet-600' 
-            : isLocked ? 'opacity-30 cursor-not-allowed filter grayscale' : 'text-slate-500 hover:text-slate-900'
+            : isLocked ? 'opacity-30 cursor-not-allowed' : 'text-slate-500 hover:text-slate-900'
         }`}
       >
         {isActive && !isSub && (
@@ -112,31 +105,34 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 overflow-hidden font-sans shadow-sm text-left">
+    <aside className="w-64 bg-white border-r-4 border-slate-950 flex flex-col h-screen sticky top-0 overflow-hidden font-sans text-left shadow-[4px_0px_0px_0px_rgba(0,0,0,0.05)]">
+      {/* HEADER LOGO */}
       <div className="p-8 flex items-center gap-3.5 group cursor-default">
-        <div className="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-violet-100 group-hover:rotate-12 transition-all duration-500">
-          <Zap size={18} fill="currentColor" />
+        <div className="w-10 h-10 bg-violet-600 border-2 border-slate-950 rounded-xl flex items-center justify-center text-white shadow-[4px_4px_0px_0px_#000] group-hover:rotate-6 transition-all duration-300">
+          <Zap size={20} fill="currentColor" />
         </div>
-        <span className="font-black italic text-xl tracking-tighter text-slate-950 uppercase">SKUY<span className="text-violet-600">.GG</span></span>
+        <span className="font-black italic text-2xl tracking-tighter text-slate-950 uppercase">SKUY<span className="text-violet-600">.GG</span></span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar pt-4">
+        {/* REVENUE CONTROL */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Revenue Control</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Masuk" onClickCustom={handleShowTips} />
           </nav>
         </div>
 
+        {/* LIVE TOOLS */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Live Tools</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Stream Ops</p>
           <nav className="space-y-1">
             <NavButton id="activity" icon={Activity} label="Activity Feed" badge="LIVE" disabled={!isCreator} />
-            <NavButton id="overlay" icon={Tv} label="Overlay Setup" disabled={!isCreator} onClickCustom={() => { setIsOverlayOpen(!isOverlayOpen); setActiveMenu('overlay'); if (!overlayTabs.includes(activeSubMenu)) setActiveSubMenu('tip'); }} />
+            <NavButton id="overlay" icon={Tv} label="Overlay Setup" disabled={!isCreator} onClickCustom={() => { setIsOverlayOpen(!isOverlayOpen); setActiveMenu('overlay'); }} />
             <AnimatePresence>
               {isOverlayOpen && isCreator && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden ml-6 border-l-2 border-slate-50 mt-1">
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden ml-6 border-l-4 border-slate-100 mt-1 pl-2">
                   <NavButton id="tip" icon={Bell} label="Tip Alert" isSub />
                   <NavButton id="mediashare" icon={Video} label="Mediashare" isSub />
                   <NavButton id="milestone" icon={Target} label="Milestone" isSub />
@@ -147,33 +143,39 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           </nav>
         </div>
 
+        {/* PREFERENCES */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-4 italic select-none">Preferences</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Settings</p>
           <nav className="space-y-1">
-            {/* ✅ FIX: Tombol-tombol ini sekarang sinkron dengan setActiveMenu */}
             <NavButton id="profile" icon={User} label="Profile Edit" />
-            <NavButton id="security" icon={ShieldCheck} label="Security (2FA)" />
+            <NavButton id="security" icon={isSecured ? ShieldCheck : ShieldAlert} label="Security (QR)" />
             <NavButton id="appearance" icon={Palette} label="Appearance" />
           </nav>
         </div>
       </div>
 
-      <div className="p-6 mt-auto border-t border-slate-100 bg-slate-50/30">
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm mb-4 group cursor-pointer hover:border-violet-200 transition-all" onClick={() => setActiveMenu('profile')}>
-          <div className="w-10 h-10 rounded-xl bg-violet-50 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-             <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
+      {/* USER PROFILE CARD - REDESIGN SULTAN */}
+      <div className="p-6 mt-auto border-t-4 border-slate-100 bg-slate-50/50">
+        <div 
+          className={`flex items-center gap-3 p-3 rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-5 group cursor-pointer transition-all active:translate-y-1 active:shadow-none ${isSecured ? 'bg-emerald-50' : 'bg-white'}`}
+          onClick={() => setActiveMenu('profile')}
+        >
+          <div className="w-11 h-11 rounded-xl bg-violet-100 overflow-hidden border-2 border-slate-950 shadow-sm flex-shrink-0">
+             <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
           </div>
           <div className="overflow-hidden">
-            <p className="text-[11px] font-black text-slate-900 truncate uppercase leading-tight">{user?.full_name || user?.username}</p>
+            <p className="text-[11px] font-black text-slate-900 truncate uppercase italic">{user?.full_name || user?.username}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-1.5 h-1.5 ${isCreator ? 'bg-green-500' : 'bg-slate-300'} rounded-full animate-pulse`} />
-              <p className="text-[8px] text-violet-500 font-black uppercase tracking-widest italic">{isCreator ? 'Live Creator' : 'Member'}</p>
+              <span className={`w-1.5 h-1.5 rounded-full ${isSecured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <p className={`text-[8px] font-black uppercase tracking-widest italic ${isSecured ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {isSecured ? 'SECURED SULTAN' : 'STANDARD PROTECTION'}
+              </p>
             </div>
           </div>
         </div>
         
-        <button onClick={logout} className="w-full flex items-center gap-2 text-slate-400 hover:text-red-500 font-black text-[10px] uppercase transition-all px-3 group">
-          <LogOut size={14} className="group-hover:-translate-x-1 transition-transform" /> Sign Out System
+        <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-500 font-black text-[10px] uppercase transition-all group py-2">
+          <LogOut size={14} className="group-hover:-translate-x-1 transition-transform" /> Sign Out Protocol
         </button>
       </div>
     </aside>
