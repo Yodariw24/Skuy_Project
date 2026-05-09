@@ -10,65 +10,84 @@ const router = express.Router();
 // --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
-        { id: user.id, username: user.username, role: user.role || 'creator' },
+        { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role || 'creator' 
+        },
         process.env.JWT_SECRET || 'RAHASIA_SLEBEW_2026',
         { expiresIn: '7d' }
     );
 };
 
-// --- 2. GOOGLE AUTH & LOGIN MANUAL ---
-// (Tetap pakai kodingan lo yang sudah ada, sudah benar logikanya)
-
-// --- 3. QR-CODE SETUP ---
-router.post('/setup-2fa', async (req, res) => {
-    const { userId } = req.body;
+// --- 2. LOGIN MANUAL (PINTU MASUK UTAMA) ---
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ success: false, message: "Sultan tidak ditemukan!" });
-
-        // Generate secret yang konsisten
-        const secret = authenticator.generateSecret(); 
-        const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
-        const qrCodeUrl = await QRCode.toDataURL(otpauth);
-
-        // Simpan secret mentah (library bakal handle case sensitive)
-        await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
+        const query = `
+            SELECT u.*, s.full_name, s.profile_picture 
+            FROM users u
+            LEFT JOIN streamers s ON u.id = s.user_id
+            WHERE LOWER(u.email) = LOWER($1)
+        `;
+        const { rows } = await req.db.query(query, [email]);
         
-        res.json({ success: true, qrCode: qrCodeUrl });
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
+        const user = rows[0];
+
+        if (!user.password) return res.status(400).json({ success: false, message: "Login via Google, Ri!" });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
+
+        // ✅ CEK STATUS 2FA
+        if (user.is_two_fa_enabled) {
+            // JANGAN kasih token dulu, suruh dia ke halaman OTP
+            return res.json({ 
+                success: true, 
+                requiresTwoFA: true, 
+                userId: user.id 
+            });
+        }
+
+        // Kalau nggak aktif 2FA, langsung kasih token sakti
+        res.json({ 
+            success: true, 
+            token: generateToken(user), 
+            user: { id: user.id, username: user.username, profile_picture: user.profile_picture } 
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal generate QR." });
+        res.status(500).json({ success: false, message: "Engine Error." });
     }
 });
 
-// --- 4. VERIFY 2FA (THE ULTIMATE FIX) ---
+// --- 3. VERIFY 2FA (PEMBUKTIAN KODE) ---
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
+        // Kita tarik ulang data user buat dapet secret-nya
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user?.two_fa_secret) return res.status(400).json({ success: false, message: "Setup dulu, Ri!" });
+        if (!user?.two_fa_secret) {
+            return res.status(400).json({ success: false, message: "Secret hilang, setup ulang!" });
+        }
 
-        // Pembersihan total: hapus spasi dan pastikan format secret bersih
         const secret = user.two_fa_secret.trim();
         const inputToken = token.trim().replace(/\s/g, '');
 
-        // 🛡️ SOLUSI PALING AMPUH: Gunakan authenticator.check
-        // 'window: 2' berarti mengecek 1 menit ke belakang dan 1 menit ke depan (Total 3 menit)
-        // Ini jauh lebih stabil daripada generate manual satu per satu
+        // 🛡️ VERIFIKASI MURNI
         const isValid = authenticator.check(inputToken, secret);
-
-        // Backup: Kalau tetap gagal, kita paksa cek pakai window manual yang lebih luas
+        
+        // Backup dengan window toleransi
         const isExtraValid = authenticator.verify({
             token: inputToken,
             secret: secret,
-            window: 2 // Toleransi 1 menit
+            window: 2 // Kasih nyawa 1 menit kalau jam HP telat
         });
 
         if (isValid || isExtraValid) {
-            await req.db.query("UPDATE users SET is_two_fa_enabled = true WHERE id = $1", [userId]);
-            
-            // Ambil data user terbaru untuk dikirim ke frontend
+            // ✅ LOGIN BERHASIL: Kasih token di sini!
             const tokenJwt = generateToken(user);
             
             res.json({ 
@@ -81,28 +100,32 @@ router.post('/verify-2fa', async (req, res) => {
                 } 
             });
         } else {
-            // Debugging buat lo di log Railway
-            const serverCodeNow = authenticator.generate(secret);
-            console.log(`[OTP_FAILED] User: ${userId} | Input: ${inputToken} | Server_Expects: ${serverCodeNow}`);
+            const serverCode = authenticator.generate(secret);
+            console.log(`[LOG_SULTAN] Jam Server: ${new Date().toLocaleTimeString()} | Expected: ${serverCode}`);
             
             res.status(400).json({ 
                 success: false, 
-                message: `OTP Salah! Cek sinkronisasi jam HP lo ya.` 
+                message: "Kode OTP Salah atau Expired!" 
             });
         }
     } catch (err) {
-        console.error("🔥 VERIFY_ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Internal Server Error." });
+        res.status(500).json({ success: false, message: "Gagal verifikasi." });
     }
 });
 
-router.post('/disable-2fa', async (req, res) => {
+// --- 4. SETUP 2FA (UNTUK HALAMAN SETTINGS) ---
+router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
-        await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
-        res.json({ success: true, message: "2FA Dinonaktifkan." });
+        const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
+        const secret = authenticator.generateSecret(); 
+        const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
+        const qrCodeUrl = await QRCode.toDataURL(otpauth);
+
+        await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
+        res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal." });
+        res.status(500).json({ success: false, message: "Gagal setup QR." });
     }
 });
 
