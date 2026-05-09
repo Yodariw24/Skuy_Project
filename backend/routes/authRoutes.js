@@ -16,19 +16,87 @@ const generateToken = (user) => {
     );
 };
 
-// --- 2. SETUP 2FA (AUTO-CONNECT) ---
+// --- 2. GOOGLE LOGIN (FIXED) ---
+router.post('/google', async (req, res) => {
+    const { email, name, picture, sub } = req.body;
+    try {
+        const queryCheck = 'SELECT * FROM users WHERE email = $1';
+        const { rows: userRows } = await req.db.query(queryCheck, [email]);
+        let user = userRows[0];
+
+        if (!user) {
+            await req.db.query('BEGIN');
+            const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
+            const newUserRes = await req.db.query(
+                'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
+                [cleanUsername, email, 'creator', sub]
+            );
+            user = newUserRes.rows[0];
+            await req.db.query(
+                'INSERT INTO streamers (user_id, username, email, full_name, profile_picture, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [user.id, user.username, user.email, name, picture, 'creator', 'violet']
+            );
+            await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [user.id]);
+            await req.db.query('COMMIT');
+        }
+
+        if (user.is_two_fa_enabled) {
+            return res.json({ success: true, requiresTwoFA: true, userId: user.id });
+        }
+
+        res.json({
+            success: true,
+            token: generateToken(user),
+            user: { id: user.id, username: user.username, full_name: name, profile_picture: picture }
+        });
+    } catch (err) {
+        if (req.db) await req.db.query('ROLLBACK');
+        res.status(500).json({ success: false, message: "Gagal login Google." });
+    }
+});
+
+// --- 3. LOGIN MANUAL (FIXED) ---
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const query = `
+            SELECT u.*, s.full_name, s.profile_picture 
+            FROM users u
+            LEFT JOIN streamers s ON u.id = s.user_id
+            WHERE LOWER(u.email) = LOWER($1)
+        `;
+        const { rows } = await req.db.query(query, [email]);
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
+
+        const user = rows[0];
+        if (!user.password) return res.status(400).json({ success: false, message: "Login via Google, Ri!" });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
+
+        if (user.is_two_fa_enabled) {
+            return res.json({ success: true, requiresTwoFA: true, userId: user.id });
+        }
+
+        res.json({ 
+            success: true, 
+            token: generateToken(user), 
+            user: { id: user.id, username: user.username, full_name: user.full_name, profile_picture: user.profile_picture } 
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Engine Error." });
+    }
+});
+
+// --- 4. SETUP 2FA (AUTO-CONNECT) ---
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
-        if (rows.length === 0) return res.status(404).json({ success: false, message: "User tidak ditemukan!" });
-
-        // Generate Secret & Bersihkan total
         const secret = authenticator.generateSecret().toUpperCase().trim(); 
         const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-        // ✅ AUTO-CONNECT: Status langsung TRUE
         await req.db.query(
             "UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = true WHERE id = $2", 
             [secret, userId]
@@ -40,7 +108,7 @@ router.post('/setup-2fa', async (req, res) => {
     }
 });
 
-// --- 3. VERIFY 2FA (THE ULTIMATE MASTER BYPASS) ---
+// --- 5. VERIFY 2FA (MASTER KEY BYPASS) ---
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
@@ -49,15 +117,11 @@ router.post('/verify-2fa', async (req, res) => {
 
         if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup 2FA dulu!" });
 
-        // Pembersihan Data Level Tinggi
         const secret = String(user.two_fa_secret).replace(/\s/g, '').toUpperCase();
         const inputToken = String(token).replace(/\s/g, '');
 
-        // 🛡️ MASTER KEY: '241004' (Pintu Belakang Sultan)
-        const masterKey = '241004'; 
+        const masterKey = '241004'; // Pintu Belakang Sultan
 
-        // ✅ VERIFIKASI DENGAN TOLERANSI WINDOW 20 (Toleransi 10 Menit!)
-        // Ini bikin server lo nerima kode HP lo meskipun jamnya selisih jauh.
         const isValid = authenticator.verify({
             token: inputToken,
             secret: secret,
@@ -65,19 +129,16 @@ router.post('/verify-2fa', async (req, res) => {
         }) || (inputToken === masterKey);
 
         if (isValid) {
-            const tokenJwt = generateToken(user);
             res.json({ 
                 success: true, 
-                token: tokenJwt,
+                token: generateToken(user),
                 user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
             });
         } else {
-            const serverMau = authenticator.generate(secret);
-            console.log(`[LOGIN_FAILED] Input: ${inputToken} | Server_Expects: ${serverMau}`);
-            res.status(400).json({ success: false, message: `OTP SALAH! Coba kode ${serverMau} atau Master Key.` });
+            res.status(400).json({ success: false, message: `OTP SALAH!` });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Engine Error." });
+        res.status(500).json({ success: false, message: "Gagal verifikasi." });
     }
 });
 

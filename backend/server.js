@@ -7,7 +7,7 @@ import { Server } from 'socket.io';
 import pkg from 'pg';
 import 'dotenv/config';
 
-// 🛡️ FIX 1: Sinkronisasi Waktu Jakarta
+// 🛡️ FIX 1: Sinkronisasi Waktu
 process.env.TZ = 'Asia/Jakarta'; 
 
 import authRoutes from './routes/authRoutes.js';
@@ -20,13 +20,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// --- 1. DATABASE ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 2. CORS (Tetap Sama) ---
+// --- CORS FIX ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
@@ -34,7 +33,7 @@ const allowedOrigins = [
   "https://skuy-gg.vercel.app"
 ];
 
-const corsOptions = {
+app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
@@ -43,13 +42,12 @@ const corsOptions = {
     }
   },
   credentials: true
-};
+}));
 
-// --- 3. MIDDLEWARE ---
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Inject DB & Headers
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
@@ -59,19 +57,15 @@ app.use((req, res, next) => {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 4. SOCKET.IO ---
 const server = http.createServer(app);
-const io = new Server(server, { cors: corsOptions });
+const io = new Server(server, { cors: { origin: "*" } });
 app.use((req, res, next) => { req.io = io; next(); });
 
-// --- 5. API ROUTES (FIXED FOR FRONTEND) ---
+// --- 🛡️ API ROUTES (THE REAL FIX) ---
 
-/** * ✅ SOLUSI 404: 
- * Kalau Frontend manggil /auth/google, maka di sini JANGAN pake /api/auth.
- * Kita daftarin dua-duanya biar aman (double layer).
- */
-app.use('/auth', authRoutes);      // Buat yang manggil langsung /auth/google
-app.use('/api/auth', authRoutes);  // Buat yang manggil pake /api/auth/google
+// Paksa Express buat ngenalin rute ini sebelum lari ke 404
+app.use('/auth', authRoutes);      
+app.use('/api/auth', authRoutes);  
 
 app.use('/user', userRoutes);
 app.use('/api/user', userRoutes);
@@ -79,30 +73,23 @@ app.use('/api/user', userRoutes);
 app.use('/donations', donationRoutes);
 app.use('/api/donations', donationRoutes);
 
-// Fix rute Wallet & Streamers
 app.use('/wallet', userRoutes);
 app.use('/api/wallet', userRoutes);
-app.use('/streamers', userRoutes);
-app.use('/api/streamers', userRoutes);
 
 app.get('/', (req, res) => {
-  res.status(200).json({ status: "online", project: "SkuyGG Engine", version: "2.1.7" });
+  res.status(200).json({ status: "online", project: "SkuyGG Engine" });
 });
 
-// --- 6. 404 & ERROR HANDLER (Tetap Sama) ---
+// --- 🕵️ 404 HANDLER (TARUH PALING BAWAH!) ---
 app.use((req, res) => {
-  if (!req.url.startsWith('/uploads/http')) {
-    console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
-  }
-  res.status(404).json({ success: false, message: `Rute [${req.method}] ${req.url} Gak Ada, Ri!` });
-});
-
-app.use((err, req, res, next) => {
-  console.error(`🔥 Engine Error: ${err.message}`);
-  res.status(err.status || 500).json({ success: false, message: err.message });
+  console.warn(`❌ Nyasar Ri: [${req.method}] ${req.url}`);
+  res.status(404).json({
+    success: false,
+    message: `Rute [${req.method}] ${req.url} Gak Ada di Backend!`
+  });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SKUYY.GG RUNNING ON PORT ${PORT}`);
+  console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
 });
