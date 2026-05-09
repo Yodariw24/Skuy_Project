@@ -9,7 +9,7 @@ import 'dotenv/config';
 
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
-import streamerRoutes from './routes/userRoutes.js'; 
+import userRoutes from './routes/userRoutes.js'; // Ganti nama biar gak bingung
 import donationRoutes from './routes/donationRoutes.js';
 
 const { Pool } = pkg;
@@ -24,14 +24,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 2. SECURITY HEADERS (FIX UNTUK GOOGLE AUTH & POPUPS) ---
+// --- 2. SECURITY HEADERS ---
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   next();
 });
 
-// --- 3. CORS CONFIGURATION (DYNAMIC UNTUK VERCEL) ---
+// --- 3. CORS CONFIGURATION ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
@@ -41,7 +41,6 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Izinkan jika: Tanpa origin (mobile), ada di whitelist, atau domain vercel.app
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -49,14 +48,11 @@ const corsOptions = {
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: true,
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle Preflight untuk semua rute
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -68,52 +64,56 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
-// Inject Context Middleware
+// Inject Pool & IO ke Request
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
   next();
 });
 
-// --- 5. API ROUTES (PRIORITY ORDER) ---
+// --- 5. API ROUTES (Gue Rapihin Urutannya Ri) ---
 
-// A. Auth - Handle login, Google Auth, & 2FA Setup
+// ✅ Auth Routes (Setup 2FA, Google Login, dll)
 app.use('/api/auth', authRoutes);
 
-// B. Wallet - History ditaruh di atas agar tidak tertabrak rute parameter
-app.use('/api/wallet/history', streamerRoutes); 
-app.use('/api/wallet', streamerRoutes); 
-
-// C. User & Profile
-app.use('/api/user', streamerRoutes); 
-app.use('/api/streamers', streamerRoutes); 
-
-// D. Donations
+// ✅ Donation Routes
 app.use('/api/donations', donationRoutes);
+
+// ✅ User & Wallet Routes (Disederhanakan)
+// Gabungkan semua yang berkaitan dengan user/wallet ke satu base path atau pisah dengan jelas
+app.use('/api/user', userRoutes);
+app.use('/api/wallet', userRoutes); 
+app.use('/api/streamers', userRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    message: "CORS, Security Headers, and Routes Fixed!"
+    version: "2.0.0-QR-Auth"
   });
 });
 
-// --- 6. ERROR HANDLING ---
+// --- 6. 404 HANDLER (Biar lo tau rute mana yang salah) ---
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Rute [${req.method}] ${req.url} Gak Ada di SkuyGG Engine, Ri! Cek typo.`
+  });
+});
+
+// --- 7. ERROR HANDLING ---
 app.use((err, req, res, next) => {
-  const statusCode = err.status || 500;
-  console.error(`🔥 Error: ${err.message}`);
-  res.status(statusCode).json({
+  console.error(`🔥 Engine Error: ${err.message}`);
+  res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error'
   });
 });
 
-// --- 7. SERVER START ---
+// --- 8. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
-  console.log(`📡 URL: http://0.0.0.0:${PORT}`);
   console.log('-----------------------------------------');
 });

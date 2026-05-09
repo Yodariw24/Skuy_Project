@@ -1,18 +1,16 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS TIPFLOW
- * Dibuat fleksibel untuk handle Localhost & Production (Railway)
+ * KONFIGURASI AXIOS SKUY.GG
+ * Dibuat Sultan-Proof untuk handle Localhost & Production
  */
 const api = axios.create({
-  // Menentukan baseURL secara dinamis
+  // ✅ FIX LOGIC: Pastiin baseURL bersih dan mengarah ke endpoint Railway lo
   baseURL: import.meta.env.VITE_API_URL 
     ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api` 
-    : 'http://localhost:8080/api', 
+    : 'https://skuy-project-backend-production.up.railway.app/api', 
   
-  // WAJIB: Agar cookie/header otorisasi bisa lewat antar domain (Vercel <-> Railway)
   withCredentials: true, 
-  
   headers: {
     'Content-Type': 'application/json'
   }
@@ -20,7 +18,7 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR REQUEST
- * Menempelkan token JWT secara otomatis dari localStorage
+ * Nempelkan token JWT otomatis dari localStorage
  */
 api.interceptors.request.use(
   (config) => {
@@ -30,29 +28,32 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 /**
  * INTERCEPTOR RESPONSE
- * Menangani error 401 (Unauthorized) agar user otomatis login ulang jika token mati
+ * Handle error 401 dan 404 agar log-nya lebih informatif buat Sultan
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Jika server kirim 401, artinya token lo udah hangus
+    // 🛡️ Handle Token Hangus
     if (error.response && error.response.status === 401) {
-      console.warn("⚠️ Sesi habis, mengarahkan ke login...");
+      console.warn("⚠️ Sesi habis, Ri! Balik ke login dulu.");
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       
-      // Mencegah redirect loop jika sudah di halaman login
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (window.location.pathname !== '/auth') {
+        window.location.href = '/auth'; // ✅ Sesuaikan dengan rute lo '/auth'
       }
     }
+
+    // 🕵️ Handle 404 (Biar lo tau kalau endpoint-nya emang gak ada)
+    if (error.response && error.response.status === 404) {
+      console.error("❌ Error 404: Endpoint gak ketemu. Cek routes di backend!");
+    }
+
     return Promise.reject(error);
   }
 );
