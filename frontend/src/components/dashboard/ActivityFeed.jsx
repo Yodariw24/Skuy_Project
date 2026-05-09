@@ -1,33 +1,30 @@
 import { useEffect, useState, useCallback } from 'react'
-// ✅ GANTI: Gunakan instance api sentral, hapus Supabase client
 import api from '../../api/axios' 
 import { 
   Clock, Heart, RefreshCcw, Zap, 
-  Crown, Sparkles, Share2, CheckCircle2 
+  Crown, Sparkles, Share2, CheckCircle2, TrendingUp 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-function ActivityFeed({ userId }) {
+function ActivityFeed() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // --- 1. AMBIL DATA DARI BACKEND RAILWAY ---
+  // --- 1. FETCH DATA DARI RAILWAY ---
   const fetchHistory = useCallback(async (isAuto = false) => {
     if (!isAuto) setLoading(true);
     else setIsRefreshing(true);
 
     try {
-      // ✅ Cukup panggil endpoint, interceptor otomatis menempelkan user_token
-      const res = await api.get('/user/activity-feed');
+      // ✅ Interceptor di axios.js udah otomatis nempel user_token, jadi aman Ri
+      const res = await api.get('/api/user/activity-feed');
       
       if (res.data && res.data.success) {
-        setHistory(res.data.donations);
+        setHistory(res.data.donations || []);
       }
     } catch (err) {
-      console.error("Gagal ambil history dari Railway:", err.message);
-      // Fallback data dummy jika koneksi terputus agar UI tetap cantik
-      if (!isAuto) setHistory([]);
+      console.error("Gagal sinkron feed Railway:", err.message);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -35,14 +32,10 @@ function ActivityFeed({ userId }) {
   }, []);
 
   useEffect(() => {
-    // ✅ Gunakan key 'user_token' sesuai standar keamanan TipFlow
-    const token = localStorage.getItem('user_token');
-    if (token) {
-      fetchHistory();
-      // Auto-refresh setiap 30 detik untuk memantau donasi masuk (gacor!)
-      const interval = setInterval(() => fetchHistory(true), 30000);
-      return () => clearInterval(interval);
-    }
+    fetchHistory();
+    // 🚀 GACOR MODE: Auto-refresh tiap 30 detik biar gak ketinggalan notif cuan
+    const interval = setInterval(() => fetchHistory(true), 30000);
+    return () => clearInterval(interval);
   }, [fetchHistory]);
 
   const formatRelativeTime = (dateString) => {
@@ -60,89 +53,100 @@ function ActivityFeed({ userId }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-20 px-4 font-sans text-left">
-      {/* --- HEADER --- */}
-      <div className="flex justify-between items-end mb-12">
+    <div className="max-w-4xl mx-auto pb-24 px-2 font-sans text-left">
+      
+      {/* --- HEADER SULTAN --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-14 gap-6 px-2">
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
-            </span>
-            <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em] italic">Railway Live Feed</span>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-3 w-3 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] italic">Railway Live Stream Ops</span>
           </div>
-          <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
-            Recent Support
+          <h1 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
+            Recent <span className="text-violet-600">Support</span>
           </h1>
         </div>
         
-        <button 
-          onClick={() => fetchHistory()}
-          disabled={loading || isRefreshing}
-          className="group relative p-4 bg-white border-2 border-slate-100 rounded-[1.8rem] hover:border-violet-600 transition-all active:scale-90 shadow-xl shadow-slate-100/50"
-        >
-          <RefreshCcw 
-            size={20} 
-            strokeWidth={3} 
-            className={`text-slate-400 group-hover:text-violet-600 transition-all duration-700 ${isRefreshing || loading ? 'animate-spin' : 'group-hover:rotate-180'}`} 
-          />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex flex-col items-end mr-2">
+             <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Status Sync</p>
+             <p className="text-[10px] font-bold text-emerald-500 uppercase italic">All Systems Operational</p>
+          </div>
+          <button 
+            onClick={() => fetchHistory()}
+            disabled={loading || isRefreshing}
+            className="group relative p-5 bg-white border-4 border-slate-950 rounded-2xl hover:bg-slate-50 transition-all active:translate-y-1 shadow-[6px_6px_0px_0px_#000]"
+          >
+            <RefreshCcw 
+              size={22} 
+              strokeWidth={3} 
+              className={`text-slate-950 transition-all duration-700 ${isRefreshing || loading ? 'animate-spin' : 'group-hover:rotate-180'}`} 
+            />
+          </button>
+        </div>
       </div>
 
       {/* --- FEED CONTENT --- */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-6">
-             <div className="relative">
-                <div className="w-16 h-16 border-[6px] border-slate-100 rounded-full" />
-                <div className="absolute top-0 w-16 h-16 border-[6px] border-violet-600 border-t-transparent rounded-full animate-spin" />
-             </div>
-             <p className="font-black italic uppercase tracking-[0.4em] text-[10px] text-slate-400 animate-pulse">Syncing Cloud History...</p>
+          <div className="flex flex-col items-center justify-center py-32 space-y-8">
+              <div className="relative w-20 h-20">
+                <div className="absolute inset-0 border-[8px] border-slate-100 rounded-[2rem] rotate-45" />
+                <div className="absolute inset-0 border-[8px] border-violet-600 border-t-transparent rounded-[2rem] animate-spin rotate-45" />
+              </div>
+              <p className="font-black italic uppercase tracking-[0.5em] text-[10px] text-slate-400 animate-pulse">Scanning Railway Nodes...</p>
           </div>
         ) : history.length > 0 ? (
           <AnimatePresence mode='popLayout'>
             {history.map((item, i) => (
               <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: i * 0.08 }}
+                transition={{ delay: i * 0.05, type: 'spring', stiffness: 100 }}
                 key={item.id} 
-                className="group relative bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 shadow-2xl shadow-slate-200/30 flex flex-col md:flex-row items-start md:items-center gap-8 hover:border-violet-200 transition-all duration-500"
+                className={`group relative bg-white p-8 md:p-12 rounded-[3.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-start md:items-center gap-10 hover:translate-y-[-4px] hover:translate-x-[-4px] hover:shadow-[16px_16px_0px_0px_#7C3AED] transition-all duration-500 overflow-hidden ${item.amount >= 100000 ? 'bg-amber-50/30' : ''}`}
               >
-                <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                   <Sparkles size={120} />
+                {/* Background Decoration */}
+                <div className="absolute -top-4 -right-4 p-8 opacity-[0.05] group-hover:opacity-20 transition-all group-hover:rotate-12 group-hover:scale-150">
+                   {item.amount >= 100000 ? <Crown size={120} /> : <Heart size={120} />}
                 </div>
 
+                {/* Left Side: Avatar/Icon */}
                 <div className="relative shrink-0">
-                  <div className={`w-20 h-20 rounded-[2.2rem] flex items-center justify-center transition-all duration-500 shadow-xl ${
+                  <div className={`w-24 h-24 rounded-[2.5rem] border-4 border-slate-950 flex items-center justify-center transition-all duration-500 shadow-[6px_6px_0px_0px_#000] ${
                     item.amount >= 100000 
-                    ? 'bg-gradient-to-br from-amber-400 to-orange-600 text-white rotate-6 group-hover:rotate-0' 
+                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white rotate-6 group-hover:rotate-0' 
                     : 'bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white'
                   }`}>
-                    {item.amount >= 100000 ? <Crown size={32} strokeWidth={2.5} /> : <Heart size={32} strokeWidth={2.5} />}
+                    {item.amount >= 100000 ? <Crown size={40} strokeWidth={3} /> : <Heart size={40} strokeWidth={3} />}
                   </div>
                 </div>
                 
-                <div className="flex-1 w-full min-w-0">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                {/* Right Side: Info */}
+                <div className="flex-1 w-full min-w-0 z-10">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
                     <div>
-                      <h3 className="font-black italic text-slate-900 uppercase tracking-tighter text-2xl leading-none mb-3 group-hover:text-violet-600 transition-colors">
+                      <h3 className="font-black italic text-slate-950 uppercase tracking-tighter text-3xl leading-none mb-4 flex items-center gap-3">
                         {item.donatur_name}
+                        {item.amount >= 100000 && <Sparkles size={20} className="text-amber-500 animate-pulse" />}
                       </h3>
-                      <div className="flex items-center gap-3 text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl">
-                          <Clock size={12} strokeWidth={3} /> {formatRelativeTime(item.created_at)}
+                      <div className="flex flex-wrap items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        <span className="flex items-center gap-1.5 bg-slate-100 px-3 py-2 rounded-xl text-slate-600">
+                          <Clock size={14} strokeWidth={3} /> {formatRelativeTime(item.created_at)}
                         </span>
-                        <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl">
-                          <CheckCircle2 size={12} strokeWidth={3} /> Verified
+                        <span className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
+                          <CheckCircle2 size={14} strokeWidth={3} /> Verified
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 group-hover:bg-violet-50 p-4 md:p-6 rounded-[2rem] border border-slate-100 group-hover:border-violet-100 transition-all">
-                      <p className={`text-2xl md:text-3xl font-black italic tracking-tighter leading-none ${
-                        item.amount >= 100000 ? 'text-orange-600' : 'text-violet-600'
+                    <div className="bg-slate-950 p-5 md:p-7 rounded-[2.2rem] shadow-[6px_6px_0px_0px_#7C3AED] transform group-hover:rotate-2 transition-transform">
+                      <p className={`text-2xl md:text-4xl font-black italic tracking-tighter leading-none ${
+                        item.amount >= 100000 ? 'text-amber-400' : 'text-violet-400'
                       }`}>
                         Rp {Number(item.amount).toLocaleString('id-ID')}
                       </p>
@@ -150,8 +154,8 @@ function ActivityFeed({ userId }) {
                   </div>
 
                   {item.message && (
-                    <div className="relative pl-6 border-l-4 border-slate-100 group-hover:border-violet-200 transition-colors">
-                      <p className="text-sm text-slate-500 italic font-bold leading-relaxed">
+                    <div className="relative p-5 bg-slate-50 rounded-2xl border-l-8 border-slate-950 italic group-hover:bg-white transition-colors">
+                      <p className="text-base text-slate-700 font-bold leading-relaxed">
                         "{item.message}"
                       </p>
                     </div>
@@ -161,25 +165,25 @@ function ActivityFeed({ userId }) {
             ))}
           </AnimatePresence>
         ) : (
-          <div className="bg-white rounded-[4rem] border-4 border-dashed border-slate-100 py-32 text-center flex flex-col items-center group">
-            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-violet-50 transition-all duration-500">
-              <Zap size={40} className="text-slate-200 group-hover:text-violet-400 animate-pulse" />
+          /* --- EMPTY STATE --- */
+          <div className="bg-white rounded-[4rem] border-4 border-slate-950 py-32 text-center flex flex-col items-center shadow-[16px_16px_0px_0px_#f1f5f9] group">
+            <div className="w-28 h-28 bg-slate-100 rounded-[2.5rem] flex items-center justify-center mb-10 border-4 border-slate-950 group-hover:rotate-12 transition-all duration-500">
+              <Zap size={48} className="text-slate-300 group-hover:text-violet-600 animate-pulse" />
             </div>
-            <div className="space-y-4 px-6">
-              <p className="text-slate-400 font-black italic uppercase tracking-[0.4em] text-xs leading-loose">
-                Belum ada sinyal energi masuk.
+            <div className="space-y-6 px-10">
+              <p className="text-slate-400 font-black italic uppercase tracking-[0.5em] text-xs leading-loose">
+                Energi Donasi Belum Terdeteksi
               </p>
               <button 
                 onClick={() => {
                   const user = JSON.parse(localStorage.getItem('user'));
                   if (user) {
                     navigator.clipboard.writeText(`https://skuy-project.vercel.app/${user.username}`);
-                    alert('Link donasi disalin!');
                   }
                 }}
-                className="flex items-center gap-2 mx-auto bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-widest shadow-xl active:scale-95 transition-all"
+                className="flex items-center gap-3 mx-auto bg-[#7C3AED] text-white px-10 py-5 rounded-2xl text-xs font-black uppercase italic tracking-[0.2em] shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 active:shadow-none border-2 border-slate-950 transition-all"
               >
-                <Share2 size={14} /> Share Link Support
+                <Share2 size={16} /> Aktifkan Link Sultan
               </button>
             </div>
           </div>

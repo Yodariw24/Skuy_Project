@@ -1,5 +1,5 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import HomePage from './pages/HomePage';
 import DonationPage from './pages/DonationPage';
@@ -7,11 +7,11 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage'; 
 import PaymentPage from './pages/PaymentPage';
 import WidgetClient from './pages/WidgetClient';
-import axios from 'axios'; // Pastikan axios sudah terinstall
+import api from './api/axios'; // ✅ Gunakan central instance sultan lo
 
 import 'animate.css';
 
-// --- 1. LOGIC PROTECTED ROUTE ---
+// --- 1. LOGIC PROTECTED ROUTE (Sultan Guard) ---
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('user_token'); 
   if (!token) {
@@ -22,72 +22,81 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   const [user, setUser] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // ✅ PERBAIKAN VITAL: Sinkronisasi State User
-  useEffect(() => {
-    const syncUser = async () => {
-      const token = localStorage.getItem('user_token');
-      const savedUser = localStorage.getItem('user');
+  // ✅ PERBAIKAN SULTAN: Sinkronisasi Global State User
+  const syncUser = useCallback(async () => {
+    const token = localStorage.getItem('user_token');
+    const savedUser = localStorage.getItem('user');
 
-      if (token && savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          // Ambil data terbaru dari backend (menggunakan route dashboard-sync yang kita buat tadi)
-          const res = await axios.get(`https://skuyproject-production.up.railway.app/api/user/dashboard-sync?userId=${parsedUser.id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+    if (token && savedUser) {
+      try {
+        // Ambil data terbaru (termasuk status 2FA & phone_number)
+        const res = await api.get('/user/dashboard-sync');
 
-          if (res.data.success) {
-            // Update state dan storage dengan data terbaru (termasuk ROLE 'creator')
-            setUser(res.data.user);
-            localStorage.setItem('user', JSON.stringify(res.data.user));
-          }
-        } catch (err) {
-          console.error("Gagal sinkronisasi user, Ri:", err.message);
-          // Kalau token expired, paksa logout
-          if (err.response?.status === 401) {
-            localStorage.clear();
-            navigate('/auth');
-          }
+        if (res.data.success) {
+          setUser(res.data.user);
+          localStorage.setItem('user', JSON.stringify(res.data.user));
         }
+      } catch (err) {
+        console.error("Shield Broken: Sesi Sultan Gagal Sinkron.");
+        if (err.response?.status === 401) {
+          localStorage.clear();
+          if (!location.pathname.includes('/auth')) navigate('/auth');
+        }
+      } finally {
+        setIsSyncing(false);
       }
-    };
+    } else {
+      setIsSyncing(false);
+    }
+  }, [navigate, location.pathname]);
 
+  useEffect(() => {
     syncUser();
-  }, [navigate]);
+  }, [syncUser]);
+
+  // Loading Screen pas booting biar gak flicker
+  if (isSyncing && localStorage.getItem('user_token')) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <GoogleOAuthProvider clientId="195922640796-u1uucrttadnkjshpvn009lredf9bqoro.apps.googleusercontent.com">
-      <div className="w-full min-h-screen font-sans antialiased">
+      <div className="w-full min-h-screen font-sans antialiased selection:bg-violet-100">
         <Routes>
           {/* 1. PUBLIC ROUTES */}
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
           <Route path="/payment/:donationId" element={<PaymentPage />} />
 
-          {/* 2. WIDGET ROUTE */}
-          <Route path="/v4/widget/:type/:key" element={<WidgetClient />} />
+          {/* 2. SULTAN OVERLAY PROTOCOL (OBS Browser Source) */}
+          {/* URL: /widget/ariwirayuda/tip */}
+          <Route path="/widget/:streamKey/:type" element={<WidgetClient />} />
 
           {/* 3. DASHBOARD ROUTES (PROTECTED) */}
           <Route 
-            path="/dashboard/:tab" 
+            path="/dashboard" 
             element={
               <ProtectedRoute>
-                {/* ✅ Kirim data 'user' terbaru ke DashboardPage */}
                 <DashboardPage user={user} setUser={setUser} />
               </ProtectedRoute>
             } 
           />
 
-          <Route 
-            path="/dashboard" 
-            element={<Navigate to="/dashboard/wallet" replace />} 
-          />
+          {/* Fallback Dashboard Tabs */}
+          <Route path="/dashboard/:tab" element={<Navigate to="/dashboard" replace />} />
           
-          {/* 4. DYNAMIC CREATOR PROFILE */}
+          {/* 4. DYNAMIC CREATOR PROFILE (Public) */}
           <Route path="/:username" element={<DonationPage />} />
           
+          {/* 5. 404 REDIRECT */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-// ✅ FIX UTAMA 1: Import instance api lo yang udah disetting canggih!
 import api from '../api/axios' 
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
-  History, Skull, Heart, Info, Mail, User, Clock 
+  History, Skull, Heart, Info, Mail, User, Clock, ShieldCheck 
 } from 'lucide-react' 
 
 const themeMap = {
@@ -24,6 +23,7 @@ function DonationPage() {
   const [balance, setBalance] = useState(0)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   
   const [formData, setFormData] = useState({
     donatur_name: '', donatur_email: '', amount: '', message: ''
@@ -32,32 +32,29 @@ function DonationPage() {
   const shortcuts = [10000, 25000, 50000, 100000];
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
-  // --- LOGIKA AMBIL DATA VIA BACKEND RAILWAY ---
+  // --- LOGIKA FETCH DATA SULTAN (Railway Sync) ---
   const fetchData = async () => {
     try {
       setLoading(true);
-      // ✅ FIX UTAMA 2: Pake api.get(), URL-nya otomatis nyambung ke Railway asli
-      const res = await api.get(`/streamers/public/${username}`);
+      // ✅ SINKRON: Panggil endpoint public profile
+      const res = await api.get(`/api/donations/profile/${username}`);
       
-      if (res.data) {
-        setStreamer(res.data.profile);
-        setBalance(res.data.balance || 0);
-        setHistory(res.data.history || []);
+      if (res.data.success) {
+        const data = res.data.data;
+        setStreamer(data);
+
+        // ✅ FETCH SALDO & HISTORY SECARA PARALEL
+        const [resBalance, resHistory] = await Promise.all([
+          api.get(`/api/donations/${data.id}/balance`),
+          api.get(`/api/donations/public-history/${data.id}`)
+        ]);
+
+        if (resBalance.data.success) setBalance(resBalance.data.total_saldo);
+        if (resHistory.data.success) setHistory(resHistory.data.data);
       }
-      setLoading(false);
     } catch (err) { 
-      console.warn("Backend gagal ditarik, cek URL atau Database lo, Ri!");
-      // DATA DUMMY TETAP ADA BUAT FALLBACK KALO SERVER MATI
-      setStreamer({ 
-        id: '1', username: username, full_name: 'Skuy Creator', 
-        bio: 'Dukung terus karya saya lewat energi saweran paling gacor!',
-        theme_color: 'violet'
-      });
-      setBalance(1500000);
-      setHistory([
-        { donatur_name: 'Sultan_Jakarta', amount: 500000, message: 'Gas terus bang!', created_at: new Date() },
-        { donatur_name: 'Wibu_Elite', amount: 100000, message: 'Keren parah kontennya.', created_at: new Date() }
-      ]);
+      console.error("Node railway unreachable:", err.message);
+    } finally {
       setLoading(false); 
     }
   };
@@ -66,155 +63,199 @@ function DonationPage() {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!formData.amount || formData.amount < 1000) return alert("Minimal dukungan adalah Rp 1.000");
+    if (!formData.amount || formData.amount < 10000) return alert("Minimal dukungan Sultan adalah Rp 10.000");
     
+    setSubmitting(true);
     try {
-      // ✅ FIX UTAMA 3: Pake api.post() tanpa perlu nulis baseURL panjang-panjang
-      const res = await api.post('/donations', {
+      // ✅ SINKRON: Kirim donasi ke backend
+      const res = await api.post('/api/donations/create', {
         ...formData,
-        streamer_id: streamer.id
+        streamer_id: streamer.id,
+        payment_method: 'QRIS' // Default protocol
       });
 
-      if (res.data.id) {
-        navigate(`/payment/${res.data.id}`); 
+      if (res.data.success) {
+        // Arahkan ke halaman status atau checkout (sesuai flow lo)
+        alert("Instruksi Pembayaran Meluncur! Cek email lo, Ri!");
+        // window.location.href = res.data.payment_url;
       }
     } catch (err) { 
-      alert("Sistem Pembayaran sedang dalam pemeliharaan! 🔥"); 
+      alert("Energi transmission failed! Cek koneksi lo."); 
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF]">
-      <div className="w-12 h-12 border-4 border-slate-100 border-t-violet-600 rounded-full animate-spin mb-4" />
-      <p className="text-violet-600 font-black italic uppercase tracking-widest text-sm text-center">
-        SYNCHRONIZING RAILWAY DATABASE<br/>
-        <span className="text-[10px] opacity-40">ESTABLISHING ENCRYPTED TUNNEL...</span>
+      <div className="relative w-20 h-20">
+        <div className="absolute inset-0 border-[8px] border-slate-100 rounded-3xl rotate-45" />
+        <div className="absolute inset-0 border-[8px] border-violet-600 border-t-transparent rounded-3xl animate-spin rotate-45" />
+      </div>
+      <p className="mt-10 text-violet-600 font-black italic uppercase tracking-[0.4em] text-xs text-center animate-pulse">
+        Establishing Railway Tunnel...
       </p>
     </div>
   );
 
   if (!streamer) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF] text-red-500 font-black uppercase gap-4 text-center p-6">
-      <Skull size={64} className="animate-bounce" />
-      <h2 className="text-2xl italic tracking-tighter">Creator Not Found 404</h2>
-      <p className="text-slate-400 text-[10px] tracking-widest leading-relaxed font-bold">
-        SISTEM TIDAK MENEMUKAN ID @{username.toUpperCase()} <br/> DALAM PANGKALAN DATA CLOUD RAILWAY.
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFDFF] text-rose-500 font-black uppercase gap-6 text-center p-6">
+      <Skull size={80} strokeWidth={2.5} />
+      <h2 className="text-4xl italic tracking-tighter">Node Not Found</h2>
+      <p className="text-slate-400 text-xs tracking-[0.2em] leading-loose max-w-xs font-bold">
+        SISTEM TIDAK MENEMUKAN ID @{username.toUpperCase()} DALAM CLOUD RAILWAY SKUYGG.
       </p>
-      <Link to="/" className="text-[10px] bg-slate-950 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest mt-4 hover:bg-violet-600 transition-all">Back to Home</Link>
+      <Link to="/" className="bg-slate-950 text-white px-10 py-5 rounded-2xl font-black uppercase italic tracking-widest mt-4 shadow-2xl hover:bg-violet-600 transition-all border-4 border-slate-900">Back to Hub</Link>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-20 selection:bg-violet-100">
+    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-24 selection:bg-violet-100">
+      {/* Dynamic Glow Background */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className={`absolute top-[-10%] left-[-5%] w-[50%] h-[50%] ${theme.bgLight} opacity-40 blur-[120px] rounded-full`} />
-        <div className={`absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] ${theme.bgLight} opacity-30 blur-[120px] rounded-full`} />
+        <div className={`absolute top-[-10%] left-[-5%] w-[60%] h-[60%] ${theme.bgLight} opacity-50 blur-[150px] rounded-full`} />
+        <div className={`absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] ${theme.bgLight} opacity-40 blur-[150px] rounded-full`} />
       </div>
 
-      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/70 border-b border-slate-100 p-4">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2 text-slate-400 hover:text-slate-950 transition-all font-black text-[10px] uppercase tracking-widest">
-            <ArrowLeft size={16} strokeWidth={3} /> Explore Hub
+      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/60 border-b-4 border-slate-950/5 p-5">
+        <div className="max-w-6xl mx-auto flex justify-between items-center px-4">
+          <Link to="/" className="flex items-center gap-3 text-slate-400 hover:text-slate-950 transition-all font-black text-[10px] uppercase tracking-[0.3em]">
+            <ArrowLeft size={20} strokeWidth={4} /> Explore
           </Link>
-          <div className="text-xl font-black italic uppercase tracking-tighter text-slate-950">SKUY<span className="text-violet-600">.GG</span></div>
+          <div className="text-2xl font-black italic uppercase tracking-tighter text-slate-950">SKUY<span className={theme.text}>.GG</span></div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 mt-12">
-        <header className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
-          <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} className="lg:col-span-8 flex flex-col md:flex-row items-center md:items-start gap-10 bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 relative overflow-hidden">
-            <div className={`absolute top-0 right-0 w-32 h-32 ${theme.bgLight} rounded-full -mr-16 -mt-16 blur-3xl opacity-50`} />
+      <main className="max-w-6xl mx-auto px-6 mt-16">
+        <header className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-20">
+          {/* CREATOR PROFILE CARD */}
+          <motion.div initial={{opacity:0, y:30}} animate={{opacity:1, y:0}} className="lg:col-span-8 flex flex-col md:flex-row items-center md:items-start gap-12 bg-white p-10 md:p-14 rounded-[4rem] border-4 border-slate-950 shadow-[20px_20px_0px_0px_rgba(0,0,0,0.05)] relative overflow-hidden group">
+            <div className={`absolute top-0 right-0 w-40 h-40 ${theme.bgLight} rounded-full -mr-20 -mt-20 blur-3xl opacity-60`} />
+            
             <div className="relative shrink-0">
-              <div className={`w-32 h-32 md:w-40 md:h-40 rounded-[3.5rem] p-1.5 bg-gradient-to-tr ${theme.gradient} shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500`}>
-                <div className="w-full h-full rounded-[3.2rem] bg-white overflow-hidden border-4 border-white">
+              <div className={`w-40 h-40 md:w-48 md:h-48 rounded-[3.5rem] p-2 bg-slate-950 shadow-[10px_10px_0px_0px_${theme.bg.replace('bg-', '#')}]`}>
+                <div className="w-full h-full rounded-[3rem] bg-white overflow-hidden border-4 border-white">
                   <img 
-                    src={streamer.profile_picture?.startsWith('http') ? streamer.profile_picture : `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}`} 
-                    alt="Avatar" className="w-full h-full object-cover" 
+                    src={streamer.profile_picture ? (streamer.profile_picture.startsWith('http') ? streamer.profile_picture : `${import.meta.env.VITE_API_URL}/uploads/${streamer.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}`} 
+                    alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                    onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}` }}
                   />
                 </div>
               </div>
-              <div className={`absolute -bottom-2 -right-2 ${theme.bg} text-white p-3 rounded-2xl shadow-lg border-4 border-white animate-pulse`}><Zap size={20} fill="currentColor" /></div>
+              {streamer.is_two_fa_enabled && (
+                <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-3 rounded-2xl shadow-xl border-4 border-white group-hover:rotate-12 transition-transform">
+                  <ShieldCheck size={24} strokeWidth={3} />
+                </div>
+              )}
             </div>
+
             <div className="text-center md:text-left flex-1 relative z-10">
-              <span className={`inline-block ${theme.text} font-black tracking-[0.2em] text-[10px] uppercase ${theme.bgLight} px-4 py-1.5 rounded-full border ${theme.border} mb-4`}>Official SKUY Agent</span>
-              <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-slate-950 uppercase mb-4">{streamer.display_name || streamer.full_name}</h1>
-              <p className="text-base text-slate-500 font-medium leading-relaxed mb-8 italic">"{streamer.bio || "Sistem transmisi energi aktif. Dukung saya terus untuk berkarya! 🚀"}"</p>
+              <div className="flex items-center justify-center md:justify-start gap-3 mb-6">
+                 <span className={`${theme.text} font-black tracking-[0.3em] text-[10px] uppercase ${theme.bgLight} px-5 py-2 rounded-full border-2 ${theme.border}`}>Sultan Level Agent</span>
+                 {streamer.is_two_fa_enabled && <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border-2 border-emerald-100">Verified</span>}
+              </div>
+              <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-slate-950 uppercase mb-6 leading-none">{streamer.display_name || streamer.username}</h1>
+              <p className="text-lg text-slate-500 font-bold leading-relaxed mb-10 italic max-w-xl">"{streamer.bio || "Sistem transmisi energi aktif. Dukung saya terus untuk berkarya! 🚀"}"</p>
+              
               <div className="flex gap-4 justify-center md:justify-start">
                 {['instagram', 'tiktok', 'youtube'].map(platform => streamer[platform] && (
-                  <a key={platform} href={streamer[platform]} target="_blank" rel="noreferrer" className="p-4 bg-slate-50 hover:bg-white rounded-2xl border border-slate-100 shadow-sm transition-all hover:scale-110 active:scale-95">
-                    <img src={`https://cdn.simpleicons.org/${platform}`} className="w-5 h-5" alt={platform} />
+                  <a key={platform} href={streamer[platform]} target="_blank" rel="noreferrer" className="p-5 bg-slate-50 hover:bg-white rounded-3xl border-4 border-transparent hover:border-slate-950 shadow-sm transition-all hover:-translate-y-1 active:scale-95">
+                    <img src={`https://cdn.simpleicons.org/${platform}`} className="w-6 h-6" alt={platform} />
                   </a>
                 ))}
               </div>
             </div>
           </motion.div>
 
-          <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.1}} className={`lg:col-span-4 bg-gradient-to-br ${theme.gradient} p-10 rounded-[3.5rem] text-white flex flex-col justify-between shadow-2xl ${theme.shadow} relative overflow-hidden border border-white/10`}>
-            <div className="p-4 bg-white/20 backdrop-blur-xl rounded-2xl border border-white/20 w-fit shadow-xl"><Wallet size={32} className="text-white" /></div>
-            <div className="relative z-10">
-              <span className="text-[11px] text-white/70 uppercase font-black tracking-widest block mb-2">Power Collected</span>
-              <span className="text-4xl font-black italic tracking-tight text-white drop-shadow-md">Rp {Number(balance).toLocaleString('id-ID')}</span>
+          {/* BALANCE CARD */}
+          <motion.div initial={{opacity:0, y:30}} animate={{opacity:1, y:0}} transition={{delay:0.1}} className={`lg:col-span-4 bg-slate-950 p-12 rounded-[4rem] text-white flex flex-col justify-between shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden border-4 border-slate-900 group`}>
+            <div className={`absolute top-0 right-0 p-10 opacity-[0.05] group-hover:rotate-12 transition-transform duration-700`}><Zap size={200} fill="white" /></div>
+            <div className="p-5 bg-white/10 backdrop-blur-2xl rounded-3xl border-2 border-white/20 w-fit shadow-2xl"><Wallet size={36} strokeWidth={2.5} /></div>
+            <div className="relative z-10 mt-12">
+              <span className="text-[11px] text-white/40 uppercase font-black tracking-[0.4em] block mb-4 italic">Power Collected</span>
+              <span className={`text-4xl md:text-5xl font-black italic tracking-tighter ${theme.text} drop-shadow-[0_0_15px_rgba(124,58,237,0.4)]`}>Rp {Number(balance).toLocaleString('id-ID')}</span>
             </div>
           </motion.div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
+          {/* DONATION FORM */}
           <div className="lg:col-span-7">
-            <div className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/30">
-                <div className="flex items-center gap-4 mb-10">
-                  <div className={`p-3 ${theme.bgLight} ${theme.text} rounded-2xl shadow-lg ${theme.shadow}`}><Heart size={20} fill="currentColor" /></div>
-                  <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900">Authorize Support</h2>
+            <div className="bg-white p-10 md:p-16 rounded-[4.5rem] border-4 border-slate-950 shadow-[20px_20px_0px_0px_#F1F5F9]">
+                <div className="flex items-center gap-5 mb-14">
+                  <div className={`p-4 ${theme.bg} text-white rounded-3xl shadow-xl rotate-3`}><Heart size={28} strokeWidth={3} fill="currentColor" /></div>
+                  <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-950">Initialize Support</h2>
                 </div>
-                <form onSubmit={handleSend} className="space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><User size={12} strokeWidth={3}/> Agent Nickname</label>
-                        <input type="text" placeholder="Masukkan nama" required className={`w-full bg-slate-50 p-5 rounded-2xl outline-none text-slate-900 font-bold border-2 border-transparent ${theme.focusBorder} focus:bg-white focus:ring-4 ${theme.ring} transition-all`} value={formData.donatur_name} onChange={(e) => setFormData({...formData, donatur_name: e.target.value})} />
+
+                <form onSubmit={handleSend} className="space-y-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2 italic">Agent Alias</label>
+                        <input type="text" placeholder="Masukkan nama" required className={`w-full bg-slate-50 p-6 rounded-3xl outline-none text-slate-950 font-black border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all`} value={formData.donatur_name} onChange={(e) => setFormData({...formData, donatur_name: e.target.value})} />
                       </div>
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Mail size={12} strokeWidth={3}/> Access Email</label>
-                        <input type="email" placeholder="Email kamu" required className={`w-full bg-slate-50 p-5 rounded-2xl outline-none text-slate-900 font-bold border-2 border-transparent ${theme.focusBorder} focus:bg-white focus:ring-4 ${theme.ring} transition-all`} value={formData.donatur_email} onChange={(e) => setFormData({...formData, donatur_email: e.target.value})} />
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2 italic">Access Mail</label>
+                        <input type="email" placeholder="Email aktif" required className={`w-full bg-slate-50 p-6 rounded-3xl outline-none text-slate-950 font-black border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all`} value={formData.donatur_email} onChange={(e) => setFormData({...formData, donatur_email: e.target.value})} />
                       </div>
                     </div>
-                    <div className="space-y-6">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Zap size={12} strokeWidth={3}/> Energy Amount</label>
+
+                    <div className="space-y-8">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2 italic text-left block">Support Energy Nominal</label>
                       <div className="relative group">
-                        <span className={`absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 font-black text-2xl group-focus-within:${theme.text}`}>Rp</span>
-                        <input type="number" required placeholder="0" className={`w-full bg-slate-50 p-8 pl-18 rounded-[2.5rem] outline-none ${theme.text} text-5xl font-black border-2 border-transparent ${theme.focusBorder} focus:bg-white focus:ring-8 ${theme.ring} transition-all`} value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
+                        <span className={`absolute left-8 top-1/2 -translate-y-1/2 text-slate-300 font-black text-4xl group-focus-within:${theme.text}`}>Rp</span>
+                        <input type="number" required placeholder="0" className={`w-full bg-slate-50 p-10 pl-24 rounded-[3.5rem] outline-none ${theme.text} text-6xl font-black border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all shadow-inner tracking-tighter`} value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {shortcuts.map((val) => (
                           <button key={val} type="button" onClick={() => setFormData({...formData, amount: val})}
-                            className={`py-3 rounded-2xl border-2 font-black text-[11px] uppercase tracking-wider transition-all active:scale-95 ${formData.amount == val ? `${theme.bg} text-white border-transparent shadow-lg ${theme.shadow}` : `bg-white text-slate-400 border-slate-100 hover:border-slate-200 hover:text-slate-600`}`}>
+                            className={`py-5 rounded-2xl border-4 font-black text-[12px] uppercase tracking-widest transition-all active:translate-y-1 ${formData.amount == val ? `${theme.bg} text-white border-slate-950 shadow-[6px_6px_0px_0px_#000]` : `bg-white text-slate-400 border-slate-100 hover:border-slate-300`}`}>
                             Rp {val.toLocaleString('id-ID')}
                           </button>
                         ))}
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Info size={12} strokeWidth={3}/> Encrypted Message</label>
-                      <textarea placeholder="Tulis pesan untuk agen..." className={`w-full bg-slate-50 p-6 rounded-[2.5rem] h-40 outline-none text-slate-700 font-bold border-2 border-transparent ${theme.focusBorder} focus:bg-white transition-all resize-none`} value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} />
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2 italic">Encrypted Intel</label>
+                      <textarea placeholder="Tulis pesan untuk agen..." className={`w-full bg-slate-50 p-8 rounded-[3rem] h-48 outline-none text-slate-900 font-bold border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all resize-none italic shadow-inner`} value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} />
                     </div>
-                    <button type="submit" className={`w-full group ${theme.bg} text-white font-black py-8 rounded-[3rem] uppercase italic text-xl shadow-2xl ${theme.shadow} active:scale-95 transition-all hover:brightness-110 flex items-center justify-center gap-4`}>
-                      <span>Initiate Transmission</span><div className="p-2 bg-white/20 rounded-xl group-hover:rotate-12 transition-transform"><Zap size={20} fill="currentColor" /></div>
+
+                    <button type="submit" disabled={submitting} className={`w-full group ${theme.bg} text-white font-black py-10 rounded-[4rem] uppercase italic text-2xl shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-2 border-4 border-slate-950 transition-all hover:brightness-110 flex items-center justify-center gap-6 disabled:opacity-50`}>
+                      {submitting ? 'TRANSMITTING...' : <>Initiate Support <Zap size={28} strokeWidth={3} fill="currentColor" /></>}
                     </button>
                 </form>
             </div>
           </div>
 
-          <div className="lg:col-span-5 space-y-8">
-            <div className="bg-white p-8 md:p-10 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/20">
-              <h3 className="text-lg font-black mb-10 italic uppercase tracking-tighter flex items-center gap-3 text-slate-900"><div className={`p-2 ${theme.bgLight} ${theme.text} rounded-xl`}><History size={20} strokeWidth={3} /></div>Transmission Log</h3>
-              <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+          {/* HISTORY FEED */}
+          <div className="lg:col-span-5">
+            <div className="bg-white p-10 md:p-12 rounded-[4rem] border-4 border-slate-950 shadow-[20px_20px_0px_0px_#F8FAFF] sticky top-24">
+              <h3 className="text-2xl font-black mb-14 italic uppercase tracking-tighter flex items-center gap-4 text-slate-950">
+                <div className={`p-3 ${theme.bg} text-white rounded-2xl shadow-lg border-2 border-slate-950`}><History size={24} strokeWidth={3} /></div>
+                Transmission Feed
+              </h3>
+              
+              <div className="space-y-8 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
                 {history.length > 0 ? history.map((h, i) => (
-                  <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} transition={{delay: i * 0.1}} key={i} className={`group bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 hover:${theme.border} hover:bg-white transition-all shadow-sm`}>
-                    <div className="flex justify-between items-start mb-3"><div className="space-y-1"><p className="font-black text-slate-950 text-sm uppercase italic tracking-tight">{h.donatur_name}</p><p className="text-[9px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1"><Clock size={10} /> {h.created_at ? new Date(h.created_at).toLocaleDateString('id-ID') : 'Baru saja'}</p></div></div>
-                    <p className={`text-3xl font-black ${theme.text} tracking-tighter`}>Rp {Number(h.amount).toLocaleString('id-ID')}</p>
-                    <div className="mt-4 bg-white p-4 rounded-2xl border border-slate-100"><p className="text-xs text-slate-500 font-bold italic">"{h.message}"</p></div>
+                  <motion.div initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} transition={{delay: i * 0.05}} key={i} className={`group bg-slate-50/50 p-8 rounded-[3rem] border-4 border-slate-100 hover:border-slate-950 hover:bg-white transition-all shadow-sm`}>
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="space-y-2">
+                            <p className="font-black text-slate-950 text-lg uppercase italic tracking-tight">{h.donatur_name}</p>
+                            <div className="flex items-center gap-2 text-[9px] text-slate-400 font-black uppercase tracking-widest bg-slate-100/50 w-fit px-3 py-1.5 rounded-full">
+                                <Clock size={12} strokeWidth={3} /> {h.created_date ? new Date(h.created_date).toLocaleDateString('id-ID') : 'VORTEX'}
+                            </div>
+                        </div>
+                        <div className={`p-2 ${theme.bgLight} ${theme.text} rounded-xl border-2 ${theme.border}`}><Zap size={14} fill="currentColor" /></div>
+                    </div>
+                    <p className={`text-4xl font-black ${theme.text} tracking-tighter mb-4`}>Rp {Number(h.amount).toLocaleString('id-ID')}</p>
+                    {h.message && <div className="p-5 bg-white rounded-[2rem] border-2 border-slate-100 italic"><p className="text-sm text-slate-500 font-bold leading-relaxed">"{h.message}"</p></div>}
                   </motion.div>
                 )) : (
-                  <div className="text-center py-24 opacity-30 flex flex-col items-center gap-4"><Zap size={32} className="text-slate-300" /><p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">No Signal Detected</p></div>
+                  <div className="text-center py-32 opacity-30 flex flex-col items-center gap-6">
+                    <Zap size={48} className="text-slate-300 animate-pulse" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400 italic">No Support Signal Yet</p>
+                  </div>
                 )}
               </div>
             </div>

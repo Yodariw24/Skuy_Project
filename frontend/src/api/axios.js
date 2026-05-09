@@ -1,17 +1,19 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS SKUY.GG
- * Dibuat Sultan-Proof untuk handle Localhost & Production
+ * KONFIGURASI AXIOS SKUY.GG v2.3
+ * Dibuat Sultan-Proof untuk koneksi Vercel <-> Railway
  */
 const api = axios.create({
-  // ✅ FIX: Memastikan baseURL selalu bersih, tanpa double slash di tengah atau akhir
-  baseURL: import.meta.env.VITE_API_URL 
-    ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api` 
-    : 'https://skuyproject-production.up.railway.app/api', 
+  // ✅ SMART LOGIC: Deteksi apakah VITE_API_URL sudah mengandung /api atau belum
+  baseURL: (() => {
+    const rawUrl = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
+    const cleanUrl = rawUrl.replace(/\/$/, ""); // Buang slash di akhir
+    return cleanUrl.includes('/api') ? cleanUrl : `${cleanUrl}/api`;
+  })(),
   
   withCredentials: true, 
-  timeout: 10000, // ✅ Tambahin timeout 10 detik biar gak gampang RTO pas Railway lagi booting
+  timeout: 15000, // ✅ Naik ke 15 detik, kasih napas buat cold-start Railway
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -20,7 +22,7 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR REQUEST
- * Nempelkan Token & Handle FormData
+ * Security Shield: Nempelkan Token & Handle Multipart
  */
 api.interceptors.request.use(
   (config) => {
@@ -29,7 +31,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // ✅ TRICK SULTAN: Jika kirim foto, biarkan browser set boundary-nya sendiri
+    // ✅ TRICK SULTAN: Handle upload foto agar browser set boundary secara otomatis
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -41,28 +43,36 @@ api.interceptors.request.use(
 
 /**
  * INTERCEPTOR RESPONSE
- * Handle 401 (Logout) & 404 (Nyasar)
+ * Emergency Protocol: Handle Auto-Logout & Logging
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const { response, config } = error;
 
-    // 🛡️ 1. Handle Sesi Habis
+    // 🛡️ 1. PROTOKOL 401: Sesi Sultan Berakhir
     if (response && response.status === 401) {
-      console.warn("⚠️ Otorisasi dicabut atau sesi habis!");
+      console.warn("⚠️ Access Denied: Sesi expired atau Token Ilegal!");
+      
+      // Bersihkan markas lokal
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       
-      if (window.location.pathname !== '/auth') {
+      // Tendang ke pintu masuk jika bukan di halaman auth
+      if (!window.location.pathname.includes('/auth')) {
         window.location.href = '/auth'; 
       }
     }
 
-    // 🕵️ 2. Handle Rute Nyasar (Biar ketauan typo-nya di mana)
+    // 🕵️ 2. PROTOKOL 404: Node Tidak Ditemukan
     if (response && response.status === 404) {
-      console.error(`❌ API Nyasar: [${config.method.toUpperCase()}] ${config.url}`);
-      console.error(`Cek apakah di Backend sudah ada rute tersebut, Ri!`);
+      console.error(`❌ Jalur Putus: [${config.method.toUpperCase()}] ${config.url}`);
+      console.info(`Ri, cek lagi rute di backend/server.js, pastikan sudah di-mount!`);
+    }
+
+    // ⚡ 3. PROTOKOL TIMEOUT
+    if (error.code === 'ECONNABORTED') {
+      console.error("🚀 Railway Node RTO: Server kelamaan bales, Ri!");
     }
 
     return Promise.reject(error);

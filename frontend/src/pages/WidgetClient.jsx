@@ -1,154 +1,146 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Play } from 'lucide-react';
+import { Zap, Play, Crown, Heart } from 'lucide-react';
 import { io } from 'socket.io-client'; 
-// ✅ GANTI: Gunakan instance api kita
 import api from '../api/axios'; 
 
 const WidgetClient = () => {
-  const { type, key } = useParams(); // 'key' di sini adalah ID Streamer (User ID) lo
+  // 'streamKey' di sini adalah Username lo di URL OBS
+  const { streamKey, type } = useParams(); 
   const [activeAlert, setActiveAlert] = useState(null);
   const [settings, setSettings] = useState({
-    primary: '#6366f1',
-    accent: '#fbbf24',
-    text: '#ffffff',
-    glow: '#818cf8',
-    duration: 8
+    primary_color: '#7C3AED',
+    accent_color: '#FF1493',
+    text_color: '#ffffff',
+    glow_color: '#7C3AED',
+    duration: 8,
+    streamer_id: null
   });
 
-  // --- 1. FETCH SETTINGS VIA BACKEND (SINKRON RAILWAY) ---
+  // --- 1. FETCH SETTINGS VIA USERNAME (Sync Railway) ---
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // ✅ Cukup panggil endpoint, instance api sudah tahu harus ke mana
-        const res = await api.get(`/streamers/settings/${key}`);
-        if (res.data) {
-          const data = res.data;
-          setSettings(prev => ({
-            ...prev,
-            primary: data.theme_color === 'violet' ? '#6366f1' : data.theme_color || '#6366f1',
-            glow: data.theme_color === 'violet' ? '#818cf8' : data.theme_color || '#818cf8',
-          }));
+        // Panggil rute widget yang sudah kita buat di widgetController
+        const res = await api.get(`/api/user/widgets/settings/${streamKey}/${type || 'tip'}`);
+        if (res.data.success) {
+          setSettings(res.data.data);
         }
       } catch (err) {
-        console.warn("⚠️ Gagal ambil settings, pakai default local.");
+        console.warn("⚠️ Widget Node Offline, using default visuals.");
       }
     };
-    if (key) fetchSettings();
-  }, [key]);
+    if (streamKey) fetchSettings();
+  }, [streamKey, type]);
 
-  // --- 2. SOCKET.IO REALTIME PROTOCOL ---
+  // --- 2. SOCKET.IO REAL-TIME PROTOCOL ---
   useEffect(() => {
-    if (!key) return;
+    if (!settings.streamer_id) return;
 
-    // ✅ Ambil URL base dari variabel env lewat axios instance kita (tanpa /api di ujung)
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const socketUrl = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
+    const cleanSocketUrl = socketUrl.replace(/\/api$/, ""); // Pastiin gak ada /api di socket
+
+    // Connect ke Railway Engine
+    const socket = io(cleanSocketUrl);
+
+    // Dengarkan event spesifik buat lo doang Ri (pake ID lo)
+    const channel = `new-donation-${settings.streamer_id}`;
     
-    // Hubungkan ke Backend Railway lo untuk streaming alert
-    const socket = io(socketUrl, {
-      query: { streamerId: key }
-    });
-
-    // Dengarkan event 'new-donation' dari backend Railway
-    socket.on('new-donation', (data) => {
+    socket.on(channel, (data) => {
       setActiveAlert({
         sender: data.donatur_name,
         amount: data.amount,
         message: data.message,
-        type: 'tip'
+        alertType: 'tip'
       });
 
-      const timer = (settings.duration || 8) * 1000;
-      setTimeout(() => setActiveAlert(null), timer);
+      // Timer Sultan (Alert ilang otomatis)
+      setTimeout(() => setActiveAlert(null), (settings.duration || 8) * 1000);
     });
 
-    // TESTER MANUAL (Pencet 'T' di OBS buat test alert Ri!)
-    const handleKeyDown = (e) => {
-      if (e.key.toLowerCase() === 't') {
-        setActiveAlert({
-          sender: "TEST_GACOR_RAILWAY",
-          amount: 50000,
-          message: "Widget udah konek ke Railway Cloud, Ri! 🚀",
-          type: type || 'tip'
-        });
-        setTimeout(() => setActiveAlert(null), 5000);
-      }
-    };
+    // Dengarkan jika ada perubahan warna real-time dari Dashboard lo
+    socket.on(`widget-update-${settings.streamer_id}`, (update) => {
+        if (update.type === type) {
+            setSettings(update.settings);
+        }
+    });
 
-    window.addEventListener('keydown', handleKeyDown);
     return () => {
+      socket.off(channel);
+      socket.off(`widget-update-${settings.streamer_id}`);
       socket.disconnect();
-      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [key, type, settings.duration]);
+  }, [settings.streamer_id, type, settings.duration]);
 
   const formatR = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
 
   const AlertRender = useMemo(() => {
     if (!activeAlert) return null;
 
-    if (activeAlert.type === 'tip' || type === 'tip') {
-      return (
-        <motion.div 
-          key="tip-alert"
-          initial={{ opacity: 0, scale: 0.5, y: 100 }} 
-          animate={{ opacity: 1, scale: 1, y: 0 }} 
-          exit={{ opacity: 0, scale: 1.2, filter: "blur(20px)" }}
-          className="relative text-left"
-        >
-          <div style={{ backgroundColor: settings.glow }} className="absolute -inset-10 blur-[80px] opacity-40 rounded-full animate-pulse" />
-          <div style={{ backgroundColor: settings.primary }} className="relative w-[450px] p-12 rounded-[50px] shadow-2xl border-t-4 border-white/20 overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><Zap size={140} fill="white" /></div>
-            <p style={{ color: settings.text }} className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60 mb-2 italic">Interaction Detected</p>
-            <h2 style={{ color: settings.text }} className="text-4xl font-black italic tracking-tighter mb-6 leading-none uppercase">{activeAlert.sender}</h2>
-            <div className="h-1 w-20 bg-white/20 rounded-full mb-6" />
-            <p style={{ color: settings.text }} className="text-lg font-bold opacity-90 mb-8 leading-tight italic">"{activeAlert.message}"</p>
-            <h1 style={{ color: settings.accent }} className="text-5xl font-black italic tracking-tighter drop-shadow-md">Rp {formatR(activeAlert.amount)}</h1>
-          </div>
-        </motion.div>
-      );
-    }
+    const isSultan = activeAlert.amount >= 100000;
 
-    if (type === 'mediashare') {
-      return (
-        <motion.div 
-          key="media-alert"
-          initial={{ y: 200, opacity: 0 }} 
-          animate={{ y: 0, opacity: 1 }} 
-          exit={{ y: -100, opacity: 0 }}
-          className="w-[500px]"
+    return (
+      <motion.div 
+        key="skuy-alert-v2"
+        initial={{ opacity: 0, scale: 0.8, y: 50, rotate: -5 }} 
+        animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }} 
+        exit={{ opacity: 0, scale: 1.1, y: -20, filter: "blur(15px)" }}
+        transition={{ type: 'spring', damping: 15, stiffness: 100 }}
+        className="relative text-left"
+      >
+        {/* Glow Dynamic Node */}
+        <div 
+          style={{ backgroundColor: settings.glow_color }} 
+          className="absolute -inset-10 blur-[100px] opacity-40 rounded-full animate-pulse" 
+        />
+
+        {/* Card Body Neo-Brutalism */}
+        <div 
+          style={{ backgroundColor: isSultan ? '#0f172a' : settings.primary_color }} 
+          className="relative w-[500px] p-12 rounded-[3.5rem] shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] border-4 border-slate-950 overflow-hidden"
         >
-          <div className="bg-slate-950 rounded-[45px] p-3 shadow-2xl border-[12px] border-white relative overflow-hidden text-left">
-            <div className="aspect-video bg-slate-900 rounded-[30px] flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent z-10" />
-              <div style={{ backgroundColor: settings.primary }} className="w-16 h-16 rounded-full flex items-center justify-center text-white z-20 shadow-2xl">
-                <Play size={24} fill="currentColor" className="ml-1" />
-              </div>
-              <div className="absolute bottom-6 left-8 right-8 z-30">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 italic">Live Media Protocol</p>
-                </div>
-                <div className="h-1.5 w-full bg-white/10 rounded-full mb-4 overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: settings.duration }} style={{ backgroundColor: settings.primary }} className="h-full" />
-                </div>
-                <p className="text-[11px] font-black text-white italic truncate uppercase tracking-tighter mb-1 leading-none">Cloud Request</p>
-                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">By: <span style={{ color: settings.accent }}>{activeAlert.sender}</span></p>
-              </div>
+          {/* Background Decor */}
+          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+            {isSultan ? <Crown size={160} fill="white" /> : <Zap size={160} fill="white" />}
+          </div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+               <div className="p-2 bg-white/20 rounded-lg">
+                 {isSultan ? <Crown size={18} className="text-amber-400" /> : <Heart size={18} className="text-white" />}
+               </div>
+               <p style={{ color: settings.text_color }} className="text-[11px] font-black uppercase tracking-[0.4em] opacity-80 italic">
+                 {isSultan ? 'Sultan Contribution' : 'New Interaction'}
+               </p>
+            </div>
+
+            <h2 style={{ color: settings.text_color }} className="text-5xl font-black italic tracking-tighter mb-6 leading-none uppercase truncate">
+              {activeAlert.sender}
+            </h2>
+
+            <div className="h-2 w-24 bg-white/20 rounded-full mb-8" />
+
+            <div className="min-h-[60px]">
+                <p style={{ color: settings.text_color }} className="text-xl font-bold opacity-90 leading-tight italic">
+                  "{activeAlert.message || 'Gak ada pesan, yang penting gacor!'}"
+                </p>
+            </div>
+
+            <div className="mt-10 pt-8 border-t-4 border-white/10 flex items-center justify-between">
+                <h1 style={{ color: isSultan ? '#fbbf24' : settings.accent_color }} className="text-5xl font-black italic tracking-tighter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)]">
+                  Rp {formatR(activeAlert.amount)}
+                </h1>
+                <Zap size={32} className="text-white/20 animate-bounce" fill="currentColor" />
             </div>
           </div>
-        </motion.div>
-      );
-    }
-    return null;
-  }, [activeAlert, settings, type]);
+        </div>
+      </motion.div>
+    );
+  }, [activeAlert, settings]);
 
   return (
-    <div 
-      className="w-screen h-screen flex items-center justify-center overflow-hidden font-sans"
-      style={{ background: 'transparent' }} 
-    >
+    <div className="w-screen h-screen flex items-center justify-center overflow-hidden" style={{ background: 'transparent' }}>
       <AnimatePresence mode="wait">
         {AlertRender}
       </AnimatePresence>

@@ -43,18 +43,16 @@ export default function ProfileSettings({ user, setUser }) {
         tiktok: user.tiktok || '',
         youtube: user.youtube || '', 
         profile_picture: user.profile_picture || '',
-        phone_number: user.phone_number || '' // Ambil data awal nomor HP
+        phone_number: user.phone_number || '' 
       })
     }
   }, [user])
 
-  // ✅ VALIDASI NOMOR HP (Only Numbers)
   const handlePhoneChange = (e) => {
-    const cleanValue = e.target.value.replace(/\D/g, ''); // Hapus semua yang bukan angka
+    const cleanValue = e.target.value.replace(/\D/g, ''); 
     setFormData({ ...formData, phone_number: cleanValue });
   }
 
-  // REFINED CONFIG: Handle base URL
   const API_BASE = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.split('/api')[0].replace(/\/$/, "")
     : 'https://skuyproject-production.up.railway.app';
@@ -94,24 +92,31 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }
 
+  // ✅ LOGIC UPDATE SULTAN: Sinkronisasi Backend + LocalStorage
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // ✅ SINKRONISASI KE BACKEND (Termasuk phone_number buat 2FA)
-      const res = await api.put('/user/update-profile', {
+      // 🔍 STEP 1: Kirim data (Termasuk phone_number) ke rute update-profile
+      const res = await api.put(`/user/update-profile`, {
         userId: user.id,
         ...formData
       });
 
       if (res.data.success) {
-        const updatedUser = { ...user, ...formData };
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        setStatus({ type: 'success', message: 'Profil & WhatsApp Berhasil Disinkronkan! ✨' });
+        // 🔍 STEP 2: Gabungkan data lama dengan data baru dari server
+        // Pastiin backend balikin data 'user' terbaru
+        const finalUserData = { ...user, ...res.data.user };
+        
+        // 🔍 STEP 3: Update Global State & Local Storage
+        setUser(finalUserData);
+        localStorage.setItem('user', JSON.stringify(finalUserData));
+
+        setStatus({ type: 'success', message: 'Data & WhatsApp Berhasil Disinkronkan! 🚀' });
       }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Gagal update profil.' });
+      console.error("Update Error:", err);
+      setStatus({ type: 'error', message: 'Gagal update database Railway.' });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
@@ -133,7 +138,7 @@ export default function ProfileSettings({ user, setUser }) {
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <button type="button" onClick={() => { navigator.clipboard.writeText(`${currentUrl}/${user.username}`); setStatus({ type: 'success', message: 'Copied!' }); setTimeout(()=>setStatus({type:'',message:''}),2000) }} className="flex-1 md:flex-none px-5 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-black text-[10px] uppercase border border-slate-100 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"><Icon.Copy size={14} /> Copy</button>
+            <button type="button" onClick={() => { navigator.clipboard.writeText(`${currentUrl}/${user.username}`); setStatus({ type: 'success', message: 'Link Copied!' }); setTimeout(()=>setStatus({type:'',message:''}),2000) }} className="flex-1 md:flex-none px-5 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-black text-[10px] uppercase border border-slate-100 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"><Icon.Copy size={14} /> Copy</button>
           </div>
         </div>
       </div>
@@ -150,11 +155,11 @@ export default function ProfileSettings({ user, setUser }) {
                 <div className="flex items-center gap-3 mb-2"><div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl"><Icon.SquarePen size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Profile Info</h2></div>
                 <FormInput label="Display Nickname" iconName="Tag" placeholder="Ari Wirayuda" value={formData.display_name} onChange={(e) => setFormData({...formData, display_name: e.target.value})} />
                 
-                {/* ✅ INPUT WHATSAPP BARU (Sultan 2FA Ready) */}
+                {/* ✅ INPUT WHATSAPP SULTAN */}
                 <FormInput 
                   label="WhatsApp Number" 
                   iconName="Phone" 
-                  helpText="Wajib untuk Dual-OTP" 
+                  helpText="Syarat Dual-OTP" 
                   placeholder="0812xxxxxxxx" 
                   value={formData.phone_number} 
                   onChange={handlePhoneChange} 
@@ -191,7 +196,7 @@ export default function ProfileSettings({ user, setUser }) {
             </div>
             <button type="submit" disabled={loading} className="w-full py-5 bg-violet-600 text-white rounded-[1.5rem] font-black uppercase text-[11px] italic tracking-[0.2em] shadow-xl shadow-violet-100 active:scale-95 transition-all flex items-center justify-center gap-3">
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Icon.Save size={16} strokeWidth={2.5} />}
-                {loading ? 'SAVING...' : 'SAVE CHANGES'}
+                {loading ? 'SYNCING...' : 'SAVE CHANGES'}
             </button>
         </div>
       </form>

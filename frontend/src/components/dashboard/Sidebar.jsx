@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  // Logic Role & Security
   const role = user?.role?.toLowerCase();
   const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
-  const isSecured = user?.is_two_fa_enabled; // ✅ Status Dual-OTP
+  const isSecured = user?.is_two_fa_enabled; 
   
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
@@ -115,18 +114,16 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar pt-4 text-left">
-        {/* REVENUE CONTROL */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Revenue Hub</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Sultan" onClickCustom={handleShowTips} />
           </nav>
         </div>
 
-        {/* LIVE TOOLS */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Stream Ops</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Stream Ops</p>
           <nav className="space-y-1">
             <NavButton id="activity" icon={Activity} label="Activity Feed" badge="LIVE" disabled={!isCreator} />
             <NavButton id="overlay" icon={Tv} label="Overlay Setup" disabled={!isCreator} onClickCustom={() => { setIsOverlayOpen(!isOverlayOpen); setActiveMenu('overlay'); }} />
@@ -143,40 +140,42 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
           </nav>
         </div>
 
-        {/* PREFERENCES */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Settings</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Settings</p>
           <nav className="space-y-1">
             <NavButton id="profile" icon={User} label="Profile Edit" />
-            {/* ✅ UPDATED: Icon & Label disesuaikan dengan Dual-OTP (WA) */}
             <NavButton id="security" icon={isSecured ? ShieldCheck : MessageSquare} label={isSecured ? "Security Active" : "Security (WA)"} />
             <NavButton id="appearance" icon={Palette} label="Appearance" />
           </nav>
         </div>
       </div>
 
-      {/* USER PROFILE CARD */}
-      <div className="p-6 mt-auto border-t-4 border-slate-100 bg-slate-50/50">
+      {/* USER PROFILE CARD - SULTAN POLISHED */}
+      <div className="p-5 mt-auto border-t-4 border-slate-100 bg-slate-50/50">
         <div 
-          className={`flex items-center gap-3 p-3 rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-5 group cursor-pointer transition-all active:translate-y-1 active:shadow-none ${isSecured ? 'bg-emerald-50 border-emerald-500' : 'bg-white'}`}
+          className={`flex items-center gap-3 p-3 rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-4 group cursor-pointer transition-all active:translate-y-1 active:shadow-none ${
+            isSecured ? 'bg-emerald-50 border-emerald-500 shadow-emerald-500/20' : 'bg-white'
+          }`}
           onClick={() => setActiveMenu('profile')}
         >
-          <div className="w-11 h-11 rounded-xl bg-violet-100 overflow-hidden border-2 border-slate-950 shadow-sm flex-shrink-0">
-             <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
+          <div className={`w-11 h-11 rounded-xl bg-violet-100 overflow-hidden border-2 border-slate-950 flex-shrink-0 transition-transform group-hover:scale-105`}>
+             <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
           </div>
-          <div className="overflow-hidden text-left">
-            <p className="text-[11px] font-black text-slate-900 truncate uppercase italic">{user?.full_name || user?.username}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black text-slate-900 truncate uppercase italic tracking-tight">
+              {user?.display_name || user?.full_name || user?.username}
+            </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${isSecured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              <p className={`text-[8px] font-black uppercase tracking-widest italic ${isSecured ? 'text-emerald-600' : 'text-slate-400'}`}>
+              <p className={`text-[8px] font-black uppercase tracking-widest italic truncate ${isSecured ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {isSecured ? 'SECURED SULTAN' : 'UNSECURED'}
               </p>
             </div>
           </div>
         </div>
         
-        <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-500 font-black text-[10px] uppercase transition-all group py-2">
-          <LogOut size={14} className="group-hover:-translate-x-1 transition-transform" /> Sign Out Protocol
+        <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-500 font-black text-[9px] uppercase transition-all group py-1.5 tracking-widest">
+          <LogOut size={12} className="group-hover:-translate-x-1 transition-transform" /> Sign Out Protocol
         </button>
       </div>
     </aside>

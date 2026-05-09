@@ -21,18 +21,18 @@ const SecurityPage = () => {
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // ✅ AUTO-RESET: Kalau status user berubah, reset form verifikasi
+  // ✅ AUTO-RESET: Kalau status user berubah (misal lo logout/login akun lain), reset form
   useEffect(() => {
     if (user?.is_two_fa_enabled) {
       setIsVerifying(false);
     }
   }, [user]);
 
-  // --- 1. REQUEST OTP (Dual-Channel Protocol) ---
+  // --- 1. REQUEST OTP (WhatsApp + Email Sultan Protocol) ---
   const handleRequestOTP = async () => {
     if (!user?.id) return;
     
-    // 🛡️ PROTEKSI: Cek nomor WA dulu
+    // 🛡️ PROTEKSI: Nomor WA wajib ada di database
     if (!user?.phone_number || user?.phone_number.trim() === "") {
       return skuyAlert.fire({
         icon: 'warning',
@@ -43,7 +43,7 @@ const SecurityPage = () => {
 
     setLoading(true);
     try {
-      // ✅ Jalur Resend API + Fonnte
+      // ✅ Panggil backend (authRoutes.js) buat trigger OTP
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -51,14 +51,14 @@ const SecurityPage = () => {
         skuyAlert.fire({
           icon: 'info',
           title: 'KODE TERKIRIM 🚀',
-          text: 'Cek WhatsApp & Email lo sekarang, Ri!',
+          text: 'Cek WhatsApp lo atau Email Sultan (ariwirayuda24), Ri!',
         });
       }
     } catch (err) {
       skuyAlert.fire({
         icon: 'error',
         title: 'ENGINE ERROR',
-        text: 'Gagal kontak server OTP. Pastiin backend Railway lo UP!',
+        text: 'Gagal kontak server keamanan. Pastiin backend lo udah running!',
       });
     } finally { 
       setLoading(false); 
@@ -76,7 +76,7 @@ const SecurityPage = () => {
       });
 
       if (res.data.success) {
-        // ✅ Sync State & Storage
+        // ✅ Sinkronisasi State Global & Storage
         const updatedUser = { ...user, is_two_fa_enabled: true };
         setUser(updatedUser); 
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -84,9 +84,9 @@ const SecurityPage = () => {
         skuyAlert.fire({
           icon: 'success',
           title: 'GACOR! PROTECTED 🛡️',
-          text: '2FA resmi aktif lewat jalur WA & Email Sultan!',
+          text: '2FA resmi aktif. Akun lo sekarang setangguh benteng!',
         }).then(() => {
-          // Force reload biar Sidebar & View sinkron 100%
+          // Force reload untuk memastikan Sidebar & UI Dashboard dapet status terbaru
           window.location.reload(); 
         });
       }
@@ -94,7 +94,7 @@ const SecurityPage = () => {
       skuyAlert.fire({
         icon: 'error',
         title: 'KODE SALAH',
-        text: 'OTP nggak cocok, Ri. Cek WA/Email lagi ya!',
+        text: 'OTP nggak cocok atau expired, Ri!',
       });
       setOtp('');
     } finally { 
@@ -102,7 +102,7 @@ const SecurityPage = () => {
     }
   };
 
-  // --- 3. DISABLE 2FA (Emergency Master Key) ---
+  // --- 3. DISABLE 2FA (Master Key & Emergency) ---
   const handleDisable2FA = async () => {
     skuyAlert.fire({
       title: 'COPOT PROTEKSI?',
@@ -115,13 +115,11 @@ const SecurityPage = () => {
       if (result.isConfirmed) {
         setLoading(true);
         try {
-          // Kita pake Master Key buat bypass/disable langsung di tahap aktivasi
+          // Menggunakan Master Key lo buat bypass penghapusan
           const res = await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); 
           
           if (res.data.success) {
-            // Karena rute /verify-2fa kita juga otomatis ngaktifin, 
-            // kita harus pastiin backend punya logic /disable-2fa atau update manual statusnya
-            // Untuk sementara, kita paksa update lokal:
+            // Update status lokal
             const updatedUser = { ...user, is_two_fa_enabled: false };
             setUser(updatedUser);
             localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -152,7 +150,7 @@ const SecurityPage = () => {
           setOtp={setOtp}
           loading={loading}
           isVerifying={isVerifying}
-          onGenerateQR={handleRequestOTP} // Mapping ke request OTP WA
+          onGenerateQR={handleRequestOTP} // Link ke tombol aktivasi
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
         />

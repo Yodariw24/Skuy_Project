@@ -31,21 +31,24 @@ function AuthPage() {
     email: '', 
     password: '', 
     username: '',
-    phone_number: '' // 🚀 Tambah state nomor HP
+    phone_number: '' 
   });
   
   const navigate = useNavigate();
 
+  // ✅ AUTO-SUBMIT: 6 Digit langsung gass
   useEffect(() => {
     if (otp.length === 6) handleVerify2FALogin();
   }, [otp]);
 
+  // 🔥 TRIGGER SEND OTP
   const triggerSendOTP = async (userId) => {
     try {
       await api.post('/auth/send-otp', { userId });
-      skuyAlert("SECURITY", "Kode OTP meluncur ke WhatsApp lo, Ri!", "info");
+      // Bahasa alert disesuaikan: Menginfokan kode masuk ke Email Sultan & WA
+      skuyAlert("SECURITY", "Kode OTP dikirim via WA & Email Sultan (ariwirayuda24)!", "info");
     } catch (err) {
-      skuyAlert("ERROR", "Gagal kontak kurir OTP (WA).", "error");
+      skuyAlert("ERROR", "Gagal kontak server keamanan.", "error");
     }
   };
 
@@ -70,7 +73,7 @@ function AuthPage() {
         navigate('/dashboard/wallet');
       }
     } catch (err) {
-      skuyAlert("ERROR", "Gagal sinkronisasi Google Auth.", "error");
+      skuyAlert("ERROR", "Google Auth Gagal Sinkron.", "error");
     } finally { setLoading(false); }
   };
 
@@ -80,10 +83,9 @@ function AuthPage() {
     try {
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
       
-      // Bersihkan nomor HP sebelum kirim
       const cleanData = {
         ...formData,
-        phone_number: formData.phone_number.replace(/\D/g, '')
+        phone_number: formData.phone_number ? formData.phone_number.replace(/\D/g, '') : ''
       };
 
       const res = await api.post(endpoint, cleanData);
@@ -99,11 +101,11 @@ function AuthPage() {
           navigate('/dashboard/wallet');
         } else {
           setIsLogin(true);
-          skuyAlert("SUCCESS", "Squad aktif! Silakan login dan pastikan nomor WA lo aktif.", "success");
+          skuyAlert("SUCCESS", "Squad aktif! Login sekarang dan aktifkan 2FA di profil.", "success");
         }
       }
     } catch (err) {
-      skuyAlert("ERROR", err.response?.data?.message || "Engine Error", "error");
+      skuyAlert("ACCESS DENIED", err.response?.data?.message || "Engine Error", "error");
     } finally { setLoading(false); }
   };
 
@@ -118,13 +120,14 @@ function AuthPage() {
         navigate('/dashboard/wallet');
       }
     } catch (err) {
-      skuyAlert("KODE SALAH", "OTP salah atau expired, Ri!", "error");
+      skuyAlert("KODE SALAH", "Cek lagi WA lo atau Email ariwirayuda24!", "error");
       setOtp('');
     } finally { setLoading(false); }
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans relative overflow-hidden">
+      {/* Background Decor */}
       <div className="absolute inset-0 z-0 opacity-40">
         <div className="absolute top-[-10%] left-[-5%] w-[450px] h-[450px] bg-violet-300 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-fuchsia-300 blur-[120px] rounded-full" />
@@ -132,7 +135,7 @@ function AuthPage() {
 
       <div className="w-full max-w-[1000px] grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] border-[4px] border-slate-950 shadow-[16px_16px_0px_0px_#000] z-10 overflow-hidden">
         
-        {/* LEFT SIDE: BRANDING */}
+        {/* LEFT SIDE */}
         <div className="bg-[#0F0F1A] p-12 text-white flex flex-col justify-between hidden lg:flex relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10"><Zap size={200} /></div>
           <div className="relative z-10">
@@ -142,14 +145,14 @@ function AuthPage() {
             </div>
             
             <h2 className="text-6xl font-black italic uppercase leading-[0.9] tracking-tighter mb-8">
-              JOIN THE <br /> <span className="text-[#7C3AED]">CREATOR</span> <br /> REVOLUTION
+              SULTAN <br /> <span className="text-[#7C3AED]">SECURITY</span> <br /> V3 READY
             </h2>
             
             <div className="space-y-4">
               {[
-                { icon: <MessageSquare size={18}/>, text: 'WhatsApp OTP Integration' },
-                { icon: <ShieldCheck size={18}/>, text: 'Neo-Brutalism Interface' },
-                { icon: <CheckCircle2 size={18}/>, text: 'One-Click Google Login' }
+                { icon: <MessageSquare size={18}/>, text: 'Dual-Channel (WA + Email Sultan)' },
+                { icon: <ShieldCheck size={18}/>, text: 'Neo-Brutalism Engine' },
+                { icon: <Zap size={18}/>, text: 'Fast-Sync Railway' }
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 text-slate-400 font-bold italic text-sm">
                   <span className="text-[#7C3AED]">{item.icon}</span> {item.text}
@@ -157,19 +160,17 @@ function AuthPage() {
               ))}
             </div>
           </div>
-          <div className="relative z-10">
-             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 italic">© 2026 SKUY.GG • MADE IN KARAWANG</p>
-          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 italic">© 2026 SKUY.GG • REDIRECT PROTOCOL ACTIVE</p>
         </div>
 
-        {/* RIGHT SIDE: AUTH FORM */}
+        {/* RIGHT SIDE */}
         <div className="p-8 md:p-14 flex flex-col justify-center bg-white">
           <AnimatePresence mode="wait">
             {!show2FA ? (
               <motion.div key="form" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="mb-8">
-                  <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">{isLogin ? 'WELCOME BACK!' : 'CREATE ACCOUNT'}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sultan access gateway v2.2</p>
+                  <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">{isLogin ? 'ACCESS PORTAL' : 'CREATE ACCOUNT'}</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Authorized by ariwirayuda24</p>
                 </div>
 
                 {isLogin && (
@@ -179,7 +180,7 @@ function AuthPage() {
                     </div>
                     <div className="relative flex items-center justify-center my-6">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t-2 border-slate-100"></div></div>
-                      <span className="relative bg-white px-4 text-[9px] font-black text-slate-300 uppercase tracking-widest italic">OR USE EMAIL</span>
+                      <span className="relative bg-white px-4 text-[9px] font-black text-slate-300 uppercase tracking-widest italic">MANUAL LOGIN</span>
                     </div>
                   </>
                 )}
@@ -193,7 +194,7 @@ function AuthPage() {
                       </div>
                       <div className="relative group">
                         <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#7C3AED]" size={16}/>
-                        <input type="text" placeholder="WhatsApp Number (0812...)" required className="w-full bg-slate-50 border-2 border-slate-200 p-4 pl-14 rounded-xl font-bold focus:border-slate-950 outline-none transition-all text-sm" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value.replace(/\D/g, '')})} />
+                        <input type="text" placeholder="WA Number (Contoh: 0812...)" required className="w-full bg-slate-50 border-2 border-slate-200 p-4 pl-14 rounded-xl font-bold focus:border-slate-950 outline-none transition-all text-sm" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value.replace(/\D/g, '')})} />
                       </div>
                     </>
                   )}
@@ -212,7 +213,7 @@ function AuthPage() {
                 </form>
 
                 <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-6 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-950 transition-all text-center">
-                  {isLogin ? "NEW CREATOR? REGISTER HERE" : "ALREADY A MEMBER? LOGIN"}
+                  {isLogin ? "NEW CREATOR? JOIN HERE" : "ALREADY A MEMBER? LOGIN"}
                 </button>
               </motion.div>
             ) : (
@@ -220,9 +221,9 @@ function AuthPage() {
                 <div className="w-16 h-16 bg-violet-50 text-[#7C3AED] rounded-2xl mx-auto flex items-center justify-center border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000]">
                   <MessageSquare size={30} />
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-2xl font-black italic uppercase tracking-tighter">SECURE ACCESS</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Masukkan 6 digit kode dari WhatsApp lo</p>
+                <div className="space-y-1 text-center">
+                  <h4 className="text-2xl font-black italic uppercase tracking-tighter">SULTAN VERIFY</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Cek kode di WA lo atau di Email ariwirayuda24!</p>
                 </div>
                 <input 
                   type="text" maxLength="6" placeholder="••••••" autoFocus
@@ -235,7 +236,10 @@ function AuthPage() {
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'AUTHORIZE SULTAN'}
                 </button>
-                <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-[#7C3AED] hover:underline block mx-auto tracking-widest">RE-SEND OTP CODE</button>
+                <div className="flex flex-col gap-3">
+                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-[#7C3AED] hover:underline tracking-widest">KIRIM ULANG KODE</button>
+                  <button onClick={() => {setShow2FA(false); setOtp('');}} className="text-[9px] font-black uppercase text-slate-300 hover:text-red-500 tracking-widest">BATALKAN</button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

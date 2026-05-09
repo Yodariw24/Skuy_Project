@@ -1,29 +1,31 @@
-/* --- FONTS --- */
+/* --- FONTS: PLUS JAKARTA SANS --- */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..1100;1,200..1100&display=swap');
-/* --- TAILWIND V3 DIRECTIVES --- */
+
+/* --- TAILWIND CORE --- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
-
 :root {
+  --skuy-violet: #7c3aed;
+  --skuy-dark: #0f172a;
+  --skuy-emerald: #10b981;
   font-family: "Plus Jakarta Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* --- BODY & SCROLL SYSTEM --- */
+/* --- GLOBAL RESET & SCROLL SYSTEM --- */
 html, body {
   margin: 0;
   padding: 0;
-  /* Memastikan scroll vertikal aktif dan scroll horizontal mati */
+  /* Anti horizontal scroll & smooth vertical flow */
   overflow-x: hidden !important; 
   overflow-y: auto !important; 
-  /* Biar tinggi halaman mengikuti konten, bukan ukuran layar */
   height: auto !important;
   min-height: 100% !important;
-  background-color: #ffffff; 
-  color: #1e293b;
+  background-color: #F8FAFF; /* Background Sultan yang bersih */
+  color: #0f172a;
   scroll-behavior: smooth;
 }
 
@@ -35,58 +37,76 @@ html, body {
   display: block;
 }
 
-/* --- SKUY ULTRA SLIM TOAST (MODERN LOOK) --- */
+/* --- NEO-BRUTALISM UTILITIES (Sultan Shortcut) --- */
+@layer components {
+  /* Class buat border item tebel khas SkuyGG */
+  .skuy-border {
+    @apply border-4 border-slate-950;
+  }
+  
+  /* Class buat shadow kaku kasta Sultan */
+  .skuy-shadow {
+    @apply shadow-[8px_8px_0px_0px_rgba(0,0,0,1)];
+  }
+
+  /* Animasi halus buat transisi hover */
+  .skuy-transition {
+    @apply transition-all duration-300 ease-out;
+  }
+}
+
+/* --- SWEETALERT2: SULTAN SLIM TOAST --- */
 .skuy-slim-toast {
   width: auto !important;
-  min-width: 200px !important;
-  max-width: 350px !important;
-  border-radius: 12px !important;
-  padding: 0.6rem 1rem !important;
-  border: 1px solid rgba(0,0,0,0.05) !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05) !important;
+  min-width: 250px !important;
+  max-width: 400px !important;
+  border-radius: 1.5rem !important;
+  padding: 1rem 1.5rem !important;
+  border: 3px solid #0f172a !important;
+  background: #ffffff !important;
+  box-shadow: 6px 6px 0px 0px rgba(0,0,0,1) !important;
 }
 
 .skuy-toast-content {
-  font-size: 0.75rem !important;
+  font-size: 0.85rem !important;
   font-family: "Plus Jakarta Sans", sans-serif;
-  color: #1e293b;
-  text-align: left;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  font-style: italic;
+  letter-spacing: -0.02em;
 }
 
 .skuy-toast-content b { 
-  color: #7c3aed; 
-  text-transform: uppercase; 
-  margin-right: 4px; 
-  letter-spacing: 0.5px;
-}
-
-.skuy-toast-content span { 
-  font-weight: 500; 
-  opacity: 0.8; 
+  color: var(--skuy-violet); 
 }
 
 .swal2-timer-progress-bar { 
-  background: #7c3aed !important; 
-  height: 2px !important; 
+  background: var(--skuy-violet) !important; 
+  height: 4px !important; 
 }
 
-.swal2-icon { 
-  transform: scale(0.45) !important; 
-  margin: 0 6px 0 0 !important; 
-}
-
-/* --- CUSTOM SCROLLBAR (SKUY STYLE) --- */
+/* --- CUSTOM SULTAN SCROLLBAR --- */
 ::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #7c3aed;
-  border-radius: 10px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--skuy-violet);
+  border-radius: 100px;
+  border: 2px solid #F8FAFF; /* Biar ada padding visual */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6d28d9;
+}
+
+/* --- SELECTION COLOR --- */
+::selection {
+  background-color: var(--skuy-violet);
+  color: white;
 }
