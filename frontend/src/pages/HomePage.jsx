@@ -45,7 +45,7 @@ const FAQItem = ({ question, answer, darkMode }) => {
   return (
     <motion.div 
       layout
-      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all ${darkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_#000]'}`}
+      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all ${darkMode ? 'bg-slate-900/50 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_#000]'}`}
     >
       <motion.button 
         layout
@@ -60,7 +60,7 @@ const FAQItem = ({ question, answer, darkMode }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="px-8 pb-8">
-            <p className="text-sm text-slate-500 font-bold italic leading-relaxed border-t-2 border-slate-100 dark:border-white/5 pt-6">"{answer}"</p>
+            <p className="text-sm text-slate-400 font-bold italic leading-relaxed border-t-2 border-slate-100 dark:border-white/5 pt-6">"{answer}"</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -74,7 +74,7 @@ function HomePage() {
   
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, springConfig);
-  const navBg = useTransform(scrollYProgress, [0, 0.05], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(8, 8, 10, 0.95)" : "rgba(255, 255, 255, 0.95)"]);
+  const navBg = useTransform(scrollYProgress, [0, 0.05], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(10, 10, 14, 0.95)" : "rgba(255, 255, 255, 0.95)"]);
 
   useEffect(() => {
     const fetchStreamers = async () => {
@@ -90,16 +90,16 @@ function HomePage() {
   }, []);
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-[#08080a] text-white' : 'bg-[#F8FAFF] text-slate-900'} transition-colors duration-700 font-sans selection:bg-violet-600 selection:text-white overflow-x-hidden relative`}>
+    <div className={`min-h-screen ${darkMode ? 'bg-[#0a0a0e] text-white' : 'bg-[#F8FAFF] text-slate-900'} transition-colors duration-700 font-sans selection:bg-violet-600 selection:text-white overflow-x-hidden relative`}>
       
-      {/* SULTAN PROGRESS BAR */}
+      {/* PROGRESS BAR */}
       <motion.div className="fixed top-0 left-0 right-0 h-1.5 bg-violet-600 z-[1000] origin-left" style={{ scaleX }} />
 
       {/* --- NAVBAR --- */}
       <div className="fixed top-0 left-0 right-0 z-[100] p-6 flex justify-center">
         <motion.nav 
           style={{ backgroundColor: navBg }} 
-          className={`w-full max-w-7xl px-8 py-4 rounded-[2.5rem] border-4 border-slate-950 backdrop-blur-md flex justify-between items-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-colors`}
+          className={`w-full max-w-7xl px-8 py-4 rounded-[2.5rem] border-4 border-slate-950 backdrop-blur-md flex justify-between items-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all`}
         >
           <SkuyLogo darkMode={darkMode} />
           <div className="flex items-center gap-4">
@@ -120,7 +120,7 @@ function HomePage() {
             className="inline-flex items-center gap-3 bg-white dark:bg-white/5 border-4 border-slate-950 px-6 py-2.5 rounded-full mb-12 shadow-[6px_6px_0px_0px_#7C3AED]"
           >
             <ShieldCheck size={16} className="text-emerald-500" />
-            <span className="text-[11px] font-black uppercase tracking-[0.3em]">Infrastructure Node v2.9 Online</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.3em]">Infrastructure Node v3.1 Online</span>
           </motion.div>
 
           <h1 className="text-6xl md:text-[140px] font-black leading-[0.8] tracking-tighter mb-14 uppercase italic">
@@ -130,48 +130,49 @@ function HomePage() {
           </h1>
 
           <p className="text-lg md:text-2xl text-slate-500 max-w-3xl mx-auto mb-20 font-bold italic leading-relaxed">
-            Platform dukungan kreator kasta tertinggi dengan <br />
-            <span className="text-slate-950 dark:text-white underline decoration-violet-500 decoration-4 italic">Zero Delays & High-Performance Node.</span>
+            Naikkan level stream lo ke kasta Sultan. <br />
+            <span className={`${darkMode ? 'text-white' : 'text-slate-950'} underline decoration-violet-500 decoration-4 italic`}>Otomatis, Transparan, & Tanpa Potongan Gila.</span>
           </p>
 
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link to="/auth" className="inline-block bg-violet-600 text-white font-black px-16 py-8 rounded-[2.5rem] shadow-[12px_12px_0px_0px_#000] border-4 border-slate-950 text-2xl uppercase italic transition-all hover:bg-slate-950">GABUNG SQUAD SKUY</Link>
+            <Link to="/auth" className="inline-block bg-violet-600 text-white font-black px-16 py-8 rounded-[2.5rem] shadow-[12px_12px_0px_0px_#000] border-4 border-slate-950 text-2xl uppercase italic transition-all hover:bg-slate-950">MULAI SEKARANG</Link>
           </motion.div>
         </Reveal>
       </section>
 
       {/* --- FEATURES GRID --- */}
-      <section className="max-w-7xl mx-auto px-6 py-32 relative z-10 text-left">
-        {/* Copywriting Fitur */}
+      <section className="max-w-7xl mx-auto px-6 py-32 relative z-10 text-center">
+        {/* Copywriting Fitur (CENTERED & REFINED) */}
         <Reveal>
-          <div className="mb-20 space-y-4">
-            <div className="flex items-center gap-3">
-               <div className="w-12 h-12 bg-violet-600 text-white rounded-2xl flex items-center justify-center border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000]">
-                  <motion.div animate={{ rotate: [0, 15, -15, 0] }} transition={{ repeat: Infinity, duration: 2 }}>
-                    <Gamepad2 size={24} />
-                  </motion.div>
-               </div>
-               <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter">THE <span className="text-violet-600">ULTIMATE</span> PROTOCOL</h2>
-            </div>
-            <p className="text-lg font-bold text-slate-400 italic max-w-2xl">Bukan sekadar dashboard. Ini adalah pusat kendali streaming lo buat naik ke level Sultan. Canggih, kaku, dan tanpa ampun.</p>
+          <div className="mb-24 flex flex-col items-center space-y-6">
+            <motion.div 
+              animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }} 
+              transition={{ repeat: Infinity, duration: 3 }}
+              className="w-16 h-16 bg-violet-600 text-white rounded-3xl flex items-center justify-center border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000]"
+            >
+              <Gamepad2 size={32} />
+            </motion.div>
+            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter">THE <span className="text-violet-600">SULTAN</span> PROTOCOL</h2>
+            <p className="text-lg md:text-xl font-bold text-slate-400 italic max-w-2xl mx-auto">
+              Bangun ekosistem donasi lo sendiri. Lebih dari sekadar overlay, ini adalah bukti nyata kalau stream lo beneran <span className={darkMode ? 'text-white' : 'text-slate-950'}>berkelas dunia.</span>
+            </p>
           </div>
         </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-white/5 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.1)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 text-left">
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-slate-900 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
             <div className="flex justify-between items-start mb-20 relative z-10">
               <div className="space-y-6">
                 <div className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2 rounded-full w-fit">
                    <Zap size={12} className="text-violet-400" />
-                   <span className="text-[9px] font-black uppercase tracking-widest italic">Lightning Support</span>
+                   <span className="text-[9px] font-black uppercase tracking-widest italic">Fast Payout</span>
                 </div>
                 <h3 className="text-6xl font-black italic uppercase tracking-tighter leading-none">Smart <br /> <span className="text-violet-600">Donation</span></h3>
               </div>
               <div className="p-8 bg-violet-600 text-white rounded-[2.5rem] shadow-[6px_6px_0px_0px_#000] rotate-12 border-4 border-slate-950"><Wallet size={50} /></div>
             </div>
-            <p className="text-slate-500 font-bold text-lg italic max-w-md leading-relaxed relative z-10">Terima energi dukungan secepat kilat dengan notifikasi real-time di layar stream lo.</p>
-            {/* Background Icon Gamer Decor */}
-            <Gamepad2 size={200} className="absolute -bottom-10 -right-10 opacity-[0.03] text-slate-400 rotate-12" />
+            <p className="text-slate-500 font-bold text-lg italic max-w-md leading-relaxed relative z-10">Duit masuk langsung cair ke e-wallet lo. Gak pake nunggu lama, gak pake drama admin.</p>
+            <Gamepad2 size={200} className="absolute -bottom-10 -right-10 opacity-[0.05] text-slate-400 rotate-12" />
           </motion.div>
 
           <motion.div whileHover={{ y: -10 }} className="md:col-span-4 p-12 rounded-[4rem] border-4 border-slate-950 bg-slate-950 text-white flex flex-col justify-between shadow-[15px_15px_0px_0px_rgba(255,255,255,0.1)] group overflow-hidden relative">
@@ -179,24 +180,24 @@ function HomePage() {
                <Monitor size={40} className="text-violet-500" />
                <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Overlay <br/> Master</h3>
             </div>
-            <p className="text-slate-400 font-bold italic mt-10 relative z-10">Widget alert paling estetik yang bisa lo kustomisasi sesuka hati lewat dashboard.</p>
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <p className="text-slate-400 font-bold italic mt-10 relative z-10">Atur visual stream lo semudah drag-and-drop. Kustomisasi kasta Sultan buat penonton betah.</p>
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </motion.div>
 
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-white/5' : 'bg-white shadow-[15px_15px_0px_0px_#EF4444]'}`}>
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-slate-900 border-red-500/20 shadow-[15px_15px_0px_0px_rgba(239,68,68,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#EF4444]'}`}>
              <div className="space-y-6">
                 <Video size={40} className="text-red-500" />
                 <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Media <br /> <span className="text-red-500">Share</span></h3>
              </div>
-             <p className="text-slate-500 font-bold italic mt-10">Biar penonton lo bisa muter video YouTube favorit langsung di stream dengan donasi.</p>
+             <p className="text-slate-500 font-bold italic mt-10">Biarkan fans lo yang jadi DJ. Putar video favorit mereka lewat donasi interaktif secara live.</p>
           </motion.div>
 
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-white/5' : 'bg-slate-950 text-white shadow-[15px_15px_0px_0px_#10B981]'}`}>
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-slate-900 border-emerald-500/20 shadow-[15px_15px_0px_0px_rgba(16,185,129,0.2)]' : 'bg-slate-950 text-white shadow-[15px_15px_0px_0px_#10B981]'}`}>
              <div className="space-y-6">
                 <Target size={40} className="text-emerald-500" />
                 <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Goal <br /> <span className="text-emerald-500">Tracker</span></h3>
              </div>
-             <p className="text-slate-400 font-bold italic mt-10">Tunjukkan progress mimpi lo dengan Bar target donasi transparan biar Squad makin loyal.</p>
+             <p className="text-slate-400 font-bold italic mt-10">Tunjukkan ambisi lo. Pantau target donasi secara real-time dengan bar progres yang gahar.</p>
           </motion.div>
         </div>
       </section>
@@ -220,7 +221,7 @@ function HomePage() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
               whileHover={{ y: -15 }}
-              className={`group p-10 rounded-[3.5rem] border-4 border-slate-950 transition-all ${darkMode ? 'bg-white/5' : 'bg-white shadow-[10px_10px_0px_0px_#F1F5F9] hover:shadow-[10px_10px_0px_0px_#7C3AED]'}`}
+              className={`group p-10 rounded-[3.5rem] border-4 border-slate-950 transition-all ${darkMode ? 'bg-slate-900 shadow-[10px_10px_0px_0px_rgba(255,255,255,0.05)]' : 'bg-white shadow-[10px_10px_0px_0px_#F1F5F9] hover:shadow-[12px_12px_0px_0px_#7C3AED]'}`}
             >
               <div className="w-24 h-24 bg-slate-100 rounded-[2rem] mb-10 overflow-hidden border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000]">
                 <img 
@@ -231,7 +232,7 @@ function HomePage() {
                 />
               </div>
               <h3 className="text-3xl font-black italic mb-3 uppercase tracking-tighter leading-none">{s.full_name || s.username}</h3>
-              <p className="text-slate-400 text-[11px] font-bold mb-10 italic truncate">"Verified Elite Sultan Node"</p>
+              <p className="text-slate-400 text-[11px] font-bold mb-10 italic truncate">"Verified Elite Node"</p>
               <Link to={`/${s.username}`} className="inline-flex items-center gap-3 text-xs font-black uppercase text-violet-600 tracking-widest group">
                 INSPECT <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
               </Link>
@@ -243,17 +244,17 @@ function HomePage() {
       {/* --- FAQ --- */}
       <section className="max-w-4xl mx-auto px-6 py-40">
         <Reveal>
-          <div className="flex items-center gap-6 mb-20 justify-center">
+          <div className="flex flex-col items-center space-y-6 mb-20">
             <div className="p-5 bg-violet-600 text-white rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000]"><HelpCircle size={32} strokeWidth={2.5}/></div>
             <h2 className="text-5xl font-black italic uppercase tracking-tighter">SULTAN <span className="text-violet-600">INTEL</span></h2>
           </div>
         </Reveal>
-        <FAQItem darkMode={darkMode} question="Potongan adminnya berapa, Ri?" answer="Transparan kasta tertinggi. Cuma biaya maintenance sistem dikit banget, sisanya full masuk kantong lo secepat kilat!" />
-        <FAQItem darkMode={darkMode} question="Keamanannya beneran terjamin?" answer="Shield kita pake Dual-OTP WhatsApp + Email Sultan. Database kita di Railway Cloud dengan enkripsi kasta tertinggi. Gak ada obat!" />
+        <FAQItem darkMode={darkMode} question="Potongan adminnya berapa, Ri?" answer="Gak usah pusing. Skuy.GG pake sistem fee paling rendah cuma buat maintenance server. 95%++ donasi masuk kantong lo." />
+        <FAQItem darkMode={darkMode} question="Keamanannya beneran terjamin?" answer="Shield kita pake Dual-OTP WhatsApp + Email. Database kita di Railway Cloud dengan enkripsi kasta tertinggi. Akun lo aman di markas pusat." />
         <FAQItem darkMode={darkMode} question="Support pembayaran apa aja?" answer="Semua QRIS, E-Wallet (Dana, OVO, GoPay), sampe Bank Transfer Sultan kita sikat habis tanpa delay!" />
       </section>
 
-      {/* --- FOOTER SULTAN (VIOLET BRUTALISM) --- */}
+      {/* --- FOOTER SULTAN (VIOLET EDITION) --- */}
       <footer className="bg-violet-600 text-white border-t-8 border-slate-950 py-20 relative overflow-hidden">
         <div className="absolute top-0 right-0 opacity-10 rotate-12 scale-150 pointer-events-none">
            <Zap size={300} fill="white" />
@@ -279,11 +280,11 @@ function HomePage() {
                 <a href="#" className="hover:text-violet-950 transition-colors">Discord</a>
               </div>
             </div>
-            <Link to="/auth" className="bg-slate-950 text-white px-10 py-5 rounded-2xl font-black uppercase italic shadow-[6px_6px_0px_0px_rgba(255,255,255,0.3)] hover:translate-y-1 hover:shadow-none active:translate-y-2 transition-all border-4 border-slate-950 text-[11px] tracking-[0.2em]">Join Squad Skuy</Link>
+            <Link to="/auth" className="bg-slate-950 text-white px-10 py-5 rounded-2xl font-black uppercase italic shadow-[6px_6px_0px_0px_rgba(255,255,255,0.2)] hover:translate-y-1 transition-all border-4 border-slate-950 text-[11px]">Join Dashboard</Link>
           </div>
         </div>
         
-        <div className="max-w-7xl mx-auto px-10 mt-16 pt-8 border-t-2 border-white/20 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] font-black uppercase tracking-[0.5em] text-violet-100 italic relative z-10 text-center md:text-left">
+        <div className="max-w-7xl mx-auto px-10 mt-16 pt-8 border-t-2 border-white/20 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] font-black uppercase tracking-[0.5em] text-violet-100 italic relative z-10">
            <p>© 2026 Skuy.GG Engine • Karawang Industrial Pride</p>
            <p className="md:ml-auto">Engineered by Ari Wirayuda</p>
         </div>
@@ -294,8 +295,8 @@ function HomePage() {
         html { scroll-behavior: smooth; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; cursor: crosshair; }
         ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: ${darkMode ? '#08080a' : '#f8faff'}; }
-        ::-webkit-scrollbar-thumb { background: #7c3aed; border: 3px solid ${darkMode ? '#08080a' : '#f8faff'}; border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: ${darkMode ? '#0a0a0e' : '#f8faff'}; }
+        ::-webkit-scrollbar-thumb { background: #7c3aed; border: 3px solid ${darkMode ? '#0a0a0e' : '#f8faff'}; border-radius: 10px; }
       `}</style>
     </div>
   )
