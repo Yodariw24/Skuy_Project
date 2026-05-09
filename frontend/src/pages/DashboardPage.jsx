@@ -22,8 +22,10 @@ function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('wallet')
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState(0)
+  // ✅ FIX: Tambahkan state history agar EarningsView tidak crash saat .filter
+  const [history, setHistory] = useState([]) 
   const [otp, setOtp] = useState('')
-  const [qrCodeUrl, setQrCodeUrl] = useState(null) // ✅ State baru buat simpan gambar QR
+  const [qrCodeUrl, setQrCodeUrl] = useState(null) 
   const [loading2FA, setLoading2FA] = useState(false)
   const [bankData, setBankData] = useState({ bank_name: 'Belum Diatur', account_number: '-', account_name: '-' })
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -42,6 +44,19 @@ function DashboardPage() {
         const userData = res.data.user;
         setUser(userData);
         setBalance(userData.total_saldo || 0);
+        
+        // ✅ FIX: Tarik riwayat transaksi juga biar sinkron
+        try {
+          const resWallet = await api.get(`/wallet/history/${userData.id}`);
+          if (resWallet.data.success) {
+            // Pastikan resWallet.data.history adalah array, jika bukan kasih []
+            setHistory(Array.isArray(resWallet.data.history) ? resWallet.data.history : []);
+          }
+        } catch (walletErr) {
+          console.warn("Wallet history belum siap, setting array kosong.");
+          setHistory([]);
+        }
+
         localStorage.setItem('user', JSON.stringify(userData));
       }
     } catch (err) {
@@ -61,17 +76,17 @@ function DashboardPage() {
     }
   }, [navigate]);
 
-  // --- 2. LOGIKA QR CODE TOTP (GANTI WHATSAPP) ---
+  // --- 2. LOGIKA QR CODE TOTP ---
   const handleGenerateQR = async () => {
     setLoading2FA(true);
     try {
-      // Menembak setup-2fa yang sekarang generate QR Code
-      const res = await api.post('/auth/setup-2fa');
+      // ✅ FIX: Sertakan userId agar tidak dapet error 400 di backend
+      const res = await api.post('/auth/setup-2fa', { userId: user.id });
       if (res.data.success) {
-        setQrCodeUrl(res.data.qrCode); // Simpan URL gambar QR
+        setQrCodeUrl(res.data.qrCode);
         skuyAlert.fire({ 
           title: 'PROTOCOL READY 🛡️', 
-          text: 'Scan QR Code di layar pakai Google Authenticator atau Authy lo, Ri!', 
+          text: 'Scan QR Code di layar pakai Google Authenticator lo, Ri!', 
           icon: 'info' 
         });
       }
@@ -97,21 +112,20 @@ function DashboardPage() {
         const updatedUser = { ...user, is_two_fa_enabled: true };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        localStorage.setItem('user_token', res.data.token); // Simpan token baru hasil verify
         
         setQrCodeUrl(null); 
         setOtp('');
 
         skuyAlert.fire({ 
           title: 'GACOR TOTAL! 🛡️', 
-          text: 'Protokol QR-Code Aktif. Akun lo sekarang setara benteng besi!', 
+          text: 'Protokol QR-Code Aktif!', 
           icon: 'success' 
         }).then(() => {
             window.location.reload(); 
         });
       }
     } catch (err) {
-      skuyAlert.fire({ title: 'KODE SALAH', text: 'OTP dari app lo nggak cocok atau udah expired!', icon: 'error' });
+      skuyAlert.fire({ title: 'KODE SALAH', text: 'OTP tidak cocok!', icon: 'error' });
     } finally {
       setLoading2FA(false);
     }
@@ -120,28 +134,26 @@ function DashboardPage() {
   const handleDisable2FA = async () => {
     const confirm = await skuyAlert.fire({
         title: 'COPOT PROTEKSI?',
-        text: 'Yakin mau cabut protokol keamanan QR? Akun lo jadi rentan lho, Ri!',
+        text: 'Akun lo jadi rentan lho, Ri!',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'IYA, CABUT AJA',
-        cancelButtonText: 'BATAL'
+        confirmButtonText: 'IYA, CABUT AJA'
     });
 
     if (!confirm.isConfirmed) return;
 
     try {
-      const res = await api.post('/auth/disable-2fa');
+      const res = await api.post('/auth/disable-2fa', { userId: user.id });
       if (res.data.success) {
         const updatedUser = { ...user, is_two_fa_enabled: false };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        skuyAlert.fire('PROTECTION OFF', 'Sistem keamanan diturunkan ke standar.', 'info').then(() => {
+        skuyAlert.fire('PROTECTION OFF', 'Sistem keamanan diturunkan.', 'info').then(() => {
           window.location.reload();
         });
       }
     } catch (err) {
-      skuyAlert.fire('ERROR', 'Gagal mematikan protokol keamanan.', 'error');
+      skuyAlert.fire('ERROR', 'Gagal mematikan protokol.', 'error');
     }
   };
 
@@ -175,15 +187,15 @@ function DashboardPage() {
           </div>
         </header>
 
-        {/* --- DYNAMIC VIEW --- */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} bankData={bankData} />}
+            {/* ✅ FIX: Kirim history (Array) ke EarningsView agar tidak crash .filter */}
+            {activeMenu === 'wallet' && <EarningsView user={user} balance={balance} history={history} bankData={bankData} />}
             {activeMenu === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
             {activeMenu === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
             {activeMenu === 'security' && (
               <SecurityView 
                 user={user} 
-                qrCodeUrl={qrCodeUrl} // ✅ Kirim gambar QR ke View
+                qrCodeUrl={qrCodeUrl} 
                 onGenerateQR={handleGenerateQR} 
                 onVerify={handleVerify2FA} 
                 onDisable={handleDisable2FA} 
