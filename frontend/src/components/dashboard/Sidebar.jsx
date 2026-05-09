@@ -1,29 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette, ShieldAlert } from 'lucide-react';
+import { Wallet, LogIn, Activity, Tv, LogOut, User, Zap, ChevronRight, ShieldCheck, Bell, Target, Video, Trophy, Palette, ShieldAlert, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, user, navigate }) {
-  // Logic Role
+  // Logic Role & Security
   const role = user?.role?.toLowerCase();
   const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
-  const isSecured = user?.is_two_fa_enabled; // ✅ Cek status QR-Auth
+  const isSecured = user?.is_two_fa_enabled; // ✅ Status Dual-OTP
   
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
   const [isOverlayOpen, setIsOverlayOpen] = useState(overlayTabs.includes(activeSubMenu));
 
   const handleShowTips = () => {
     const tipsData = [
-      "🛡️ <b>Protokol QR:</b> Pakai Google Authenticator biar akun anti-bobol.",
-      "💰 <b>Strategi Cuan:</b> Pasang link donasi di deskripsi stream lo.",
-      "🎨 <b>Appearance:</b> Ganti tema ke Violet-Pink biar makin Sultan.",
-      "🏦 <b>Withdrawal:</b> Proses pencairan dana sekarang lebih kilat!"
+      "🛡️ <b>Dual-OTP:</b> Pastikan nomor WA lo aktif biar kode login lancar jaya.",
+      "💰 <b>Strategi Cuan:</b> Pasang link donasi di deskripsi stream lo, Ri!",
+      "🎨 <b>Appearance:</b> Ganti tema ke Violet-Pink biar dashboard makin Sultan.",
+      "🏦 <b>Pencairan:</b> Saldo donasi sekarang bisa cair lebih cepet via E-Wallet."
     ];
     const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
     
     Swal.fire({
       title: 'SKUY TIPS 💡',
-      html: `<div class="text-left font-bold italic text-slate-600">${randomTip}</div>`,
+      html: `<div class="text-left font-bold italic text-slate-600 leading-relaxed">${randomTip}</div>`,
       icon: 'info',
       customClass: {
         popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]',
@@ -114,19 +114,19 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
         <span className="font-black italic text-2xl tracking-tighter text-slate-950 uppercase">SKUY<span className="text-violet-600">.GG</span></span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar pt-4">
+      <div className="flex-1 overflow-y-auto px-4 space-y-7 custom-scrollbar pt-4 text-left">
         {/* REVENUE CONTROL */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Revenue Hub</p>
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
-            <NavButton id="tips" icon={LogIn} label="Tips Masuk" onClickCustom={handleShowTips} />
+            <NavButton id="tips" icon={LogIn} label="Tips Sultan" onClickCustom={handleShowTips} />
           </nav>
         </div>
 
         {/* LIVE TOOLS */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Stream Ops</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Stream Ops</p>
           <nav className="space-y-1">
             <NavButton id="activity" icon={Activity} label="Activity Feed" badge="LIVE" disabled={!isCreator} />
             <NavButton id="overlay" icon={Tv} label="Overlay Setup" disabled={!isCreator} onClickCustom={() => { setIsOverlayOpen(!isOverlayOpen); setActiveMenu('overlay'); }} />
@@ -145,30 +145,31 @@ function Sidebar({ activeMenu, setActiveMenu, activeSubMenu, setActiveSubMenu, u
 
         {/* PREFERENCES */}
         <div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Settings</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic text-left">Settings</p>
           <nav className="space-y-1">
             <NavButton id="profile" icon={User} label="Profile Edit" />
-            <NavButton id="security" icon={isSecured ? ShieldCheck : ShieldAlert} label="Security (QR)" />
+            {/* ✅ UPDATED: Icon & Label disesuaikan dengan Dual-OTP (WA) */}
+            <NavButton id="security" icon={isSecured ? ShieldCheck : MessageSquare} label={isSecured ? "Security Active" : "Security (WA)"} />
             <NavButton id="appearance" icon={Palette} label="Appearance" />
           </nav>
         </div>
       </div>
 
-      {/* USER PROFILE CARD - REDESIGN SULTAN */}
+      {/* USER PROFILE CARD */}
       <div className="p-6 mt-auto border-t-4 border-slate-100 bg-slate-50/50">
         <div 
-          className={`flex items-center gap-3 p-3 rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-5 group cursor-pointer transition-all active:translate-y-1 active:shadow-none ${isSecured ? 'bg-emerald-50' : 'bg-white'}`}
+          className={`flex items-center gap-3 p-3 rounded-2xl border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-5 group cursor-pointer transition-all active:translate-y-1 active:shadow-none ${isSecured ? 'bg-emerald-50 border-emerald-500' : 'bg-white'}`}
           onClick={() => setActiveMenu('profile')}
         >
           <div className="w-11 h-11 rounded-xl bg-violet-100 overflow-hidden border-2 border-slate-950 shadow-sm flex-shrink-0">
              <img src={user?.profile_picture} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform" onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }} />
           </div>
-          <div className="overflow-hidden">
+          <div className="overflow-hidden text-left">
             <p className="text-[11px] font-black text-slate-900 truncate uppercase italic">{user?.full_name || user?.username}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${isSecured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
               <p className={`text-[8px] font-black uppercase tracking-widest italic ${isSecured ? 'text-emerald-600' : 'text-slate-400'}`}>
-                {isSecured ? 'SECURED SULTAN' : 'STANDARD PROTECTION'}
+                {isSecured ? 'SECURED SULTAN' : 'UNSECURED'}
               </p>
             </div>
           </div>

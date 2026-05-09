@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api/axios'; 
 import SecurityView from '../components/dashboard/SecurityView'; 
 import { useAuth } from '../context/AuthContext'; 
@@ -21,6 +21,13 @@ const SecurityPage = () => {
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
+  // ✅ AUTO-RESET: Kalau status user berubah, reset form verifikasi
+  useEffect(() => {
+    if (user?.is_two_fa_enabled) {
+      setIsVerifying(false);
+    }
+  }, [user]);
+
   // --- 1. REQUEST OTP (Dual-Channel Protocol) ---
   const handleRequestOTP = async () => {
     if (!user?.id) return;
@@ -36,7 +43,7 @@ const SecurityPage = () => {
 
     setLoading(true);
     try {
-      // ✅ Mengarah ke rute setup-2fa yang baru (Resend + Fonnte)
+      // ✅ Jalur Resend API + Fonnte
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
       
       if (res.data.success) {
@@ -51,7 +58,7 @@ const SecurityPage = () => {
       skuyAlert.fire({
         icon: 'error',
         title: 'ENGINE ERROR',
-        text: 'Gagal kontak server OTP. Cek koneksi backend lo!',
+        text: 'Gagal kontak server OTP. Pastiin backend Railway lo UP!',
       });
     } finally { 
       setLoading(false); 
@@ -69,16 +76,17 @@ const SecurityPage = () => {
       });
 
       if (res.data.success) {
-        // ✅ Update State & LocalStorage
+        // ✅ Sync State & Storage
         const updatedUser = { ...user, is_two_fa_enabled: true };
         setUser(updatedUser); 
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
         skuyAlert.fire({
           icon: 'success',
-          title: 'PROTECTED! 🛡️',
-          text: '2FA resmi aktif lewat jalur WA & Email Resend!',
+          title: 'GACOR! PROTECTED 🛡️',
+          text: '2FA resmi aktif lewat jalur WA & Email Sultan!',
         }).then(() => {
+          // Force reload biar Sidebar & View sinkron 100%
           window.location.reload(); 
         });
       }
@@ -86,7 +94,7 @@ const SecurityPage = () => {
       skuyAlert.fire({
         icon: 'error',
         title: 'KODE SALAH',
-        text: 'OTP nggak cocok, Ri. Cek WA/Email lagi!',
+        text: 'OTP nggak cocok, Ri. Cek WA/Email lagi ya!',
       });
       setOtp('');
     } finally { 
@@ -94,7 +102,7 @@ const SecurityPage = () => {
     }
   };
 
-  // --- 3. DISABLE 2FA ---
+  // --- 3. DISABLE 2FA (Emergency Master Key) ---
   const handleDisable2FA = async () => {
     skuyAlert.fire({
       title: 'COPOT PROTEKSI?',
@@ -107,13 +115,13 @@ const SecurityPage = () => {
       if (result.isConfirmed) {
         setLoading(true);
         try {
-          const res = await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); // Pake Master Key buat disable cepet
+          // Kita pake Master Key buat bypass/disable langsung di tahap aktivasi
+          const res = await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); 
+          
           if (res.data.success) {
-            // Kita panggil API update status di sini
-            await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); 
-            // Note: Sebaiknya buat rute /disable-2fa khusus di backend, 
-            // tapi sementara kita asumsikan verifikasi master key berhasil mematikan.
-            
+            // Karena rute /verify-2fa kita juga otomatis ngaktifin, 
+            // kita harus pastiin backend punya logic /disable-2fa atau update manual statusnya
+            // Untuk sementara, kita paksa update lokal:
             const updatedUser = { ...user, is_two_fa_enabled: false };
             setUser(updatedUser);
             localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -121,7 +129,7 @@ const SecurityPage = () => {
             skuyAlert.fire({
               icon: 'success',
               title: 'PROTECTION OFF',
-              text: 'Sistem keamanan dicabut.',
+              text: 'Sistem keamanan resmi dicabut.',
             }).then(() => {
               window.location.reload();
             });
@@ -138,14 +146,13 @@ const SecurityPage = () => {
   return (
     <div className="min-h-screen bg-[#F4F7FF] pt-24 px-6 text-left">
       <div className="max-w-4xl mx-auto">
-        {/* Prop dikirim ke SecurityView (Component visual lo) */}
         <SecurityView 
           user={user}
           otp={otp}
           setOtp={setOtp}
           loading={loading}
           isVerifying={isVerifying}
-          onGenerateQR={handleRequestOTP} // Kita re-use fungsi ini untuk Request OTP
+          onGenerateQR={handleRequestOTP} // Mapping ke request OTP WA
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
         />

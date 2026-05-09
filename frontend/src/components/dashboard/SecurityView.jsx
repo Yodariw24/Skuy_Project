@@ -1,27 +1,26 @@
 import React from 'react';
 import { 
-  ShieldCheck, Lock, Loader2, CheckCircle2, Zap, 
-  ShieldAlert, Fingerprint, Shield, Mail, MessageSquare, Send
+  ShieldCheck, Loader2, Zap, 
+  ShieldAlert, Shield, Mail, MessageSquare, Send
 } from 'lucide-react'; 
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ 
   user, 
-  onGenerateQR, // Re-used as handleRequestOTP
+  onGenerateQR, // Fungsi kirim OTP
   onVerify, 
   onDisable, 
   otp, 
   setOtp, 
   loading,
-  isVerifying // Prop baru buat nampilin input OTP
+  isVerifying 
 }) => {
-  // Status 2FA dari data user
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 p-6 font-sans text-left pb-20">
       
-      {/* --- HEADER SECTION --- */}
+      {/* --- HEADER --- */}
       <div className="space-y-2 px-2">
         <div className="flex items-center gap-2 mb-1 text-left">
           <ShieldCheck className="text-[#7C3AED]" size={18} />
@@ -31,15 +30,16 @@ const SecurityView = ({
           DUAL-OTP <span className="text-[#7C3AED]">PROTOCOL</span>
         </h1>
         <p className="text-xs text-slate-500 font-medium italic text-left">
-          Amankan akun lo dengan verifikasi ganda via WhatsApp dan Email. Real-time & Anti-Bobol.
+          Verifikasi ganda via WhatsApp dan Email. Akun lo jadi anti-bobol, Ri!
         </p>
       </div>
 
       {/* --- BANNER STATUS --- */}
       <motion.div 
-        initial={{ opacity: 0, y: -20 }}
+        key={isEnabled ? 'secured' : 'unsecured'}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`relative overflow-hidden border-4 border-slate-950 p-8 rounded-[3rem] shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between transition-all duration-500 ${
+        className={`relative overflow-hidden border-4 border-slate-950 p-8 rounded-[3rem] shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between transition-all ${
           isEnabled ? 'bg-emerald-50 border-emerald-500 shadow-emerald-500/20' : 'bg-white'
         }`}
       >
@@ -54,9 +54,8 @@ const SecurityView = ({
             {isEnabled ? 'Protected' : 'Unsecured'}
           </h2>
         </div>
-
-        <div className={`p-5 rounded-2xl border-4 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform duration-500 ${
-          isEnabled ? 'bg-emerald-500 text-white scale-110' : 'bg-slate-100 text-slate-300'
+        <div className={`p-5 rounded-2xl border-4 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
+          isEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-300'
         }`}>
             {isEnabled ? <ShieldCheck size={28} strokeWidth={3} /> : <Shield size={28} strokeWidth={3} />}
         </div>
@@ -65,37 +64,33 @@ const SecurityView = ({
       <AnimatePresence mode="wait">
         {!isEnabled ? (
           <motion.div 
-            key="setup"
+            key={isVerifying ? 'otp-input' : 'request-otp'} // Key penting buat reset UI
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             className="bg-white p-10 rounded-[3.5rem] border-4 border-slate-950 shadow-[15px_15px_0px_0px_#7C3AED] relative overflow-hidden"
           >
-            {/* Tampilan Sebelum Request OTP */}
             {!isVerifying ? (
               <div className="space-y-8 text-center flex flex-col items-center">
                 <div className="relative p-7 bg-violet-50 rounded-[2.5rem] text-[#7C3AED] border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000]">
                     <MessageSquare size={45} strokeWidth={2.5} />
                     <Zap className="absolute -top-2 -right-2 text-[#FF1493]" size={24} fill="currentColor" />
                 </div>
-
                 <div className="space-y-3">
-                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-950 text-center">Initialize Security</h3>
-                  <p className="text-slate-500 font-bold text-[11px] uppercase leading-relaxed max-w-sm mx-auto italic text-center">
-                    Klik tombol di bawah buat kirim kode rahasia ke <span className="text-[#7C3AED]">WhatsApp</span> & <span className="text-[#7C3AED]">Email</span> lo. <br/> Akun aman sekelas Sultan, Ri!
+                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-950">Initialize Security</h3>
+                  <p className="text-slate-500 font-bold text-[11px] uppercase italic text-center">
+                    Klik tombol buat kirim kode aktivasi ke <span className="text-[#7C3AED]">WA</span> & <span className="text-[#7C3AED]">Email</span>.
                   </p>
                 </div>
-
                 <button 
                   onClick={onGenerateQR}
                   disabled={loading} 
-                  className="group bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic tracking-widest text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 transition-all disabled:opacity-50"
+                  className="bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 transition-all disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" size={24}/> : <>Kirim Kode Aktivasi <Send size={20}/></>}
                 </button>
               </div>
             ) : (
-              /* Tampilan Input OTP */
               <div className="space-y-8 flex flex-col items-center">
                 <div className="text-center space-y-2">
                    <div className="flex justify-center gap-4 text-[#7C3AED] mb-2">
@@ -103,18 +98,13 @@ const SecurityView = ({
                       <MessageSquare size={24} className="animate-bounce delay-100" />
                    </div>
                    <h3 className="text-xl font-black italic uppercase text-slate-950 tracking-tighter">Verify Identity Node</h3>
-                   <p className="text-[10px] font-black text-slate-400 uppercase italic">Input 6-digit kode dari WA/Email lo</p>
+                   <p className="text-[10px] font-black text-slate-400 uppercase italic text-center">Input 6-digit kode dari WA/Email lo</p>
                 </div>
-
                 <div className="max-w-xs mx-auto space-y-6 w-full text-center">
                     <input 
-                      type="text" 
-                      maxLength="6" 
-                      placeholder="••••••" 
-                      autoFocus
-                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white transition-all placeholder:text-slate-200 shadow-inner"
-                      value={otp} 
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      type="text" maxLength="6" placeholder="••••••" autoFocus
+                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white transition-all shadow-inner"
+                      value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     />
                     <button 
                       onClick={onVerify}
@@ -129,9 +119,8 @@ const SecurityView = ({
             )}
           </motion.div>
         ) : (
-          /* Tampilan kalau sudah AKTIF */
           <motion.div 
-            key="secure"
+            key="secure-active"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white border-4 border-emerald-500 p-14 rounded-[4rem] text-center shadow-[15px_15px_0px_0px_#10b981] relative overflow-hidden"
@@ -139,9 +128,9 @@ const SecurityView = ({
               <div className="w-28 h-28 bg-emerald-500 text-white rounded-[3rem] flex items-center justify-center mx-auto mb-8 shadow-xl border-4 border-white rotate-3">
                   <ShieldCheck size={64} strokeWidth={2.5} />
               </div>
-              <h3 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2 text-center">STATUS: SECURED</h3>
-              <p className="text-slate-500 text-[11px] font-black uppercase tracking-[0.4em] italic leading-relaxed max-w-xs mx-auto text-center">
-                  Protokol Dual-Channel Aktif. Akun lo sekarang aman di bawah perlindungan Email & WhatsApp.
+              <h3 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">STATUS: SECURED</h3>
+              <p className="text-slate-500 text-[11px] font-black uppercase tracking-[0.4em] italic text-center">
+                  Dual-Channel Aktif. Akun lo resmi aman di bawah perlindungan Sultan.
               </p>
               <button 
                 onClick={onDisable}
