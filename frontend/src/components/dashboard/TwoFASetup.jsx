@@ -12,14 +12,16 @@ function TwoFASetup({ user }) {
 
   // 1. Ambil QR Code dari Backend Railway
   const handleGenerateQR = async () => {
-    // 🛡️ Proteksi: Pastiin user ID ada
+    // 🕵️ Debugging: Pastiin ID Sultan ada sebelum dikirim
+    console.log("Current User Data:", user);
+
     if (!user?.id) {
-      return skuyAlert("ERROR", "Session user tidak valid, coba login ulang", "error");
+      return skuyAlert("DATA KOSONG", "ID Sultan gak kedeteksi, coba relogin!", "error");
     }
 
     setLoadingQR(true);
     try {
-      // ✅ Kirim POST request dengan data body userId
+      // ✅ FIX: Pastiin path-nya '/auth/setup-2fa' biar gak 404
       const res = await api.post('/auth/setup-2fa', { 
         userId: user.id 
       });
@@ -29,9 +31,8 @@ function TwoFASetup({ user }) {
         skuyAlert("SCAN ME", "Buka Google Authenticator & scan QR ini", "info");
       }
     } catch (err) {
-      console.error("QR Error:", err);
-      // Detail error biar lo tau kalau Railway-nya yang mati atau rutenya yang salah
-      const msg = err.response?.data?.message || "Rute 2FA belum aktif di server Railway!";
+      console.error("QR Error:", err.response?.data);
+      const msg = err.response?.data?.message || "Gagal sinkron ke Railway!";
       skuyAlert("GAGAL", msg, "error");
     } finally {
       setLoadingQR(false);
@@ -40,13 +41,12 @@ function TwoFASetup({ user }) {
 
   // 2. Verifikasi untuk Mengaktifkan
   const handleActivate = async () => {
-    if (otp.length < 6) {
-      return skuyAlert("KODE KURANG", "Masukkan 6 digit angka dari aplikasi", "warning");
-    }
+    if (otp.length < 6) return skuyAlert("KODE KURANG", "Masukkan 6 digit angka", "warning");
     
     setIsVerifying(true);
     try {
-      const res = await api.post('/verify-2fa', {
+      // ✅ FIX: Tambahin prefix '/auth' supaya sinkron sama server.js Sultan
+      const res = await api.post('/auth/verify-2fa', {
         userId: user.id,
         token: otp.trim()
       });
@@ -56,14 +56,17 @@ function TwoFASetup({ user }) {
         setQrCode(null);
         setOtp('');
         
-        // Kasih delay dikit sebelum reload biar alert-nya kebaca
+        // Simpen status terbaru ke localStorage biar gak minta 2FA lagi pas login session ini
+        const updatedUser = { ...user, is_two_fa_enabled: true };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+
         setTimeout(() => {
           window.location.reload(); 
         }, 1500);
       }
     } catch (err) {
-      console.error("Verify Error:", err);
-      const errorMsg = err.response?.data?.message || "Kode OTP Salah atau Expired!";
+      console.error("Verify Error:", err.response?.data);
+      const errorMsg = err.response?.data?.message || "Kode OTP Salah!";
       skuyAlert("VERIFIKASI GAGAL", errorMsg, "error");
     } finally {
       setIsVerifying(false);
@@ -99,12 +102,9 @@ function TwoFASetup({ user }) {
           <div className="space-y-2 text-left">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Input 6-Digit Code</p>
             <input 
-              type="text" 
-              maxLength="6" 
-              placeholder="000 000"
-              className="w-full p-4 text-center text-4xl font-black border-4 border-slate-950 rounded-xl outline-none focus:bg-violet-50 transition-all placeholder:text-slate-200"
-              value={otp} 
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              type="text" maxLength="6" placeholder="000000"
+              className="w-full p-4 text-center text-4xl font-black border-4 border-slate-950 rounded-xl outline-none focus:bg-violet-50 transition-all"
+              value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
             />
           </div>
 
@@ -118,7 +118,7 @@ function TwoFASetup({ user }) {
             <button 
               onClick={handleActivate}
               disabled={isVerifying || otp.length < 6}
-              className="flex-[2] py-4 bg-violet-600 text-white rounded-xl font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none"
+              className="flex-[2] py-4 bg-violet-600 text-white rounded-xl font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2"
             >
               {isVerifying ? <Loader2 className="animate-spin" /> : 'Confirm Activation'}
             </button>
