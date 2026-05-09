@@ -7,6 +7,9 @@ import { Server } from 'socket.io';
 import pkg from 'pg';
 import 'dotenv/config';
 
+// 🛡️ FIX NOMOR 1: Paksa server menggunakan waktu Jakarta (WIB) agar sinkron sama HP
+process.env.TZ = 'Asia/Jakarta'; 
+
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js'; 
@@ -47,8 +50,7 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// --- 3. MIDDLEWARE STACK (URUTAN WAJIB!) ---
-
+// --- 3. MIDDLEWARE STACK ---
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); 
 
@@ -56,7 +58,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
-  // ✅ FIX COOP: Settingan paling aman biar Google Auth gak nge-block window.postMessage
+  // ✅ FIX COOP: Settingan paling aman buat Google Auth
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
   
@@ -80,14 +82,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 5. API ROUTES (Hierarchy Fix) ---
+// --- 5. API ROUTES (Clean Hierarchy) ---
 
 // Path Utama
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/donations', donationRoutes);
 
-// ✅ FIX 404 WALLET: Tambahkan ini supaya rute /api/wallet/history bisa kebaca
+// ✅ FIX RUTE KHUSUS (Pindah ke userRoutes semua biar konsisten)
 app.use('/api/wallet', userRoutes); 
 app.use('/api/streamers', userRoutes);
 
@@ -95,16 +97,19 @@ app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    version: "2.1.5-Sultan-Final"
+    version: "2.1.6-Sultan-Time-Sync"
   });
 });
 
 // --- 6. 404 HANDLER ---
 app.use((req, res) => {
-  console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
+  // ✅ Filter biar log uploads gak menuhin console kalau link Google nyasar
+  if (!req.url.startsWith('/uploads/http')) {
+    console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
+  }
   res.status(404).json({
     success: false,
-    message: `Rute [${req.method}] ${req.url} Gak Ada di Backend Railway, Ri!`
+    message: `Rute [${req.method}] ${req.url} Gak Ada, Ri!`
   });
 });
 
@@ -122,5 +127,6 @@ const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
+  console.log(`🕒 CURRENT TIMEZONE: ${process.env.TZ}`);
   console.log('-----------------------------------------');
 });
