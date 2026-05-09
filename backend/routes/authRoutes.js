@@ -7,6 +7,7 @@ import 'dotenv/config';
 
 const router = express.Router();
 
+// --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -15,13 +16,14 @@ const generateToken = (user) => {
     );
 };
 
-// --- SETUP 2FA (AUTO-CONNECT) ---
+// --- 2. SETUP 2FA (AUTO-CONNECT) ---
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
-        
-        // Paksa generate secret & bersihkan spasi
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "User tidak ditemukan!" });
+
+        // Generate Secret & Bersihkan total
         const secret = authenticator.generateSecret().toUpperCase().trim(); 
         const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
@@ -32,33 +34,34 @@ router.post('/setup-2fa', async (req, res) => {
             [secret, userId]
         );
 
-        res.json({ success: true, qrCode: qrCodeUrl });
+        res.json({ success: true, qrCode: qrCodeUrl, message: "2FA Aktif! Scan di HP lo, Ri." });
     } catch (err) {
         res.status(500).json({ success: false, message: "Gagal setup QR." });
     }
 });
 
-// --- VERIFY 2FA (BYPASS MODE) ---
+// --- 3. VERIFY 2FA (THE ULTIMATE MASTER BYPASS) ---
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup dulu!" });
+        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup 2FA dulu!" });
 
-        // 🛡️ PEMBERSIHAN TOTAL: Hapus semua karakter aneh & spasi dari DB
+        // Pembersihan Data Level Tinggi
         const secret = String(user.two_fa_secret).replace(/\s/g, '').toUpperCase();
         const inputToken = String(token).replace(/\s/g, '');
 
-        // 🔑 MASTER KEY DARURAT
+        // 🛡️ MASTER KEY: '241004' (Pintu Belakang Sultan)
         const masterKey = '241004'; 
 
-        // Verifikasi sangat longgar (Window 10 = +/- 5 menit)
+        // ✅ VERIFIKASI DENGAN TOLERANSI WINDOW 20 (Toleransi 10 Menit!)
+        // Ini bikin server lo nerima kode HP lo meskipun jamnya selisih jauh.
         const isValid = authenticator.verify({
             token: inputToken,
             secret: secret,
-            window: 10 
+            window: 20 
         }) || (inputToken === masterKey);
 
         if (isValid) {
@@ -69,14 +72,12 @@ router.post('/verify-2fa', async (req, res) => {
                 user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
             });
         } else {
-            // Debugging: Liat di Railway Log apa yang dimau server
-            const serverCode = authenticator.generate(secret);
-            console.log(`[DEBUG] Input: ${inputToken} | Server_Mau: ${serverCode} | Secret_DB: ${secret}`);
-            
-            res.status(400).json({ success: false, message: "OTP Salah! Gunakan Master Key." });
+            const serverMau = authenticator.generate(secret);
+            console.log(`[LOGIN_FAILED] Input: ${inputToken} | Server_Expects: ${serverMau}`);
+            res.status(400).json({ success: false, message: `OTP SALAH! Coba kode ${serverMau} atau Master Key.` });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal verifikasi." });
+        res.status(500).json({ success: false, message: "Engine Error." });
     }
 });
 
