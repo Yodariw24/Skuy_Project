@@ -1,19 +1,25 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS SKUY.GG v2.3
- * Dibuat Sultan-Proof untuk koneksi Vercel <-> Railway
+ * KONFIGURASI AXIOS SKUY.GG v2.4 🛡️
+ * Anti-Illegal Path Protocol
  */
 const api = axios.create({
-  // ✅ SMART LOGIC: Deteksi apakah VITE_API_URL sudah mengandung /api atau belum
+  // ✅ FIX FINAL: Hard-clean URL untuk basmi /api/api/
   baseURL: (() => {
     const rawUrl = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
-    const cleanUrl = rawUrl.replace(/\/$/, ""); // Buang slash di akhir
-    return cleanUrl.includes('/api') ? cleanUrl : `${cleanUrl}/api`;
+    
+    // Protokol Pembersihan:
+    // 1. Buang slash di ujung (/)
+    // 2. Buang tulisan /api di ujung (biar bersih total)
+    const base = rawUrl.replace(/\/$/, "").replace(/\/api$/, "");
+    
+    console.log("🚀 Sultan Bridge Connected to:", `${base}/api`);
+    return `${base}/api`;
   })(),
   
   withCredentials: true, 
-  timeout: 15000, // ✅ Naik ke 15 detik, kasih napas buat cold-start Railway
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -53,26 +59,20 @@ api.interceptors.response.use(
     // 🛡️ 1. PROTOKOL 401: Sesi Sultan Berakhir
     if (response && response.status === 401) {
       console.warn("⚠️ Access Denied: Sesi expired atau Token Ilegal!");
-      
-      // Bersihkan markas lokal
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       
-      // Tendang ke pintu masuk jika bukan di halaman auth
       if (!window.location.pathname.includes('/auth')) {
         window.location.href = '/auth'; 
       }
     }
 
-    // 🕵️ 2. PROTOKOL 404: Node Tidak Ditemukan
+    // 🕵️ 2. PROTOKOL 404: Basmi Double Prefix
     if (response && response.status === 404) {
       console.error(`❌ Jalur Putus: [${config.method.toUpperCase()}] ${config.url}`);
-      console.info(`Ri, cek lagi rute di backend/server.js, pastikan sudah di-mount!`);
-    }
-
-    // ⚡ 3. PROTOKOL TIMEOUT
-    if (error.code === 'ECONNABORTED') {
-      console.error("🚀 Railway Node RTO: Server kelamaan bales, Ri!");
+      if (config.url.includes('/api/api')) {
+        console.warn("🚨 DETEKSI DOUBLE API! Ri, jangan tulis /api lagi di pemanggilan fungsi!");
+      }
     }
 
     return Promise.reject(error);
