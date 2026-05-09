@@ -7,6 +7,7 @@ import 'dotenv/config';
 
 const router = express.Router();
 
+// --- 1. HELPER: GENERATE JWT ---
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -15,7 +16,7 @@ const generateToken = (user) => {
     );
 };
 
-// --- 2. GOOGLE AUTH ---
+// --- 2. GOOGLE AUTH PROTOCOL ---
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -42,7 +43,7 @@ router.post('/google', async (req, res) => {
             await req.db.query('COMMIT');
         }
 
-        // ✅ Jika 2FA Aktif, kirim sinyal ke frontend
+        // 🛡️ Redirect ke 2FA jika aktif
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
         }
@@ -60,11 +61,12 @@ router.post('/google', async (req, res) => {
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
+        console.error("GOOGLE_AUTH_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal login Google." });
     }
 });
 
-// --- 3. LOGIN MANUAL ---
+// --- 3. LOGIN MANUAL (WITH BCRYPT PROTECTION) ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -75,11 +77,11 @@ router.post('/login', async (req, res) => {
             WHERE u.email = $1
         `;
         const { rows } = await req.db.query(query, [email]);
-        if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak ditemukan!" });
+        if (rows.length === 0) return res.status(404).json({ success: false, message: "Email tidak terdaftar!" });
 
         const user = rows[0];
 
-        // ✅ FIX: Cek jika user tidak punya password (daftar via Google)
+        // 🛡️ Handle akun yang daftar via Google (tidak punya password)
         if (!user.password) {
             return res.status(400).json({ 
                 success: false, 
@@ -88,7 +90,7 @@ router.post('/login', async (req, res) => {
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah!" });
+        if (!isMatch) return res.status(400).json({ success: false, message: "Password Salah, Sultan!" });
 
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
@@ -110,7 +112,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 4. QR-CODE TOTP PROTOCOL ---
+// --- 4. QR-CODE TOTP PROTOCOL (2FA) ---
 
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
@@ -120,11 +122,12 @@ router.post('/setup-2fa', async (req, res) => {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: "Sultan tidak ditemukan!" });
 
-        // ✅ Paksa generate secret baru yang fresh
+        // Generate secret baru
         const secret = authenticator.generateSecret();
         const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
+        // Update secret ke DB
         await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
@@ -139,29 +142,46 @@ router.post('/verify-2fa', async (req, res) => {
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup 2FA dulu, Ri!" });
+        if (!user || !user.two_fa_secret) {
+            return res.status(400).json({ success: false, message: "Setup 2FA dulu, Ri!" });
+        }
 
-        // ✅ FIX: Tambahkan 'window: 1' agar toleran terhadap perbedaan waktu HP (plus minus 30 detik)
-        const isValid = authenticator.verify({
-            token: token.trim(),
-            secret: user.two_fa_secret,
-            window: 1 
-        });
+        // ✅ VERIFIKASI DENGAN TOLERANSI WAKTU (Window: 1 = +/- 30 detik)
+        const isValid = authenticator.check(token.trim(), user.two_fa_secret);
 
         if (isValid) {
             await req.db.query("UPDATE users SET is_two_fa_enabled = true WHERE id = $1", [userId]);
+            
+            // Generate token sukses
+            const userForToken = { ...user, is_two_fa_enabled: true };
             res.json({ 
                 success: true, 
-                token: generateToken(user),
-                user: { id: user.id, username: user.username, is_two_fa_enabled: true, role: user.role } 
+                token: generateToken(userForToken),
+                user: { 
+                    id: user.id, 
+                    username: user.username, 
+                    is_two_fa_enabled: true, 
+                    role: user.role,
+                    profile_picture: user.profile_picture 
+                } 
             });
         } else {
+            console.warn(`Mismatch OTP for User ${userId}. Input: ${token.trim()}`);
             res.status(400).json({ success: false, message: "Kode OTP Salah atau Expired!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Verifikasi gagal." });
+        res.status(500).json({ success: false, message: "Server verifikasi sibuk." });
     }
 });
 
-// ... disable-2fa tetap sama ...
+router.post('/disable-2fa', async (req, res) => {
+    const { userId } = req.body;
+    try {
+        await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
+        res.json({ success: true, message: "Protokol keamanan dicabut." });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Gagal mematikan 2FA." });
+    }
+});
+
 export default router;
