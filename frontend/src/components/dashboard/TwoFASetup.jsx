@@ -1,5 +1,4 @@
 import { useState } from 'react';
-// ✅ GANTI: Pakai instance api biar sinkron sama Railway
 import api from '../api/axios';
 import { skuyAlert } from '../utils/alerts';
 import { motion } from 'framer-motion';
@@ -13,9 +12,14 @@ function TwoFASetup({ user }) {
 
   // 1. Ambil QR Code dari Backend Railway
   const handleGenerateQR = async () => {
+    // 🛡️ Proteksi: Pastiin user ID ada
+    if (!user?.id) {
+      return skuyAlert("ERROR", "Session user tidak valid, coba login ulang", "error");
+    }
+
     setLoadingQR(true);
     try {
-      // ✅ Cukup panggil endpoint, instance api sudah tahu baseURL-nya
+      // ✅ Kirim POST request dengan data body userId
       const res = await api.post('/auth/setup-2fa', { 
         userId: user.id 
       });
@@ -26,7 +30,9 @@ function TwoFASetup({ user }) {
       }
     } catch (err) {
       console.error("QR Error:", err);
-      skuyAlert("GAGAL", err.response?.data?.message || "Gagal konek ke server Railway", "error");
+      // Detail error biar lo tau kalau Railway-nya yang mati atau rutenya yang salah
+      const msg = err.response?.data?.message || "Rute 2FA belum aktif di server Railway!";
+      skuyAlert("GAGAL", msg, "error");
     } finally {
       setLoadingQR(false);
     }
@@ -34,38 +40,45 @@ function TwoFASetup({ user }) {
 
   // 2. Verifikasi untuk Mengaktifkan
   const handleActivate = async () => {
-    if (otp.length < 6) return skuyAlert("KODE KURANG", "Masukkan 6 digit angka", "warning");
+    if (otp.length < 6) {
+      return skuyAlert("KODE KURANG", "Masukkan 6 digit angka dari aplikasi", "warning");
+    }
     
     setIsVerifying(true);
     try {
-      const res = await api.post('/auth/verify-2fa', {
+      const res = await api.post('/verify-2fa', {
         userId: user.id,
-        token: otp
+        token: otp.trim()
       });
       
       if (res.data.success) {
         skuyAlert("GACOR!", "2FA Berhasil aktif! Akun sekelas Sultan aman.", "success");
         setQrCode(null);
         setOtp('');
-        // Refresh halaman agar status 2FA terupdate di dashboard
-        window.location.reload(); 
+        
+        // Kasih delay dikit sebelum reload biar alert-nya kebaca
+        setTimeout(() => {
+          window.location.reload(); 
+        }, 1500);
       }
     } catch (err) {
-      skuyAlert("KODE SALAH", "OTP tidak valid, coba cek lagi di HP", "error");
+      console.error("Verify Error:", err);
+      const errorMsg = err.response?.data?.message || "Kode OTP Salah atau Expired!";
+      skuyAlert("VERIFIKASI GAGAL", errorMsg, "error");
     } finally {
       setIsVerifying(false);
     }
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-left">
+    <div className="bg-white p-8 rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-left overflow-hidden">
       <div className="flex items-center gap-4 mb-6">
-        <div className="bg-violet-600 p-3 rounded-xl text-white">
+        <div className="bg-violet-600 p-3 rounded-xl text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <ShieldCheck size={24} />
         </div>
         <div>
-          <h3 className="font-black italic text-lg uppercase leading-none">Keamanan Akun</h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Multi-Factor Authentication (2FA)</p>
+          <h3 className="font-black italic text-lg uppercase leading-none text-slate-950">Keamanan Akun</h3>
+          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Multi-Factor Authentication (2FA)</p>
         </div>
       </div>
 
@@ -73,7 +86,7 @@ function TwoFASetup({ user }) {
         <button 
           onClick={handleGenerateQR}
           disabled={loadingQR}
-          className="w-full py-4 bg-slate-950 text-white rounded-xl font-black italic uppercase hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95"
+          className="w-full py-4 bg-slate-950 text-white rounded-xl font-black italic uppercase hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
         >
           {loadingQR ? <Loader2 className="animate-spin" /> : <><QrCode size={18} /> Aktifkan 2FA Sekarang</>}
         </button>
@@ -83,26 +96,29 @@ function TwoFASetup({ user }) {
             <img src={qrCode} alt="QR 2FA" className="w-48 h-48" />
           </div>
           
-          <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Verify Authenticator Code</p>
+          <div className="space-y-2 text-left">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1">Input 6-Digit Code</p>
             <input 
-              type="text" maxLength="6" placeholder="000000"
-              className="w-full p-4 text-center text-4xl font-black border-4 border-slate-950 rounded-xl outline-none focus:bg-violet-50 transition-all"
-              value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              type="text" 
+              maxLength="6" 
+              placeholder="000 000"
+              className="w-full p-4 text-center text-4xl font-black border-4 border-slate-950 rounded-xl outline-none focus:bg-violet-50 transition-all placeholder:text-slate-200"
+              value={otp} 
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button 
-              onClick={() => setQrCode(null)}
-              className="flex-1 py-4 border-4 border-slate-950 rounded-xl font-black uppercase text-xs hover:bg-slate-100"
+              onClick={() => { setQrCode(null); setOtp(''); }}
+              className="flex-1 py-4 border-4 border-slate-950 rounded-xl font-black uppercase text-xs hover:bg-slate-50 transition-all"
             >
               Batal
             </button>
             <button 
               onClick={handleActivate}
-              disabled={isVerifying}
-              className="flex-[2] py-4 bg-violet-600 text-white rounded-xl font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2"
+              disabled={isVerifying || otp.length < 6}
+              className="flex-[2] py-4 bg-violet-600 text-white rounded-xl font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none"
             >
               {isVerifying ? <Loader2 className="animate-spin" /> : 'Confirm Activation'}
             </button>

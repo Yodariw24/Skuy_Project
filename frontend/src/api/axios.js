@@ -5,12 +5,11 @@ import axios from 'axios';
  * Dibuat Sultan-Proof untuk handle Localhost & Production
  */
 const api = axios.create({
-  // ✅ FIX: URL Railway udah disesuaikan 100% sama screenshot lo (TANPA STRIP!)
+  // ✅ Menghindari double slash dan memastikan '/api' nempel dengan benar
   baseURL: import.meta.env.VITE_API_URL 
     ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api` 
-    : 'https://skuyproject-production.up.railway.app/api', // 👈 PERHATIKAN BARIS INI RI
+    : 'https://skuyproject-production.up.railway.app/api', 
   
-  // WAJIB ADA buat ngirim cookie/session lintas domain (Vercel <-> Railway)
   withCredentials: true, 
   headers: {
     'Content-Type': 'application/json'
@@ -19,7 +18,6 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR REQUEST
- * Nempelkan token JWT otomatis dari localStorage ke setiap request
  */
 api.interceptors.request.use(
   (config) => {
@@ -27,6 +25,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // ✅ TRICK SULTAN: Jika yang dikirim adalah FormData (buat upload foto), 
+    // hapus Content-Type manual agar browser yang nentuin boundary-nya secara otomatis.
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -34,26 +39,25 @@ api.interceptors.request.use(
 
 /**
  * INTERCEPTOR RESPONSE
- * Penjaga gerbang kalau token Sultan kadaluwarsa atau server mati
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     // 🛡️ Handle Token Hangus (Sesi Habis)
     if (error.response && error.response.status === 401) {
-      console.warn("⚠️ Sesi habis, Ri! Otorisasi dicabut, balik ke login dulu.");
+      console.warn("⚠️ Sesi habis, Ri! Otorisasi dicabut.");
       localStorage.removeItem('user_token');
       localStorage.removeItem('user');
       
-      // Tendang balik ke halaman auth biar nggak stuck
       if (window.location.pathname !== '/auth') {
         window.location.href = '/auth'; 
       }
     }
 
-    // 🕵️ Handle 404 (Salah Jalur / Endpoint Gak Ada)
+    // 🕵️ Handle 404
     if (error.response && error.response.status === 404) {
-      console.error(`❌ Error 404 di URL: ${error.config.url} | Cek routes backend lo!`);
+      // Log detail rute mana yang nyasar biar gampang tracing-nya
+      console.error(`❌ Error 404: Endpoint ${error.config.url} tidak ditemukan di Railway!`);
     }
 
     return Promise.reject(error);

@@ -47,9 +47,9 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // ✅ FIX: Arahkan fallback langsung ke domain Railway lo (TANPA /api di ujungnya)
+  // ✅ FIXED: Mengarah langsung ke domain Railway lo tanpa tambahan /api di ujungnya
   const API_BASE = import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL.replace(/\/$/, "") 
+    ? import.meta.env.VITE_API_URL.replace(/\/$/, "").replace("/api", "") 
     : 'https://skuyproject-production.up.railway.app';
 
   const getDisplayPhoto = (photoPath) => {
@@ -73,6 +73,7 @@ export default function ProfileSettings({ user, setUser }) {
     setStatus({ type: 'success', message: 'Sinkronisasi Cloud...' });
 
     try {
+      // ✅ Menggunakan instance api yang sudah dikonfigurasi interceptor token
       const res = await api.post('/user/upload-avatar', uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
