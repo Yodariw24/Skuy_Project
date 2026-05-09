@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS SKUY.GG v2.5 🛡️
+ * KONFIGURASI AXIOS SKUY.GG v2.6 🛡️
  * Anti-Illegal Path & Auto-Sanitize Protocol
  */
 const api = axios.create({
@@ -10,7 +10,7 @@ const api = axios.create({
     const rawUrl = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
     
     // 2. Protokol Pembersihan Sultan:
-    // Hapus slash di akhir, hapus /api di akhir (biar konsisten)
+    // Hapus slash di akhir dan tulisan /api (jika ada) agar tidak double prefix
     const cleanBase = rawUrl.replace(/\/$/, "").replace(/\/api$/, "");
     
     const finalURL = `${cleanBase}/api`;
@@ -20,7 +20,7 @@ const api = axios.create({
   })(),
   
   withCredentials: true, 
-  timeout: 20000, // Gue naikin dikit biar gak gampang timeout pas network bapuk
+  timeout: 20000, 
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -33,10 +33,10 @@ const api = axios.create({
  */
 api.interceptors.request.use(
   (config) => {
-    // 🛡️ 1. Basmi Double Prefix Secara Paksa sebelum Request terkirim
-    // Kalau lo nggak sengaja ngetik api.get('/api/user'), ini bakal benerin jadi api.get('/user')
-    if (config.url.startsWith('/api')) {
-      config.url = config.url.replace('/api', '');
+    // 🛡️ 1. Basmi Double Prefix Secara Paksa
+    // Jika config.url adalah "/api/user", kita ubah jadi "/user" karena baseURL sudah punya "/api"
+    if (config.url && config.url.startsWith('/api')) {
+      config.url = config.url.replace(/^\/api/, '');
     }
 
     // 🛡️ 2. Sultan Token Injection
@@ -60,27 +60,29 @@ api.interceptors.request.use(
  * Emergency Protocol: Auto-Logout & Clean Logging
  */
 api.interceptors.response.use(
-  (response) => response,
+  (res) => res, // Gunakan 'res' agar tidak bentrok nama variabel di bawah
   (error) => {
-    const { response, config } = error;
+    // Ambil info response dan config dari object error
+    const errRes = error.response;
+    const errConfig = error.config;
 
     // 🚨 1. EMERGENCY 401: Sesi Sultan Kadaluarsa / Token Ilegal
-    if (response && response.status === 401) {
+    if (errRes && errRes.status === 401) {
       console.error("⛔ Sesi Ilegal/Expired. Melakukan Force Sign-Out...");
-      localStorage.clear(); // Bersihin semua biar gak sisa sampah session
+      localStorage.clear(); 
       
-      // Jangan redirect kalau emang lagi di halaman auth
       if (!window.location.pathname.includes('/auth')) {
         window.location.href = '/auth'; 
       }
     }
 
     // 🚨 2. DETEKSI JALUR ILEGAL (404)
-    if (response && response.status === 404) {
-      console.group("🕵️ Jalur Putus (404)");
-      console.error(`Method: [${config.method.toUpperCase()}]`);
-      console.error(`Full URL: ${config.baseURL}${config.url}`);
-      console.warn("Saran Ri: Cek rute di Backend (Express) atau hapus '/api' di pemanggilan fungsi.");
+    if (errRes && errRes.status === 404) {
+      console.group("%c🕵️ Jalur Putus (404)", "color: red; font-weight: bold;");
+      console.error(`Method: [${errConfig.method.toUpperCase()}]`);
+      console.error(`Endpoint: ${errConfig.url}`);
+      console.error(`Full URL: ${errConfig.baseURL}${errConfig.url}`);
+      console.warn("Saran Ri: Cek rute di Backend (Express) atau hapus '/api' di pemanggilan fungsi Frontend.");
       console.groupEnd();
     }
 
