@@ -28,7 +28,6 @@ router.post('/google', async (req, res) => {
             await req.db.query('BEGIN');
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
             
-            // Simpan tanpa kolom profile_picture di users (sesuai log error lo)
             const newUserRes = await req.db.query(
                 'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
                 [cleanUsername, email, 'creator', sub]
@@ -55,7 +54,7 @@ router.post('/google', async (req, res) => {
                 id: user.id, 
                 username: user.username, 
                 full_name: name, 
-                profile_picture: picture // Ambil langsung dari Google
+                profile_picture: picture 
             }
         });
     } catch (err) {
@@ -65,11 +64,10 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// --- 3. LOGIN MANUAL (FIXED COLUMN ERROR) ---
+// --- 3. LOGIN MANUAL ---
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        // Query disesuaikan: Ambil profile_picture dari tabel streamers (s) bukan users (u)
         const query = `
             SELECT u.*, s.full_name, s.profile_picture 
             FROM users u
@@ -108,7 +106,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 4. QR-CODE TOTP PROTOCOL ---
+// --- 4. QR-CODE TOTP PROTOCOL (2FA) ---
 
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
@@ -120,7 +118,6 @@ router.post('/setup-2fa', async (req, res) => {
         const otpauth = authenticator.keyuri(rows[0].username, 'SkuyGG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-        // Pastikan kolom ini sudah ada (Run SQL ALTER TABLE dulu Ri!)
         await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
@@ -137,30 +134,37 @@ router.post('/verify-2fa', async (req, res) => {
 
         if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Setup dulu!" });
 
-        // 🕵️ DEBUG: Biar lo tau angka berapa yang dimau server
-        const correctCode = authenticator.generate(user.two_fa_secret.trim());
-        console.log(`[SULTAN_LOG] Input: ${token.trim()} | Server_Mau: ${correctCode}`);
-
+        // ✅ POINT 2: GUNAKAN WINDOW 8 (Toleransi waktu +/- 4 menit)
+        // Ini bikin sistem lo sangat toleran kalau jam HP telat atau kecepetan.
         const isValid = authenticator.verify({
             token: token.trim(),
-            secret: user.two_fa_secret.trim(),
-            window: 2 
+            secret: user.two_fa_secret.trim().toUpperCase(),
+            window: 8 
         });
+
+        // 🕵️ DEBUG: Tetap munculin di log Railway buat jaga-jaga
+        const correctCode = authenticator.generate(user.two_fa_secret.trim().toUpperCase());
+        console.log(`[SULTAN_LOG] Input: ${token.trim()} | Server_Mau: ${correctCode}`);
 
         if (isValid) {
             await req.db.query("UPDATE users SET is_two_fa_enabled = true WHERE id = $1", [userId]);
+            
+            // Generate token baru
+            const tokenJwt = generateToken(user);
+
             res.json({ 
                 success: true, 
-                token: generateToken(user),
+                token: tokenJwt,
                 user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
             });
         } else {
             res.status(400).json({ 
                 success: false, 
-                message: `OTP Salah! Cek log Railway buat liat kode yang bener.` 
+                message: `OTP Salah! Server minta ${correctCode}, lo masukin ${token.trim()}. Cek jam HP lo, Ri!` 
             });
         }
     } catch (err) {
+        console.error("🔥 VERIFY_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Verifikasi gagal." });
     }
 });
@@ -169,9 +173,9 @@ router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
-        res.json({ success: true, message: "2FA Off." });
+        res.json({ success: true, message: "2FA Berhasil Dimatikan." });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal." });
+        res.status(500).json({ success: false, message: "Gagal mematikan 2FA." });
     }
 });
 
