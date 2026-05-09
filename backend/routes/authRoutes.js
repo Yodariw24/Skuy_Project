@@ -1,26 +1,14 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import axios from 'axios';
 import 'dotenv/config';
 
 const router = express.Router();
 
-// --- 1. KONFIGURASI SMTP TANGGUH (Anti-Timeout Railway) ---
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true, 
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    connectionTimeout: 10000 
-});
+// --- 1. KONFIGURASI RESEND API (Anti-Timeout & Port Block) ---
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper: Generate JWT
 const generateToken = (user) => {
@@ -102,81 +90,63 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 4. SETUP-2FA (Picu Pengiriman Pertama) ---
+// --- 4. SETUP-2FA & SEND-OTP (Integrated Dual Channel) ---
+const sendDualOTP = async (db, userId, subjectText) => {
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
+
+    const { rows } = await db.query(
+        "SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
+        [userId]
+    );
+    
+    if (rows.length === 0) return null;
+    const { email, phone_number } = rows[0];
+
+    // JALUR 1: RESEND API (Email)
+    resend.emails.send({
+        from: 'SkuyGG Security <onboarding@resend.dev>',
+        to: email,
+        subject: `${subjectText} - ${otpCode}`,
+        html: `<h3>Halo Sultan!</h3><p>Kode OTP lo adalah: <b>${otpCode}</b></p>`
+    }).catch(e => console.error("Resend API Error:", e.message));
+
+    // JALUR 2: FONNTE (WhatsApp)
+    if (phone_number && phone_number.trim() !== "") {
+        const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
+        axios.post('https://api.fonnte.com/send', {
+            target: formattedPhone,
+            message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP lo: *${otpCode}*`,
+        }, {
+            headers: { 'Authorization': process.env.FONNTE_TOKEN }
+        }).catch(e => console.error("WA Fonnte Error:", e.message));
+    }
+
+    return true;
+};
+
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        await req.db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
-
-        const { rows } = await req.db.query(
-            "SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
-            [userId]
-        );
-        
-        if (rows.length === 0) return res.status(404).json({ success: false, message: "User tak terdaftar!" });
-        const { email, phone_number } = rows[0];
-
-        // Jalur Email
-        transporter.sendMail({
-            from: `"SkuyGG Security" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `[SKUYGG] Kode Aktivasi lo: ${otpCode}`,
-            html: `<h3>Kode Aktivasi Sultan: <b>${otpCode}</b></h3>`
-        }).catch(err => console.error("⚠️ Email Timeout/Fail, tapi tenang WA meluncur."));
-
-        // Jalur WA (Fonnte)
-        if (phone_number && phone_number.trim() !== "") {
-            const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
-            axios.post('https://api.fonnte.com/send', {
-                target: formattedPhone,
-                message: `[SkuyGG Security]\n\nKode Aktivasi 2FA lo: *${otpCode}*`,
-            }, {
-                headers: { 'Authorization': process.env.FONNTE_TOKEN }
-            }).catch(err => console.error("⚠️ WA Fonnte Gagal!"));
-        }
-
-        res.json({ success: true, message: "Protokol OTP Meluncur!" });
+        const success = await sendDualOTP(req.db, userId, "[SKUYGG] Kode Aktivasi 2FA");
+        if (!success) return res.status(404).json({ success: false, message: "User tak terdaftar!" });
+        res.json({ success: true, message: "OTP Aktivasi Meluncur!" });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Engine Error." });
+        res.status(500).json({ success: false, message: "Gagal memproses OTP." });
     }
 });
 
-// --- 5. SEND-OTP (Re-send atau Login) ---
 router.post('/send-otp', async (req, res) => {
     const { userId } = req.body;
     try {
-        const query = `SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1`;
-        const { rows } = await req.db.query(query, [userId]);
-        const { email, phone_number } = rows[0];
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        await req.db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
-
-        transporter.sendMail({
-            from: `"SkuyGG Security" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `[OTP] Login SkuyGG - ${otpCode}`,
-            html: `<h3>Kode OTP Login: <b>${otpCode}</b></h3>`
-        }).catch(e => console.log("Email Error ignored."));
-
-        if (phone_number && phone_number.trim() !== "") {
-            const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
-            axios.post('https://api.fonnte.com/send', {
-                target: formattedPhone,
-                message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP Login: *${otpCode}*`,
-            }, {
-                headers: { 'Authorization': process.env.FONNTE_TOKEN }
-            }).catch(e => console.log("WA Error ignored."));
-        }
-
-        res.json({ success: true, message: "OTP meluncur!" });
+        await sendDualOTP(req.db, userId, "[OTP] Login SkuyGG");
+        res.json({ success: true, message: "OTP Login Meluncur!" });
     } catch (err) {
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Gagal kirim OTP." });
     }
 });
 
-// --- 6. VERIFY-2FA ---
+// --- 5. VERIFY-2FA (With Master Key) ---
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
@@ -202,7 +172,7 @@ router.post('/verify-2fa', async (req, res) => {
             res.status(400).json({ success: false, message: "OTP Salah!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Verifikasi Error." });
     }
 });
 
