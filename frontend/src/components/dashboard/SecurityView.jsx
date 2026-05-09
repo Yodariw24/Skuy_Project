@@ -1,13 +1,13 @@
 import React from 'react';
 import { 
   ShieldCheck, Lock, Loader2, CheckCircle2, Zap, 
-  ShieldAlert, Fingerprint, Shield, QrCode, Scan, Smartphone
+  ShieldAlert, Fingerprint, Shield, QrCode, Scan
 } from 'lucide-react'; 
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SecurityView = ({ 
   user, 
-  qrCodeUrl, // ✅ Sekarang pakai QR Code URL dari backend
+  qrCodeUrl, 
   onGenerateQR, 
   onVerify, 
   onDisable, 
@@ -15,7 +15,8 @@ const SecurityView = ({
   setOtp, 
   loading 
 }) => {
-  const isEnabled = user?.is_two_fa_enabled === true;
+  // Pastiin status 2FA kebaca dari data user
+  const isEnabled = user?.is_two_fa_enabled;
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 p-6 font-sans text-left pb-20">
@@ -30,7 +31,7 @@ const SecurityView = ({
           QR-AUTH <span className="text-[#7C3AED]">PROTOCOL</span>
         </h1>
         <p className="text-xs text-slate-500 font-medium italic">
-          Gunakan aplikasi Authenticator (Google/Authy) untuk keamanan Sultan tanpa batas.
+          Amankan aset digital lo dengan autentikasi berbasis waktu (TOTP). Gratis & Unlimited.
         </p>
       </div>
 
@@ -49,7 +50,7 @@ const SecurityView = ({
                 {isEnabled ? 'System Fully Encrypted' : 'Standard Protection'}
             </p>
           </div>
-          <h2 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950 flex items-center gap-3">
+          <h2 className="text-3xl font-black italic uppercase tracking-tighter text-slate-950">
             {isEnabled ? 'Protected' : 'Unsecured'}
           </h2>
         </div>
@@ -70,6 +71,7 @@ const SecurityView = ({
             exit={{ opacity: 0, scale: 1.05 }}
             className="bg-white p-10 rounded-[3.5rem] border-4 border-slate-950 shadow-[15px_15px_0px_0px_#7C3AED] relative overflow-hidden"
           >
+            {/* Tampilan Sebelum QR muncul */}
             {!qrCodeUrl ? (
               <div className="space-y-8 text-center flex flex-col items-center">
                 <div className="relative p-7 bg-violet-50 rounded-[2.5rem] text-[#7C3AED] border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000]">
@@ -78,29 +80,28 @@ const SecurityView = ({
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-950">Initialize TOTP QR</h3>
-                  <p className="text-slate-500 font-bold text-[11px] uppercase leading-relaxed max-w-sm mx-auto italic">
-                    Ganti WhatsApp yang limit dengan sistem QR Code gratis selamanya.
-                    <br/><span className="text-slate-950 not-italic font-black text-xs uppercase mt-2 block">Cepat, Unlimited, & Professional.</span>
+                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-950 text-center">Initialize QR Protocol</h3>
+                  <p className="text-slate-500 font-bold text-[11px] uppercase leading-relaxed max-w-sm mx-auto italic text-center">
+                    Klik tombol di bawah buat generate kode rahasia Sultan. <br/> Scan pake Google Authenticator biar akun lo anti-bobol!
                   </p>
                 </div>
 
                 <button 
                   onClick={onGenerateQR}
                   disabled={loading} 
-                  className="group bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic tracking-widest text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[0_8px_0_0_#4c1d95] hover:translate-y-1 active:translate-y-2 transition-all disabled:opacity-50"
+                  className="group bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic tracking-widest text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 transition-all disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" size={24}/> : <>Generate Secret Key <Zap size={20}/></>}
                 </button>
               </div>
             ) : (
+              /* Tampilan Setelah QR muncul */
               <div className="space-y-8 flex flex-col items-center">
                 <div className="text-center space-y-2">
                    <h3 className="text-xl font-black italic uppercase text-slate-950 tracking-tighter">Scan Secret Node</h3>
-                   <p className="text-[10px] font-black text-slate-400 uppercase italic">Gunakan Google Authenticator / Authy</p>
+                   <p className="text-[10px] font-black text-slate-400 uppercase italic">Arahkan kamera Authenticator lo ke sini</p>
                 </div>
 
-                {/* --- TEMPAT QR CODE HASIL GENERATE --- */}
                 <div className="p-4 bg-white border-4 border-slate-950 rounded-[2.5rem] shadow-[10px_10px_0_0_#FF1493] relative">
                    <img src={qrCodeUrl} alt="QR Protocol" className="w-52 h-52 rounded-xl" />
                    <div className="absolute -bottom-4 -right-4 bg-[#7C3AED] text-white p-2 rounded-xl border-2 border-slate-950">
@@ -108,56 +109,48 @@ const SecurityView = ({
                    </div>
                 </div>
 
-                <div className="max-w-xs mx-auto space-y-6 w-full">
-                  <div className="text-center">
+                <div className="max-w-xs mx-auto space-y-6 w-full text-center">
                     <input 
                       type="text" 
                       maxLength="6" 
-                      placeholder="••••••"
+                      placeholder="••••••" 
                       autoFocus
-                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white focus:ring-4 focus:ring-[#7C3AED]/10 transition-all"
+                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white transition-all placeholder:text-slate-200"
                       value={otp} 
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     />
-                  </div>
-
-                  <button 
-                    onClick={onVerify}
-                    disabled={otp.length < 6 || loading} 
-                    className="w-full bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 transition-all flex justify-center items-center gap-3 border-4 border-white/10"
-                  >
-                    {loading ? <Loader2 className="animate-spin" size={24} /> : <>Verify & Activate <ShieldCheck size={20}/></>}
-                  </button>
+                    <button 
+                      onClick={onVerify}
+                      disabled={otp.length < 6 || loading} 
+                      className="w-full bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-[0_8px_0_0_#4c1d95] active:translate-y-1 transition-all flex justify-center items-center gap-3 border-4 border-white/10"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={24} /> : <>Verify Identity <ShieldCheck size={20}/></>}
+                    </button>
                 </div>
               </div>
             )}
           </motion.div>
         ) : (
+          /* Tampilan kalau sudah AKTIF */
           <motion.div 
             key="secure"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white border-4 border-emerald-500 p-14 rounded-[4rem] text-center shadow-[15px_15px_0px_0px_#10b981] relative overflow-hidden"
           >
-              <div className="relative">
-                <div className="w-28 h-28 bg-emerald-500 text-white rounded-[3rem] flex items-center justify-center mx-auto mb-8 shadow-xl border-4 border-white rotate-3">
-                    <ShieldCheck size={64} strokeWidth={2.5} />
-                </div>
-                <h3 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">STATUS: SECURED</h3>
-                <p className="text-slate-500 text-[11px] font-black uppercase tracking-[0.4em] italic leading-relaxed max-w-xs mx-auto">
-                  Protokol QR-TOTP Aktif. Akun lo aman dari limit WA dan pembajakan.
-                </p>
+              <div className="w-28 h-28 bg-emerald-500 text-white rounded-[3rem] flex items-center justify-center mx-auto mb-8 shadow-xl border-4 border-white rotate-3">
+                  <ShieldCheck size={64} strokeWidth={2.5} />
               </div>
-              
-              <div className="mt-14 pt-8 border-t-2 border-dashed border-slate-100 flex flex-col items-center">
-                <button 
-                  onClick={onDisable}
-                  className="group flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 hover:text-rose-500 transition-all tracking-[0.3em]"
-                >
-                  <ShieldAlert size={14} className="group-hover:animate-bounce" />
-                  Copot Protokol Keamanan
-                </button>
-              </div>
+              <h3 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2 text-center">STATUS: SECURED</h3>
+              <p className="text-slate-500 text-[11px] font-black uppercase tracking-[0.4em] italic leading-relaxed max-w-xs mx-auto text-center">
+                  Protokol QR-TOTP Aktif. Akun lo sekarang aman dari limit WA dan serangan brute-force.
+              </p>
+              <button 
+                onClick={onDisable}
+                className="group mt-12 flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 hover:text-rose-500 transition-all mx-auto"
+              >
+                <ShieldAlert size={14} /> Copot Protokol Keamanan
+              </button>
           </motion.div>
         )}
       </AnimatePresence>
