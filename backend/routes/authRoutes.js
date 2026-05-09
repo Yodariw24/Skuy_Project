@@ -29,8 +29,8 @@ router.post('/google', async (req, res) => {
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
             
             const newUserRes = await req.db.query(
-                'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
-                [cleanUsername, email, 'creator', sub]
+                'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled, profile_picture) VALUES ($1, $2, $3, $4, false, $5) RETURNING *',
+                [cleanUsername, email, 'creator', sub, picture]
             );
             user = newUserRes.rows[0];
 
@@ -43,7 +43,6 @@ router.post('/google', async (req, res) => {
             await req.db.query('COMMIT');
         }
 
-        // Cek apakah Sultan butuh 2FA
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
         }
@@ -56,7 +55,7 @@ router.post('/google', async (req, res) => {
                 username: user.username, 
                 role: user.role || 'creator', 
                 full_name: name, 
-                profile_picture: picture 
+                profile_picture: user.profile_picture || picture 
             }
         });
     } catch (err) {
@@ -70,8 +69,9 @@ router.post('/google', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
+        // ✅ FIX QUERY: Ambil profile_picture dari users (fallback ke streamers)
         const query = `
-            SELECT u.*, s.full_name, s.profile_picture 
+            SELECT u.*, COALESCE(u.profile_picture, s.profile_picture) as final_picture, s.full_name
             FROM users u
             LEFT JOIN streamers s ON u.id = s.user_id
             WHERE u.email = $1
@@ -95,7 +95,7 @@ router.post('/login', async (req, res) => {
                 username: user.username, 
                 role: user.role, 
                 full_name: user.full_name, 
-                profile_picture: user.profile_picture 
+                profile_picture: user.final_picture 
             } 
         });
     } catch (err) {
@@ -105,11 +105,8 @@ router.post('/login', async (req, res) => {
 
 // --- 4. QR-CODE TOTP PROTOCOL ---
 
-// ✅ RUTE SETUP: Nge-generate secret baru dan QR Code
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
-    console.log("🛠️ Setup-2FA Request masuk untuk ID:", userId);
-
     if (!userId) return res.status(400).json({ success: false, message: "User ID wajib ada!" });
 
     try {
@@ -120,54 +117,44 @@ router.post('/setup-2fa', async (req, res) => {
         const otpauth = authenticator.keyuri(rows[0].username, 'Skuy.GG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-        // Update secret tapi JANGAN aktifkan status 2FA dulu (tunggu verifikasi)
         await req.db.query("UPDATE users SET two_fa_secret = $1, is_two_fa_enabled = false WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
-        console.error("❌ SETUP_2FA_ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal generate QR: " + err.message });
+        res.status(500).json({ success: false, message: "Gagal generate QR." });
     }
 });
 
-// ✅ RUTE VERIFY: Buat mastiin kode OTP bener sebelum benar-benar diaktifin
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (!user || !user.two_fa_secret) {
-            return res.status(400).json({ success: false, message: "Secret belum di-setup!" });
-        }
+        if (!user || !user.two_fa_secret) return res.status(400).json({ success: false, message: "Secret belum di-setup!" });
 
         const isValid = authenticator.check(token.trim(), user.two_fa_secret);
 
         if (isValid) {
-            // ✅ Aktifkan status 2FA secara permanen
             await req.db.query("UPDATE users SET is_two_fa_enabled = true WHERE id = $1", [userId]);
-            
             res.json({ 
                 success: true, 
-                message: "2FA Berhasil Diaktifkan!",
                 token: generateToken(user),
                 user: { id: user.id, username: user.username, is_two_fa_enabled: true, role: user.role } 
             });
         } else {
-            res.status(400).json({ success: false, message: "Kode OTP Salah, Ri! Cek Google Auth lo." });
+            res.status(400).json({ success: false, message: "Kode OTP Salah!" });
         }
     } catch (err) {
-        console.error("❌ VERIFY_2FA_ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal verifikasi kode." });
+        res.status(500).json({ success: false, message: "Verifikasi gagal." });
     }
 });
 
-// ✅ RUTE DISABLE: Matikan 2FA (Reset ke awal)
 router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
         await req.db.query("UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1", [userId]);
-        res.json({ success: true, message: "Keamanan dicabut." });
+        res.json({ success: true, message: "2FA Dinonaktifkan." });
     } catch (err) {
         res.status(500).json({ success: false, message: "Gagal mematikan 2FA." });
     }

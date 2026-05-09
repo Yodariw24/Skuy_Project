@@ -27,40 +27,35 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        // ✅ FIX: Nama file dibikin rapi tanpa butuh params ID lagi
         cb(null, `avatar-${uniqueSuffix}${path.extname(file.originalname)}`);
     }
 });
 
 const upload = multer({ 
     storage: storage, 
-    limits: { fileSize: 2 * 1024 * 1024 } // Batas 2MB biar server gak jebol
+    limits: { fileSize: 2 * 1024 * 1024 } 
 });
 
-// --- 2. ENDPOINT KHUSUS DASHBOARD & THEME ---
+// --- 2. ENDPOINT DASHBOARD & WALLET ---
 
-router.put('/update-theme', async (req, res) => {
-    const { theme_color, userId } = req.body;
-    const targetId = userId || req.query.userId;
-
-    if (!theme_color) return res.status(400).json({ success: false, message: "Warna temanya mana, Ri?" });
-
+// ✅ FIX WALLET HISTORY: Disesuaikan agar bisa dipanggil via /api/wallet/history/:id
+router.get('/history/:id', async (req, res) => {
     try {
-        const query = `
-            UPDATE streamers 
-            SET theme_color = $1 
-            WHERE user_id = $2 
-            RETURNING theme_color
-        `;
-        const result = await req.db.query(query, [theme_color, targetId]);
+        const { id } = req.params;
+        const resBalance = await req.db.query('SELECT total_saldo FROM balance WHERE streamer_id = $1', [id]);
+        const resHistory = await req.db.query(
+            'SELECT * FROM transactions WHERE streamer_id = $1 ORDER BY created_at DESC LIMIT 10', 
+            [id]
+        );
 
-        if (result.rows.length > 0) {
-            res.json({ success: true, message: "Visual Protocol Applied! ✨", theme: result.rows[0].theme_color });
-        } else {
-            res.status(404).json({ success: false, message: "User tidak ditemukan!" });
-        }
+        res.json({ 
+            success: true, 
+            balance: resBalance.rows[0]?.total_saldo || 0,
+            history: resHistory.rows || [] 
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal sinkronisasi tema." });
+        console.error("WALLET_HISTORY_ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal menarik riwayat transaksi." });
     }
 });
 
@@ -85,68 +80,44 @@ router.get('/dashboard-sync', async (req, res) => {
             const userData = result.rows[0];
             userData.role = userData.role || 'creator'; 
             userData.theme_color = userData.theme_color || 'violet';
-            
             res.json({ success: true, user: userData });
         } else {
             res.status(404).json({ success: false, message: "Data tidak ditemukan." });
         }
     } catch (err) {
-        console.error("DASHBOARD SYNC ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal sinkronisasi cloud." });
     }
 });
 
-router.get('/wallet/history/:id', async (req, res) => {
-    try {
-        const resBalance = await req.db.query('SELECT total_saldo FROM balance WHERE streamer_id = $1', [req.params.id]);
-        const resHistory = await req.db.query(
-            'SELECT * FROM transactions WHERE streamer_id = $1 ORDER BY created_at DESC LIMIT 10', 
-            [req.params.id]
-        );
+// --- 3. PROFIL & AVATAR ---
 
-        res.json({ 
-            success: true, 
-            balance: resBalance.rows[0]?.total_saldo || 0,
-            history: resHistory.rows || [] 
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal menarik riwayat transaksi." });
-    }
-});
-
-// --- 3. ROUTES PROFIL & AVATAR (100% MATCH DENGAN FRONTEND) ---
-
-// ✅ UPLOAD AVATAR (Nangkap file 'image' dari FormData frontend)
 router.post('/upload-avatar', upload.single('image'), async (req, res) => {
     const { userId } = req.body;
-    
-    if (!req.file) return res.status(400).json({ success: false, message: "Fotonya mana, Ri?" });
-    if (!userId) return res.status(400).json({ success: false, message: "Akses Ditolak: ID Sultan tidak valid!" });
+    if (!req.file || !userId) return res.status(400).json({ success: false, message: "Data tidak lengkap!" });
 
     try {
         const filename = req.file.filename;
-        // Update nama file foto di database
+        // Simpan ke streamers & users untuk sinkronisasi
         await req.db.query('UPDATE streamers SET profile_picture = $1 WHERE user_id = $2', [filename, userId]);
+        await req.db.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [filename, userId]);
         
         res.json({ success: true, message: "Avatar updated!", filename });
     } catch (err) {
-        console.error("UPLOAD ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal nyimpen foto ke database." });
+        res.status(500).json({ success: false, message: "Gagal simpan foto." });
     }
 });
 
-// ✅ DELETE AVATAR
 router.post('/delete-avatar', async (req, res) => {
     const { userId } = req.body;
     try {
         await req.db.query('UPDATE streamers SET profile_picture = NULL WHERE user_id = $1', [userId]);
-        res.json({ success: true, message: "Avatar reset to default!" });
+        await req.db.query('UPDATE users SET profile_picture = NULL WHERE id = $1', [userId]);
+        res.json({ success: true, message: "Avatar reset!" });
     } catch (err) {
         res.status(500).json({ success: false, message: "Gagal hapus foto." });
     }
 });
 
-// ✅ UPDATE PROFIL
 router.put('/update-profile', async (req, res) => {
     const { userId, display_name, bio, instagram, tiktok, youtube } = req.body;
     try {
@@ -164,16 +135,21 @@ router.put('/update-profile', async (req, res) => {
             res.status(404).json({ success: false, message: "User tidak ditemukan" });
         }
     } catch (err) {
-        console.error("UPDATE PROFILE ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal update profil." });
     }
 });
 
-
-// --- 4. ROUTES STANDAR LAINNYA ---
+// --- 4. STANDAR ROUTES ---
 router.get('/', getAllStreamers);
 router.get('/public/:username', getStreamerByUsername);
 router.put('/bank/:id', updateBankInfo);
+router.put('/update-theme', async (req, res) => {
+    const { theme_color, userId } = req.body;
+    try {
+        await req.db.query('UPDATE streamers SET theme_color = $1 WHERE user_id = $2', [theme_color, userId]);
+        res.json({ success: true, message: "Theme Updated!" });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
 
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', widgetController.updateSettings);

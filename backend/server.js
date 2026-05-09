@@ -52,18 +52,20 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); 
 
-// ✅ FIX 1: JSON Parser HARUS di atas semua rute API
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
+  // ✅ FIX COOP: Settingan paling aman biar Google Auth gak nge-block window.postMessage
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
-  // ✅ FIX 2: Inject DB ke req sebelum masuk ke rute
+  
+  // ✅ Inject DB ke req
   req.db = pool;
   next();
 });
 
+// Akses Folder Uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- 4. SOCKET.IO SETUP ---
@@ -80,23 +82,25 @@ app.use((req, res, next) => {
 
 // --- 5. API ROUTES (Hierarchy Fix) ---
 
-// Path Utama Ri!
+// Path Utama
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/donations', donationRoutes);
+
+// ✅ FIX 404 WALLET: Tambahkan ini supaya rute /api/wallet/history bisa kebaca
+app.use('/api/wallet', userRoutes); 
 app.use('/api/streamers', userRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    version: "2.1.4-Ultra-Fix"
+    version: "2.1.5-Sultan-Final"
   });
 });
 
 // --- 6. 404 HANDLER ---
 app.use((req, res) => {
-  // Log ini buat kita mantau di Railway rute apa yang dipanggil
   console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
   res.status(404).json({
     success: false,

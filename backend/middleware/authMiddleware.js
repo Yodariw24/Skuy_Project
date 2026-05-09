@@ -18,10 +18,10 @@ export const protect = async (req, res, next) => {
 
       /**
        * 3. Ambil data user terbaru dari DB Railway.
-       * ✅ FIX: Langsung ambil is_two_fa_enabled dari tabel users (lebih kenceng!)
+       * ✅ FIX: Ambil juga profile_picture agar sinkron saat ganti avatar!
        */
       const query = `
-        SELECT id, username, email, role, is_two_fa_enabled 
+        SELECT id, username, email, role, is_two_fa_enabled, profile_picture 
         FROM users 
         WHERE id = $1
       `;
@@ -35,12 +35,12 @@ export const protect = async (req, res, next) => {
         });
       }
 
-      // 4. Simpan data user ke objek req
+      // 4. Simpan data user ke objek req supaya bisa dipake di controller mana aja
       req.user = rows[0];
       next();
     } catch (err) {
       console.error("🔥 JWT ERROR:", err.message);
-      // Status 401 akan memicu auto-logout di frontend
+      // Status 401 akan memicu auto-logout di frontend Axios lo
       return res.status(401).json({ 
         success: false, 
         message: "Token expired atau tidak valid, silakan login kembali!" 
