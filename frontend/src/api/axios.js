@@ -1,25 +1,26 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS SKUY.GG v2.4 🛡️
- * Anti-Illegal Path Protocol
+ * KONFIGURASI AXIOS SKUY.GG v2.5 🛡️
+ * Anti-Illegal Path & Auto-Sanitize Protocol
  */
 const api = axios.create({
-  // ✅ FIX FINAL: Hard-clean URL untuk basmi /api/api/
   baseURL: (() => {
+    // 1. Ambil URL mentah dari ENV atau fallback ke Railway
     const rawUrl = import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app';
     
-    // Protokol Pembersihan:
-    // 1. Buang slash di ujung (/)
-    // 2. Buang tulisan /api di ujung (biar bersih total)
-    const base = rawUrl.replace(/\/$/, "").replace(/\/api$/, "");
+    // 2. Protokol Pembersihan Sultan:
+    // Hapus slash di akhir, hapus /api di akhir (biar konsisten)
+    const cleanBase = rawUrl.replace(/\/$/, "").replace(/\/api$/, "");
     
-    console.log("🚀 Sultan Bridge Connected to:", `${base}/api`);
-    return `${base}/api`;
+    const finalURL = `${cleanBase}/api`;
+    
+    console.log("%c🚀 Sultan Bridge Initialized:", "color: #7C3AED; font-weight: bold;", finalURL);
+    return finalURL;
   })(),
   
   withCredentials: true, 
-  timeout: 15000,
+  timeout: 20000, // Gue naikin dikit biar gak gampang timeout pas network bapuk
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -28,16 +29,23 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR REQUEST
- * Security Shield: Nempelkan Token & Handle Multipart
+ * Security Shield: Token Injection & URL Sanitize
  */
 api.interceptors.request.use(
   (config) => {
+    // 🛡️ 1. Basmi Double Prefix Secara Paksa sebelum Request terkirim
+    // Kalau lo nggak sengaja ngetik api.get('/api/user'), ini bakal benerin jadi api.get('/user')
+    if (config.url.startsWith('/api')) {
+      config.url = config.url.replace('/api', '');
+    }
+
+    // 🛡️ 2. Sultan Token Injection
     const token = localStorage.getItem('user_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // ✅ TRICK SULTAN: Handle upload foto agar browser set boundary secara otomatis
+    // 🛡️ 3. Multipart / Form Data Handling
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -49,30 +57,31 @@ api.interceptors.request.use(
 
 /**
  * INTERCEPTOR RESPONSE
- * Emergency Protocol: Handle Auto-Logout & Logging
+ * Emergency Protocol: Auto-Logout & Clean Logging
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const { response, config } = error;
 
-    // 🛡️ 1. PROTOKOL 401: Sesi Sultan Berakhir
+    // 🚨 1. EMERGENCY 401: Sesi Sultan Kadaluarsa / Token Ilegal
     if (response && response.status === 401) {
-      console.warn("⚠️ Access Denied: Sesi expired atau Token Ilegal!");
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('user');
+      console.error("⛔ Sesi Ilegal/Expired. Melakukan Force Sign-Out...");
+      localStorage.clear(); // Bersihin semua biar gak sisa sampah session
       
+      // Jangan redirect kalau emang lagi di halaman auth
       if (!window.location.pathname.includes('/auth')) {
         window.location.href = '/auth'; 
       }
     }
 
-    // 🕵️ 2. PROTOKOL 404: Basmi Double Prefix
+    // 🚨 2. DETEKSI JALUR ILEGAL (404)
     if (response && response.status === 404) {
-      console.error(`❌ Jalur Putus: [${config.method.toUpperCase()}] ${config.url}`);
-      if (config.url.includes('/api/api')) {
-        console.warn("🚨 DETEKSI DOUBLE API! Ri, jangan tulis /api lagi di pemanggilan fungsi!");
-      }
+      console.group("🕵️ Jalur Putus (404)");
+      console.error(`Method: [${config.method.toUpperCase()}]`);
+      console.error(`Full URL: ${config.baseURL}${config.url}`);
+      console.warn("Saran Ri: Cek rute di Backend (Express) atau hapus '/api' di pemanggilan fungsi.");
+      console.groupEnd();
     }
 
     return Promise.reject(error);
