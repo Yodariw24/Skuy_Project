@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { authenticator } from '@otplib/preset-default'; // ✅ FIX: Gunakan preset-default buat ESM
+import { authenticator } from '@otplib/preset-default'; 
 import QRCode from 'qrcode';
 import 'dotenv/config';
 
@@ -43,7 +43,6 @@ router.post('/google', async (req, res) => {
             await req.db.query('COMMIT');
         }
 
-        // ✅ Check if Sultan has 2FA enabled
         if (user.is_two_fa_enabled) {
             return res.json({ requiresTwoFA: true, userId: user.id });
         }
@@ -105,8 +104,13 @@ router.post('/login', async (req, res) => {
 
 // --- 4. QR-CODE TOTP PROTOCOL ---
 
+// ✅ RUTE SETUP (PASTIKAN FRONTEND PAKAI POST)
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
+    console.log("Incoming setup-2fa request for ID:", userId); // Debugging Log
+
+    if (!userId) return res.status(400).json({ message: "userId is required!" });
+
     try {
         const { rows } = await req.db.query("SELECT username FROM users WHERE id = $1", [userId]);
         if (rows.length === 0) return res.status(404).json({ message: "User not found" });
@@ -115,15 +119,17 @@ router.post('/setup-2fa', async (req, res) => {
         const otpauth = authenticator.keyuri(rows[0].username, 'Skuy.GG', secret);
         const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
+        // Update secret ke database
         await req.db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [secret, userId]);
 
         res.json({ success: true, qrCode: qrCodeUrl });
     } catch (err) {
         console.error("SETUP_2FA_ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal setup QR Protocol" });
+        res.status(500).json({ success: false, message: "Gagal setup QR Protocol: " + err.message });
     }
 });
 
+// ✅ RUTE VERIFY
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
@@ -132,7 +138,6 @@ router.post('/verify-2fa', async (req, res) => {
 
         if (!user || !user.two_fa_secret) return res.status(400).json({ message: "Secret missing!" });
 
-        // ✅ TOTP Verification
         const isValid = authenticator.check(token.trim(), user.two_fa_secret);
 
         if (isValid) {
@@ -155,6 +160,7 @@ router.post('/verify-2fa', async (req, res) => {
     }
 });
 
+// ✅ RUTE DISABLE
 router.post('/disable-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
@@ -166,4 +172,3 @@ router.post('/disable-2fa', async (req, res) => {
 });
 
 export default router;
-// UPDATE 2FA SULTAN FIX BANGET

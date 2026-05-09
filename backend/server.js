@@ -24,7 +24,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 2. DYNAMIC CORS PROTOCOL (Anti-Block Vercel) ---
+// --- 2. DYNAMIC CORS PROTOCOL ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
@@ -34,7 +34,6 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // ✅ Logic: Izinkan jika tanpa origin (mobile), ada di whitelist, atau subdomain vercel
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -43,24 +42,16 @@ const corsOptions = {
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'Accept', 
-    'X-Requested-With'
-    // ❌ HAPUS 'Access-Control-Allow-Origin' di sini, karena itu response header, bukan request header.
-  ],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
   credentials: true,
   optionsSuccessStatus: 200
 };
 
-// Pasang middleware CORS di paling atas
+// URUTAN MIDDLEWARE (Wajib!)
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ✅ Wajib handle pre-flight OPTIONS
+app.options('*', cors(corsOptions)); 
 
-// --- 3. SECURITY & UTILITY (FIX GOOGLE AUTH POPUP) ---
 app.use((req, res, next) => {
-  // ✅ FIX UTAMA: require-corp diganti jadi credentialless biar Google Login gak ke-blok!
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
   next();
@@ -68,50 +59,57 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 4. SOCKET.IO SETUP ---
+// ✅ Fix path untuk static files
+const uploadsPath = path.join(__dirname, 'uploads');
+if (!import.meta.env) { // Cek manual jika folder tidak ada
+  if (!import.meta.env && !path.resolve(uploadsPath)) {
+    // folder akan dibuat otomatis oleh multer di userRoutes
+  }
+}
+app.use('/uploads', express.static(uploadsPath));
+
+// --- 3. SOCKET.IO SETUP ---
 const server = http.createServer(app);
 const io = new Server(server, { 
   cors: corsOptions,
   transports: ['websocket', 'polling']
 });
 
-// Context Injection
 app.use((req, res, next) => {
   req.db = pool;
   req.io = io;
   next();
 });
 
-// --- 5. API ROUTES (Final Hierarchy) ---
+// --- 4. API ROUTES (Hierarchy Fix) ---
 
+// Pastikan urutan ini Ri, jangan dipindah-pindah
 app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/wallet', userRoutes); 
-app.use('/api/streamers', userRoutes);
+app.use('/api/streamers', userRoutes); // Sisakan ini saja jika wallet sudah masuk di userRoutes
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    version: "2.1.2-CORS-Google-Fixed"
+    version: "2.1.3-Final-Clean"
   });
 });
 
-// --- 6. 404 HANDLER ---
+// --- 5. 404 HANDLER (Wajib di bawah semua route) ---
 app.use((req, res) => {
+  console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
   res.status(404).json({
     success: false,
-    message: `Rute [${req.method}] ${req.url} Gak Ada, Ri!`
+    message: `Rute [${req.method}] ${req.url} Gak Ada di Backend Railway, Ri!`
   });
 });
 
-// --- 7. GLOBAL ERROR HANDLING ---
+// --- 6. GLOBAL ERROR HANDLING ---
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Error: ${err.message}`);
-  // Kalau errornya dari CORS, kasih status 403 Forbidden
   if (err.message.includes('CORS')) {
       return res.status(403).json({ success: false, message: err.message });
   }
@@ -121,7 +119,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- 8. SERVER START ---
+// --- 7. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
