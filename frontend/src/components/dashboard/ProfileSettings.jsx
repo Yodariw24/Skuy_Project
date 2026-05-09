@@ -47,22 +47,14 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // ✅ CONFIG: Base URL bersih untuk akses file statis
+  // ✅ REFINED CONFIG: Handle base URL lebih aman
   const API_BASE = import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL.replace(/\/$/, "").replace("/api", "") 
+    ? import.meta.env.VITE_API_URL.split('/api')[0].replace(/\/$/, "")
     : 'https://skuyproject-production.up.railway.app';
 
-  // ✅ LOGIKA PENAMPIL FOTO (FIXED SULTAN NYASAR)
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
-    
-    // Gunakan Regex untuk deteksi HTTP/HTTPS di awal string
-    // Jika deteksi URL luar, langsung kembalikan tanpa prefix
-    if (/^(http|https):\/\//.test(photoPath)) {
-      return photoPath;
-    }
-    
-    // Jika hanya nama file (upload manual), baru arahkan ke folder uploads Railway
+    if (/^(http|https):\/\//.test(photoPath)) return photoPath;
     return `${API_BASE}/uploads/${photoPath}`;
   };
 
@@ -70,6 +62,13 @@ export default function ProfileSettings({ user, setUser }) {
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 🛡️ Validasi Ukuran (Max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setStatus({ type: 'error', message: 'File kegedean, Ri! Max 2MB ya.' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      return;
+    }
     
     const uploadFormData = new FormData();
     uploadFormData.append('image', file);
@@ -102,7 +101,6 @@ export default function ProfileSettings({ user, setUser }) {
     setLoading(true);
     try {
       await api.post('/user/delete-avatar', { userId: user.id });
-
       const updatedUser = { ...user, profile_picture: null };
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -126,6 +124,7 @@ export default function ProfileSettings({ user, setUser }) {
       });
 
       if (res.data.success) {
+        // Gabungkan data lama dengan data baru dari server
         const updatedUser = { ...user, ...res.data.user };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -149,6 +148,7 @@ export default function ProfileSettings({ user, setUser }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto font-sans text-slate-900 pb-20 text-left">
+      {/* Banner Link */}
       <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm mb-8 group">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -165,6 +165,7 @@ export default function ProfileSettings({ user, setUser }) {
         </div>
       </div>
 
+      {/* Floating Alert */}
       {status.message && (
         <div className={`fixed top-10 right-10 z-[60] px-8 py-4 rounded-[2rem] shadow-2xl animate-in slide-in-from-right ${status.type === 'success' ? 'bg-slate-900 text-violet-400' : 'bg-red-600 text-white'} font-black text-[10px] uppercase italic tracking-widest flex items-center gap-3`}>
           <p className="tracking-tight">{status.message}</p>
@@ -172,6 +173,7 @@ export default function ProfileSettings({ user, setUser }) {
       )}
 
       <form onSubmit={handleUpdate} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Kolom Kiri: Form */}
         <div className="lg:col-span-2 space-y-8">
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
                 <div className="flex items-center gap-3 mb-2"><div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl"><Icon.SquarePen size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Profile Info</h2></div>
@@ -179,6 +181,7 @@ export default function ProfileSettings({ user, setUser }) {
                 <FormInput label="SKUY.GG Username" iconName="AtSign" type="text" readOnly value={formData.username} className="w-full pl-12 pr-6 py-4 bg-slate-100 rounded-[1.5rem] border border-slate-200 outline-none font-bold text-slate-400 text-sm cursor-not-allowed" />
                 <FormInput label="Bio Description" iconName="FileText" textArea placeholder="Tell your donors about yourself..." value={formData.bio} onChange={(e) => setFormData({...formData, bio: e.target.value})} />
             </div>
+            
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex items-center gap-3 mb-6"><div className="p-2.5 bg-fuchsia-50 text-fuchsia-600 rounded-xl"><Icon.Share2 size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Connections</h2></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -189,6 +192,7 @@ export default function ProfileSettings({ user, setUser }) {
             </div>
         </div>
 
+        {/* Kolom Kanan: Avatar & Submit */}
         <div className="space-y-6 lg:sticky lg:top-8">
             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8">Profile Avatar</h3>
@@ -199,7 +203,7 @@ export default function ProfileSettings({ user, setUser }) {
                                 src={getDisplayPhoto(user?.profile_picture)} 
                                 alt="Profile" 
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
+                                onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
                             />
                         </div>
                     </div>
