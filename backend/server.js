@@ -8,7 +8,7 @@ import pkg from 'pg';
 import helmet from 'helmet';
 import 'dotenv/config';
 
-// 🛡️ SYNC 1: Timezone & Paths
+// --- 🛡️ SYNC 1: Timezone & Paths ---
 process.env.TZ = 'Asia/Jakarta'; 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +29,7 @@ const pool = new Pool({
 
 // --- 2. SECURITY & CORS PROTOCOL ---
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Penting: Biar gambar dari uploads bisa tampil di Vercel
+  crossOriginResourcePolicy: false, // Penting: Biar file uploads tampil di frontend/Vercel
 }));
 
 const allowedOrigins = [
@@ -41,7 +41,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Izinkan jika origin terdaftar atau merupakan subdomain vercel
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -54,15 +53,14 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- 3. MIDDLEWARE INJECTION (DB & SOCKET) ---
+// --- 3. STATIC FILES & SOCKET.IO ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
 const io = new Server(server, { 
-  cors: { origin: "*", credentials: true } // OBS kadang rewel, kita buka buat signal socket
+  cors: { origin: "*", credentials: true } 
 });
 
-// Logic Socket Connection (Optional Log)
 io.on('connection', (socket) => {
   const streamerId = socket.handshake.query.streamerId;
   if (streamerId) {
@@ -71,7 +69,7 @@ io.on('connection', (socket) => {
   }
 });
 
-// Inject DB & IO ke Object Request
+// Inject DB & IO & Security Header
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   req.db = pool;
@@ -79,38 +77,44 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 🛡️ 4. API ROUTES (HIERARKI SULTAN V2.3.0) ---
+// --- 🛡️ 4. API ROUTES (SYNCED WITH FRONTEND) ---
 
-// Jalur Utama: Auth, User, & Donation
-app.use('/auth', authRoutes); 
-app.use('/user', userRoutes);
-app.use('/donations', donationRoutes);
+// ✅ SOLUSI SULTAN: Gunakan Router khusus untuk prefix /api
+const apiRouter = express.Router();
 
-// Fallback legacy routes (opsional jika frontend lama belum update)
-app.use('/auth', authRoutes); 
-app.use('/user', userRoutes);
+apiRouter.use('/auth', authRoutes); 
+apiRouter.use('/user', userRoutes);
+apiRouter.use('/donations', donationRoutes);
 
+// Pasang rute utama ke /api
+app.use('/api', apiRouter);
+
+// Jalur Non-API (Cek Health Server)
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     engine: "SkuyGG Sultan Engine", 
-    version: "2.3.0", 
-    security: "Dual-OTP Redirect Active",
+    version: "3.0.1", 
+    security: "Prefix Sync Active",
     markas: "ariwirayuda24@gmail.com"
   });
 });
 
 // --- 🕵️ 5. 404 & ERROR HANDLER ---
+// Penanganan rute yang benar-benar tidak ada
 app.use((req, res) => {
-  if (!req.url.startsWith('/uploads/')) {
-    console.warn(`❌ Jalur Ilegal: [${req.method}] ${req.url}`);
+  // Hanya log peringatan jika bukan favicon atau rute uploads
+  if (req.url !== '/favicon.ico' && !req.url.startsWith('/uploads/')) {
+    console.warn(`⚠️ Jalur Tidak Terdaftar: [${req.method}] ${req.url}`);
   }
+
   res.status(404).json({
     success: false,
     message: `Node [${req.url}] tidak ditemukan di SkuyGG Engine!`
   });
 });
 
+// Penanganan Internal Server Error
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Crash: ${err.message}`);
   res.status(err.status || 500).json({ 
@@ -125,7 +129,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('=========================================');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
   console.log(`🕒 ZONE: ${process.env.TZ}`);
-  console.log(`🛡️ SECURITY: Dual-OTP Filter Enabled`);
+  console.log(`🛡️ SECURITY: Prefix /api Sync Enabled`);
   console.log(`📧 MARKAS: ariwirayuda24@gmail.com`);
   console.log('=========================================');
 });
