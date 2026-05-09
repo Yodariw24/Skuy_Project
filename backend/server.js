@@ -47,29 +47,26 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// URUTAN MIDDLEWARE (Wajib!)
+// --- 3. MIDDLEWARE STACK (URUTAN WAJIB!) ---
+
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); 
+
+// ✅ FIX 1: JSON Parser HARUS di atas semua rute API
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless'); 
+  // ✅ FIX 2: Inject DB ke req sebelum masuk ke rute
+  req.db = pool;
   next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Fix path untuk static files
-const uploadsPath = path.join(__dirname, 'uploads');
-if (!import.meta.env) { // Cek manual jika folder tidak ada
-  if (!import.meta.env && !path.resolve(uploadsPath)) {
-    // folder akan dibuat otomatis oleh multer di userRoutes
-  }
-}
-app.use('/uploads', express.static(uploadsPath));
-
-// --- 3. SOCKET.IO SETUP ---
+// --- 4. SOCKET.IO SETUP ---
 const server = http.createServer(app);
 const io = new Server(server, { 
   cors: corsOptions,
@@ -77,29 +74,29 @@ const io = new Server(server, {
 });
 
 app.use((req, res, next) => {
-  req.db = pool;
   req.io = io;
   next();
 });
 
-// --- 4. API ROUTES (Hierarchy Fix) ---
+// --- 5. API ROUTES (Hierarchy Fix) ---
 
-// Pastikan urutan ini Ri, jangan dipindah-pindah
+// Path Utama Ri!
 app.use('/api/auth', authRoutes);
-app.use('/api/donations', donationRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/streamers', userRoutes); // Sisakan ini saja jika wallet sudah masuk di userRoutes
+app.use('/api/donations', donationRoutes);
+app.use('/api/streamers', userRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     project: "SkuyGG Engine",
-    version: "2.1.3-Final-Clean"
+    version: "2.1.4-Ultra-Fix"
   });
 });
 
-// --- 5. 404 HANDLER (Wajib di bawah semua route) ---
+// --- 6. 404 HANDLER ---
 app.use((req, res) => {
+  // Log ini buat kita mantau di Railway rute apa yang dipanggil
   console.warn(`🕵️ Sultan nyasar ke: [${req.method}] ${req.url}`);
   res.status(404).json({
     success: false,
@@ -107,19 +104,16 @@ app.use((req, res) => {
   });
 });
 
-// --- 6. GLOBAL ERROR HANDLING ---
+// --- 7. GLOBAL ERROR HANDLING ---
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Error: ${err.message}`);
-  if (err.message.includes('CORS')) {
-      return res.status(403).json({ success: false, message: err.message });
-  }
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error'
   });
 });
 
-// --- 7. SERVER START ---
+// --- 8. SERVER START ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('-----------------------------------------');
