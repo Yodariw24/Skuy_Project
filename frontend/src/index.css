@@ -39,24 +39,21 @@ html, body {
 
 /* --- NEO-BRUTALISM UTILITIES (Sultan Shortcut) --- */
 @layer components {
-  /* Class buat border item tebel khas SkuyGG */
   .skuy-border {
     @apply border-4 border-slate-950;
   }
   
-  /* Class buat shadow kaku kasta Sultan */
   .skuy-shadow {
     @apply shadow-[8px_8px_0px_0px_rgba(0,0,0,1)];
   }
 
-  /* Animasi halus buat transisi hover */
   .skuy-transition {
     @apply transition-all duration-300 ease-out;
   }
 }
 
 /* --- SWEETALERT2: SULTAN SLIM TOAST (POJOK KANAN ATAS) --- */
-/* Biar toast selalu berada di kasta tertinggi (di atas modal/sidebar) */
+/* Pastikan toast selalu di kasta tertinggi */
 .swal2-container.swal2-top-end.swal2-backdrop-show {
   z-index: 99999 !important;
 }
@@ -67,11 +64,20 @@ html, body {
   max-width: 450px !important;
   border-radius: 1.5rem !important;
   padding: 1rem 1.5rem !important;
-  border: 4px solid #0f172a !important; /* Border lebih tebel biar makin Sultan */
+  border: 4px solid #0f172a !important;
   background: #ffffff !important;
   box-shadow: 8px 8px 0px 0px rgba(0,0,0,1) !important;
   margin-top: 20px !important;
   margin-right: 20px !important;
+}
+
+/* Responsif untuk layar kecil (HP) */
+@media (max-width: 640px) {
+  .skuy-slim-toast {
+    min-width: 200px !important;
+    margin-right: 10px !important;
+    padding: 0.8rem 1rem !important;
+  }
 }
 
 .skuy-toast-content {
@@ -94,6 +100,8 @@ html, body {
   font-size: 0.7rem;
   opacity: 0.6;
   margin-top: 4px;
+  font-style: normal;
+  text-transform: none;
 }
 
 .swal2-timer-progress-bar { 
