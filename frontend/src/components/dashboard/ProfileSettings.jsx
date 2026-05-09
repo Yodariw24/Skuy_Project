@@ -47,20 +47,25 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }, [user])
 
-  // ✅ FIXED: Mengarah langsung ke domain Railway lo tanpa tambahan /api di ujungnya
+  // ✅ CONFIG: Base URL untuk akses file statis (Uploads)
   const API_BASE = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.replace(/\/$/, "").replace("/api", "") 
     : 'https://skuyproject-production.up.railway.app';
 
+  // ✅ LOGIKA PENAMPIL FOTO (ANTI-NYASAR)
   const getDisplayPhoto = (photoPath) => {
     if (!photoPath) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`;
-    if (photoPath.startsWith('http')) return photoPath;
     
-    // ✅ Mengarah tepat ke folder uploads di backend Railway
+    // Jika path diawali http (Foto Google/URL Luar), jangan tambahkan prefix uploads!
+    if (/^(http|https):\/\//.test(photoPath)) {
+      return photoPath;
+    }
+    
+    // Jika hanya nama file, baru arahkan ke folder uploads Railway
     return `${API_BASE}/uploads/${photoPath}`;
   };
 
-  // --- 1. LOGIKA UPLOAD (SINKRON RAILWAY) ---
+  // --- 1. LOGIKA UPLOAD ---
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -73,7 +78,6 @@ export default function ProfileSettings({ user, setUser }) {
     setStatus({ type: 'success', message: 'Sinkronisasi Cloud...' });
 
     try {
-      // ✅ Menggunakan instance api yang sudah dikonfigurasi interceptor token
       const res = await api.post('/user/upload-avatar', uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -110,7 +114,7 @@ export default function ProfileSettings({ user, setUser }) {
     }
   }
 
-  // --- 2. UPDATE PROFIL (SINKRON RAILWAY) ---
+  // --- 2. UPDATE PROFIL ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -127,7 +131,7 @@ export default function ProfileSettings({ user, setUser }) {
         setStatus({ type: 'success', message: 'Profil Berhasil Diperbarui! ✨' });
       }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Gagal update: ' + (err.response?.data?.message || err.message) });
+      setStatus({ type: 'error', message: 'Gagal update profil.' });
     } finally {
       setLoading(false);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
@@ -168,14 +172,14 @@ export default function ProfileSettings({ user, setUser }) {
 
       <form onSubmit={handleUpdate} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-8">
-            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6 relative overflow-hidden">
-                <div className="flex items-center gap-3 mb-2 relative z-10"><div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl"><Icon.SquarePen size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Profile Info</h2></div>
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-3 mb-2"><div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl"><Icon.SquarePen size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Profile Info</h2></div>
                 <FormInput label="Display Nickname" iconName="Tag" placeholder="Ari Wirayuda" value={formData.display_name} onChange={(e) => setFormData({...formData, display_name: e.target.value})} />
                 <FormInput label="SKUY.GG Username" iconName="AtSign" type="text" readOnly value={formData.username} className="w-full pl-12 pr-6 py-4 bg-slate-100 rounded-[1.5rem] border border-slate-200 outline-none font-bold text-slate-400 text-sm cursor-not-allowed" />
                 <FormInput label="Bio Description" iconName="FileText" textArea placeholder="Tell your donors about yourself..." value={formData.bio} onChange={(e) => setFormData({...formData, bio: e.target.value})} />
             </div>
-            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
-                <div className="flex items-center gap-3 mb-6 relative z-10"><div className="p-2.5 bg-fuchsia-50 text-fuchsia-600 rounded-xl"><Icon.Share2 size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Connections</h2></div>
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="flex items-center gap-3 mb-6"><div className="p-2.5 bg-fuchsia-50 text-fuchsia-600 rounded-xl"><Icon.Share2 size={18} strokeWidth={3}/></div><h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Connections</h2></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <FormInput label="Instagram URL" iconName="Instagram" type="text" placeholder="https://instagram.com/user" value={formData.instagram} onChange={(e) => setFormData({...formData, instagram: e.target.value})} />
                     <FormInput label="TikTok URL" iconName="Video" type="text" placeholder="https://tiktok.com/@user" value={formData.tiktok} onChange={(e) => setFormData({...formData, tiktok: e.target.value})} />
@@ -185,11 +189,10 @@ export default function ProfileSettings({ user, setUser }) {
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-8">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8 relative z-10">Profile Avatar</h3>
-                <div className="relative group w-36 h-36 mb-6 z-10">
-                    <div className="w-full h-full rounded-[3rem] p-1.5 bg-gradient-to-tr from-violet-600 to-fuchsia-500 shadow-2xl shadow-violet-200">
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8">Profile Avatar</h3>
+                <div className="relative group w-36 h-36 mb-6">
+                    <div className="w-full h-full rounded-[3rem] p-1.5 bg-gradient-to-tr from-violet-600 to-fuchsia-500 shadow-2xl">
                         <div className="w-full h-full rounded-[2.8rem] bg-white overflow-hidden border-4 border-white">
                             <img 
                                 src={getDisplayPhoto(user?.profile_picture)} 
@@ -199,19 +202,16 @@ export default function ProfileSettings({ user, setUser }) {
                             />
                         </div>
                     </div>
-                    <div className="absolute inset-0 z-20 rounded-[3rem] bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 backdrop-blur-[2px]">
+                    <div className="absolute inset-0 z-20 rounded-[3rem] bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
                         <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 bg-white text-violet-600 rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all"><Icon.Camera size={18} strokeWidth={2.5} /></button>
                         {user?.profile_picture && (<button type="button" onClick={handleDeletePhoto} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all"><Icon.Trash2 size={18} strokeWidth={2.5} /></button>)}
                     </div>
                 </div>
-                <div className="text-center relative z-10">
-                    <p className="text-[9px] font-black text-slate-300 uppercase italic">{user?.profile_picture ? "Secure Custom Avatar" : "Default Identity Avatar"}</p>
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} />
-                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} />
             </div>
-            <button type="submit" disabled={loading} className="w-full py-5 bg-violet-600 text-white rounded-[1.5rem] font-black uppercase text-[11px] italic tracking-[0.2em] shadow-xl shadow-violet-100 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-violet-700">
+            <button type="submit" disabled={loading} className="w-full py-5 bg-violet-600 text-white rounded-[1.5rem] font-black uppercase text-[11px] italic tracking-[0.2em] shadow-xl shadow-violet-100 active:scale-95 transition-all flex items-center justify-center gap-3">
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Icon.Save size={16} strokeWidth={2.5} />}
-                {loading ? 'SYNCHRONIZING...' : 'SAVE CHANGES'}
+                {loading ? 'SAVING...' : 'SAVE CHANGES'}
             </button>
         </div>
       </form>
