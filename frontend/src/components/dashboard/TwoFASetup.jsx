@@ -4,20 +4,6 @@ import { motion } from 'framer-motion';
 import { ShieldCheck, Loader2, MessageSquare, Mail, CheckCircle2, AlertTriangle, ArrowRight, Zap } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-const skuyAlert = (title, text, icon) => {
-  Swal.fire({
-    title: title.toUpperCase(),
-    text: text,
-    icon: icon,
-    customClass: {
-      popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]',
-      title: 'font-black italic tracking-tighter text-slate-950',
-      confirmButton: 'bg-slate-950 text-white px-8 py-3 rounded-xl font-black uppercase italic'
-    },
-    buttonsStyling: false
-  });
-};
-
 function TwoFASetup({ user, setActiveMenu }) {
   const [step, setStep] = useState(user?.is_two_fa_enabled ? 'enabled' : 'idle');
   const [otp, setOtp] = useState('');
@@ -26,8 +12,27 @@ function TwoFASetup({ user, setActiveMenu }) {
 
   const sultanId = user?.id || user?.user_id;
 
+  // --- HELPER: SULTAN SLIM TOAST PROTOCOL ---
+  const showSultanToast = (title) => {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true,
+      customClass: {
+        popup: 'skuy-slim-toast',
+        title: 'skuy-toast-content'
+      }
+    });
+    Toast.fire({
+      icon: 'success',
+      title: title
+    });
+  };
+
   const handleRequestOTP = async () => {
-    if (!sultanId) return skuyAlert("DATA KOSONG", "ID Sultan tidak terbaca, silakan login ulang!", "error");
+    if (!sultanId) return;
 
     // 🛡️ PROTEKSI SULTAN: Cek nomor WA
     if (!user?.phone_number || user?.phone_number.trim() === "") {
@@ -39,34 +44,40 @@ function TwoFASetup({ user, setActiveMenu }) {
         confirmButtonText: "ISI SEKARANG",
         cancelButtonText: "NANTI AJA",
         customClass: {
-          popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#F59E0B]',
+          popup: 'skuy-border skuy-shadow rounded-[2rem]',
           confirmButton: 'bg-slate-950 text-white px-8 py-3 rounded-xl font-black uppercase italic mr-2',
           cancelButton: 'bg-slate-100 text-slate-400 px-8 py-3 rounded-xl font-black uppercase italic'
         },
         buttonsStyling: false
       }).then((result) => {
         if (result.isConfirmed && setActiveMenu) {
-          setActiveMenu('profile'); // Pastiin lo passing setActiveMenu dari parent
+          setActiveMenu('profile');
         }
       });
     }
 
     setLoadingOTP(true);
     try {
+      // ✅ FIX: Path lurus /auth/setup-2fa
       const res = await api.post('/auth/setup-2fa', { userId: sultanId });
       if (res.data.success) {
-        setStep('verifying');
-        skuyAlert("PROTOCOL SENT", "Cek WhatsApp lo & Email Sultan ariwirayuda24!", "info");
+        setStep('verifying'); // Pindah ke input dulu
+        showSultanToast('<b>PROTOCOL SENT</b> <span>Cek WA & Email ariwirayuda24!</span>');
       }
     } catch (err) {
-      skuyAlert("GAGAL", "Gagal kontak server OTP. Cek Railway!", "error");
+      Swal.fire({
+        icon: 'error',
+        title: 'ENGINE ERROR',
+        text: 'Gagal kontak server OTP. Cek Railway!',
+        customClass: { popup: 'skuy-border skuy-shadow' }
+      });
     } finally {
       setLoadingOTP(false);
     }
   };
 
   const handleActivate = async () => {
-    if (otp.length < 6) return skuyAlert("KODE KURANG", "Masukkan 6 digit angka!", "warning");
+    if (otp.length < 6) return;
     setIsVerifying(true);
     try {
       const res = await api.post('/auth/verify-2fa', {
@@ -74,20 +85,22 @@ function TwoFASetup({ user, setActiveMenu }) {
         token: otp.trim()
       });
       if (res.data.success) {
-        skuyAlert("GACOR!", "Akun lo sekarang setangguh benteng.", "success");
+        showSultanToast('<b>SECURED!</b> <span>2FA Berhasil Aktif.</span>');
         
-        // Update local state sekejap
         const updatedUser = { ...user, is_two_fa_enabled: true };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
         setStep('enabled');
         setOtp('');
-        
-        // Force reload biar Sidebar & View dapet data fresh dari DB
         setTimeout(() => { window.location.reload(); }, 1500);
       }
     } catch (err) {
-      skuyAlert("VERIFIKASI GAGAL", "Kode OTP Salah atau Expired!", "error");
+      Swal.fire({
+        icon: 'error',
+        title: 'VERIFIKASI GAGAL',
+        text: 'Kode OTP Salah atau Expired!',
+        customClass: { popup: 'skuy-border skuy-shadow' }
+      });
       setOtp('');
     } finally {
       setIsVerifying(false);
@@ -96,7 +109,6 @@ function TwoFASetup({ user, setActiveMenu }) {
 
   return (
     <div className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-left relative overflow-hidden transition-all hover:shadow-[16px_16px_0px_0px_#7C3AED]">
-      {/* Background Decor */}
       <div className="absolute top-0 right-0 p-4 opacity-[0.03] rotate-12"><ShieldCheck size={120} /></div>
 
       <div className="flex items-center gap-4 mb-10 relative z-10">
@@ -105,7 +117,7 @@ function TwoFASetup({ user, setActiveMenu }) {
         </div>
         <div>
           <h3 className="font-black italic text-2xl uppercase leading-none text-slate-950">Vault Access</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-[0.3em]">Dual-Channel Auth v2.3</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-[0.3em]">Dual-Channel Auth v2.4</p>
         </div>
       </div>
 
@@ -116,9 +128,9 @@ function TwoFASetup({ user, setActiveMenu }) {
           </motion.div>
           <div className="text-center space-y-2">
             <p className="font-black italic uppercase text-slate-950 text-2xl tracking-tighter">STATUS: PROTECTED</p>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed italic">
                 Railway Cloud Sync Active <br/>
-                <span className="text-emerald-500 underline decoration-2">WhatsApp & Email markas secured</span>
+                <span className="text-emerald-500 underline decoration-2">WhatsApp & Email Secured</span>
             </p>
           </div>
         </div>
@@ -131,17 +143,11 @@ function TwoFASetup({ user, setActiveMenu }) {
                 <Zap size={14} className="text-violet-600" fill="currentColor" />
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Protocol Instruction</p>
             </div>
-            <p className="text-xs font-bold text-slate-700 leading-relaxed italic">
-              "Aktifkan Dual-OTP biar tiap login SkuyGG kirim kode rahasia ke <span className="text-violet-600">Email markas</span> dan <span className="text-emerald-600">WhatsApp lo</span> secara real-time."
+            <p className="text-xs font-bold text-slate-700 leading-relaxed italic text-left">
+              "Aktifkan Dual-OTP biar tiap login SkuyGG kirim kode rahasia ke <span className="text-violet-600">Email markas</span> dan <span className="text-emerald-600">WA lo</span>."
             </p>
           </div>
           
-          {!user?.phone_number && (
-            <div className="flex items-center gap-3 p-4 bg-amber-50 border-4 border-amber-200 rounded-2xl text-amber-700 text-[10px] font-black uppercase italic">
-              <AlertTriangle size={18} /> Nomor WA belum diset! Sinkronkan di profil dulu, Ri.
-            </div>
-          )}
-
           <button 
             onClick={handleRequestOTP}
             disabled={loadingOTP}
@@ -166,7 +172,7 @@ function TwoFASetup({ user, setActiveMenu }) {
               className="w-full p-6 text-center text-5xl font-black border-4 border-slate-950 rounded-[2rem] outline-none focus:bg-violet-50 transition-all placeholder:text-slate-100 shadow-inner tracking-[0.2em]"
               value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
             />
-            <p className="text-[9px] font-bold text-slate-400 italic">Kode dikirim ke: {user?.phone_number || 'WA'} & ariwirayuda24</p>
+            <p className="text-[9px] font-bold text-slate-400 italic">Dikirim ke: {user?.phone_number} & ariwirayuda24</p>
           </div>
 
           <div className="flex gap-4">

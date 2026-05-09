@@ -14,7 +14,7 @@ function PaymentPage() {
     setLoading(true);
     try {
       // ✅ SINKRON: Update status donasi ke SUCCESS via backend
-      const res = await api.put(`/api/donations/status/${donationId}`, {
+      const res = await api.put(`/donations/status/${donationId}`, {
         status: 'SUCCESS'
       });
 

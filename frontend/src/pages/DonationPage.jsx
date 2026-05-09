@@ -37,7 +37,7 @@ function DonationPage() {
     try {
       setLoading(true);
       // ✅ SINKRON: Panggil endpoint public profile
-      const res = await api.get(`/api/donations/profile/${username}`);
+      const res = await api.get(`/donations/profile/${username}`);
       
       if (res.data.success) {
         const data = res.data.data;
@@ -45,8 +45,8 @@ function DonationPage() {
 
         // ✅ FETCH SALDO & HISTORY SECARA PARALEL
         const [resBalance, resHistory] = await Promise.all([
-          api.get(`/api/donations/${data.id}/balance`),
-          api.get(`/api/donations/public-history/${data.id}`)
+          api.get(`/donations/${data.id}/balance`),
+          api.get(`/donations/public-history/${data.id}`)
         ]);
 
         if (resBalance.data.success) setBalance(resBalance.data.total_saldo);

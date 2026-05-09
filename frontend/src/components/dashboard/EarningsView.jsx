@@ -21,7 +21,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     if (!user?.id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/api/wallet/history/${user.id}`);
+      const res = await api.get(`/wallet/history/${user.id}`);
       
       if (res.data && Array.isArray(res.data.history)) {
         setTransactions(res.data.history);

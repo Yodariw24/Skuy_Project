@@ -23,7 +23,7 @@ const WidgetClient = () => {
     const fetchSettings = async () => {
       try {
         // Panggil rute widget yang sudah kita buat di widgetController
-        const res = await api.get(`/api/user/widgets/settings/${streamKey}/${type || 'tip'}`);
+        const res = await api.get(`/user/widgets/settings/${streamKey}/${type || 'tip'}`);
         if (res.data.success) {
           setSettings(res.data.data);
         }
