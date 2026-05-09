@@ -1,6 +1,7 @@
 import express from 'express';
 const router = express.Router();
 
+// Import semua fungsi dari Controller (Termasuk getDonationsByStreamer biar gak crash!)
 import { 
     createDonation, 
     getDonationsByStreamer, 
@@ -15,7 +16,7 @@ import { validateDonation } from '../middleware/validator.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 // --- 1. PUBLIC PROFILE PROTOCOL ---
-// Dipakai di halaman donasi (No Auth Needed)
+// No Auth Needed (Untuk donatur ngelihat profil kreator)
 router.get('/profile/:username', async (req, res) => {
     const { username } = req.params;
     if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
@@ -39,12 +40,14 @@ router.get('/profile/:username', async (req, res) => {
 });
 
 // --- 2. SULTAN PRIVACY ROUTES (Auth Required) ---
-// Dipakai di Dashboard (Butuh Login)
+// Dipakai di Dashboard (Hanya pemilik akun yang bisa akses)
 router.post('/withdraw', protect, withdrawBalance); 
 router.get('/history/:id', protect, getWalletHistory); 
 router.get('/balance/:id', protect, getStreamerBalance);
+router.get('/list/:id', protect, getDonationsByStreamer); // ✅ Sekarang aman, controller sudah ada
+
+// Rute instan buat feed di dashboard
 router.get('/activity-feed', protect, async (req, res) => {
-    // Rute instan buat feed di dashboard tanpa ribet passing ID di URL
     try {
         const result = await req.db.query(
             "SELECT * FROM donations WHERE streamer_id = $1 AND status = 'SUCCESS' ORDER BY created_date DESC LIMIT 10",
@@ -56,14 +59,11 @@ router.get('/activity-feed', protect, async (req, res) => {
     }
 });
 
-// --- 3. PUBLIC HISTORY (For Profile Page) ---
+// --- 3. PUBLIC HISTORY (Untuk List Donasi di Halaman Profil) ---
 router.get('/public-history/:id', getPublicHistory); 
 
-// --- 4. DONATION ENGINE ---
+// --- 4. DONATION ENGINE (Transaksi) ---
 router.post('/create', validateDonation, createDonation); 
 router.put('/status/:id', updateDonationStatus); 
-
-// Fallback buat narik semua data donasi (Admin/Dev only)
-router.get('/list/:id', protect, getDonationsByStreamer);
 
 export default router;

@@ -29,7 +29,7 @@ const pool = new Pool({
 
 // --- 2. SECURITY & CORS PROTOCOL ---
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Biar avatar user tetap bisa tampil di FE
+  crossOriginResourcePolicy: false, // Penting: Biar gambar dari uploads bisa tampil di Vercel
 }));
 
 const allowedOrigins = [
@@ -41,7 +41,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Jalur ekspres buat lokal & Vercel
+    // Izinkan jika origin terdaftar atau merupakan subdomain vercel
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -55,15 +55,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // --- 3. MIDDLEWARE INJECTION (DB & SOCKET) ---
-// Static folder buat simpen gambar avatar
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
 const io = new Server(server, { 
-  cors: { origin: allowedOrigins, credentials: true } 
+  cors: { origin: "*", credentials: true } // OBS kadang rewel, kita buka buat signal socket
 });
 
-// Inject Pool DB & Socket.io ke setiap request
+// Logic Socket Connection (Optional Log)
+io.on('connection', (socket) => {
+  const streamerId = socket.handshake.query.streamerId;
+  if (streamerId) {
+    socket.join(`streamer_${streamerId}`);
+    console.log(`📡 Node OBS Linked: Streamer ID ${streamerId}`);
+  }
+});
+
+// Inject DB & IO ke Object Request
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   req.db = pool;
@@ -73,17 +81,14 @@ app.use((req, res, next) => {
 
 // --- 🛡️ 4. API ROUTES (HIERARKI SULTAN V2.3.0) ---
 
-// A. AUTH - Jalur Dual-OTP (WA & Email Markas Sultan)
+// Jalur Utama: Auth, User, & Donation
 app.use('/api/auth', authRoutes); 
-app.use('/auth', authRoutes); 
-
-// B. USER - Jalur Sinkronisasi Profil & No WA
 app.use('/api/user', userRoutes);
-app.use('/user', userRoutes);
-app.use('/api/streamers', userRoutes); 
-
-// C. DONATION - Jalur Cuan & Activity Feed
 app.use('/api/donations', donationRoutes);
+
+// Fallback legacy routes (opsional jika frontend lama belum update)
+app.use('/auth', authRoutes); 
+app.use('/user', userRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
@@ -91,7 +96,7 @@ app.get('/', (req, res) => {
     engine: "SkuyGG Sultan Engine", 
     version: "2.3.0", 
     security: "Dual-OTP Redirect Active",
-    markas_pusat: "ariwirayuda24@gmail.com"
+    markas: "ariwirayuda24@gmail.com"
   });
 });
 
@@ -102,7 +107,7 @@ app.use((req, res) => {
   }
   res.status(404).json({
     success: false,
-    message: `Rute [${req.method}] ${req.url} tidak terdaftar di SkuyGG Engine!`
+    message: `Node [${req.url}] tidak ditemukan di SkuyGG Engine!`
   });
 });
 
@@ -110,7 +115,7 @@ app.use((err, req, res, next) => {
   console.error(`🔥 Engine Crash: ${err.message}`);
   res.status(err.status || 500).json({ 
     success: false, 
-    message: "Engine SkuyGG ngadat, Ri! Cek log Railway secepatnya." 
+    message: "Engine SkuyGG ngadat! Cek log Railway secepatnya." 
   });
 });
 

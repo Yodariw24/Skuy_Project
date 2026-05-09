@@ -28,7 +28,8 @@ export const getWalletHistory = async (req, res) => {
       ORDER BY created_at DESC
     `;
     const result = await req.db.query(query, [id]);
-    res.json({ success: true, history: result.rows }); // Key 'history' sinkron dengan FE
+    // Key 'history' harus ada agar FE tidak error saat .filter atau .map
+    res.json({ success: true, history: result.rows }); 
   } catch (err) {
     console.error("🔥 WALLET HISTORY ERROR:", err.message);
     res.status(500).json({ success: false, history: [] });
@@ -55,11 +56,11 @@ export const getStreamerBalance = async (req, res) => {
 
 // --- 3. WITHDRAW REQUEST (SULTAN PAYOUT) ---
 export const withdrawBalance = async (req, res) => {
-  const { userId, amount, bank } = req.body; // Sesuaikan dengan key dari EarningsView.jsx
+  const { userId, amount, bank } = req.body; 
   const targetId = userId || req.params.id;
 
   try {
-    // Cek Saldo Dulu
+    // Proteksi Saldo
     const balanceRes = await req.db.query(`
       SELECT 
         (SELECT COALESCE(SUM(amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
@@ -84,7 +85,7 @@ export const withdrawBalance = async (req, res) => {
   }
 };
 
-// --- 4. CREATE NEW DONATION ---
+// --- 4. CREATE NEW DONATION (INITIAL PENDING) ---
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   try {
@@ -99,7 +100,7 @@ export const createDonation = async (req, res) => {
   }
 };
 
-// --- 5. UPDATE DONATION STATUS (WITH SOCKET.IO) ---
+// --- 5. UPDATE DONATION STATUS (WITH SOCKET.IO TRIGGER) ---
 export const updateDonationStatus = async (req, res) => {
   const { id } = req.params; 
   const { status } = req.body;
@@ -111,6 +112,7 @@ export const updateDonationStatus = async (req, res) => {
 
     if (status.toUpperCase() === 'SUCCESS' && result.rows[0]) {
         const donation = result.rows[0];
+        // Emit ke channel spesifik streamer
         if (req.io) {
             req.io.emit(`new-donation-${donation.streamer_id}`, {
                 donatur_name: donation.donatur_name,
@@ -125,7 +127,7 @@ export const updateDonationStatus = async (req, res) => {
   }
 };
 
-// --- 6. RIWAYAT PUBLIK (FOR PROFILE) ---
+// --- 6. RIWAYAT PUBLIK (FOR PROFILE PAGE) ---
 export const getPublicHistory = async (req, res) => {
   const { id } = req.params;
   try {
@@ -136,5 +138,19 @@ export const getPublicHistory = async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// --- 7. ✅ ANTIDOTE CRASH: AMBIL SEMUA DONASI BY STREAMER ---
+// Fungsi ini wajib ada karena dipanggil di donationRoutes.js
+export const getDonationsByStreamer = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const query = `SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`;
+    const result = await req.db.query(query, [id]);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error("🔥 GET LIST ERROR:", err.message);
+    res.status(500).json({ success: false, data: [] });
   }
 };
