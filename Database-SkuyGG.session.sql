@@ -1,4 +1,2 @@
--- Satukan status ke tabel users
-UPDATE users 
-SET is_two_fa_enabled = true 
-WHERE id IN (SELECT user_id FROM streamers WHERE is_two_fa_enabled = true);
+ALTER TABLE users ADD COLUMN is_two_fa_enabled BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN two_fa_secret VARCHAR(255);

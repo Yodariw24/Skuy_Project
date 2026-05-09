@@ -5,11 +5,10 @@ import axios from 'axios';
  * Dibuat Sultan-Proof untuk handle Localhost & Production
  */
 const api = axios.create({
-  // ✅ FIX: Hapus slash di akhir URL biar gak double slash pas nembak endpoint (misal: /api//auth)
-  // Fallback URL mengarah langsung ke server Railway lo.
+  // ✅ FIX: URL Railway udah disesuaikan 100% sama screenshot lo (TANPA STRIP!)
   baseURL: import.meta.env.VITE_API_URL 
     ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api` 
-    : 'https://skuy-project-production.up.railway.app/api', 
+    : 'https://skuyproject-production.up.railway.app/api', // 👈 PERHATIKAN BARIS INI RI
   
   // WAJIB ADA buat ngirim cookie/session lintas domain (Vercel <-> Railway)
   withCredentials: true, 
