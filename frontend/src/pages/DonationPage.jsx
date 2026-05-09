@@ -68,7 +68,7 @@ function DonationPage() {
     setSubmitting(true);
     try {
       // ✅ SINKRON: Kirim donasi ke backend
-      const res = await api.post('/api/donations/create', {
+      const res = await api.post('/donations/create', {
         ...formData,
         streamer_id: streamer.id,
         payment_method: 'QRIS' // Default protocol

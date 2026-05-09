@@ -44,7 +44,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
     setLoading(true);
     try {
       // ✅ SINKRONISASI KE WIDGET CONTROLLER (Langkah 14)
-      const res = await api.post('/api/user/widgets/update', {
+      const res = await api.post('/user/widgets/update', {
         userId: user.id,
         widgetType: activeSubMenu, // Kirim tipe widget aktif
         colors,

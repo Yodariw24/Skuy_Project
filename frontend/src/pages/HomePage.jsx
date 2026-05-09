@@ -67,7 +67,7 @@ function HomePage() {
   useEffect(() => {
     const fetchStreamers = async () => {
       try {
-        const res = await api.get('/api/user/list');
+        const res = await api.get('/user/list');
         setStreamers(Array.isArray(res.data) ? res.data : []); 
       } catch (err) {
         setStreamers([{ id: 1, username: 'ariwirayuda', full_name: 'Ari Wirayuda', bio: 'Engine Architect Skuy.GG', profile_picture: null }]);

@@ -64,7 +64,7 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     }
 
     try {
-      await api.post('/api/wallet/withdraw', { userId: user.id, amount: parseInt(withdrawAmount), bank: bankData });
+      await api.post('/wallet/withdraw', { userId: user.id, amount: parseInt(withdrawAmount), bank: bankData });
       Swal.fire({ 
         title: 'GACOR!', 
         text: 'Permintaan tarik saldo dikirim ke admin!', 

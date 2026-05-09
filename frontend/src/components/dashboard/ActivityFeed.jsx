@@ -18,7 +18,7 @@ function ActivityFeed() {
 
     try {
       // ✅ Interceptor di axios.js udah otomatis nempel user_token, jadi aman Ri
-      const res = await api.get('/api/user/activity-feed');
+      const res = await api.get('/user/activity-feed');
       
       if (res.data && res.data.success) {
         setHistory(res.data.donations || []);
