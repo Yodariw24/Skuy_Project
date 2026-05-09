@@ -1,2 +1,5 @@
-ALTER TABLE users ADD COLUMN is_two_fa_enabled BOOLEAN DEFAULT false;
-ALTER TABLE users ADD COLUMN two_fa_secret VARCHAR(255);
+-- Tambahin kolom sosmed & bio di tabel streamers
+ALTER TABLE streamers 
+ADD COLUMN instagram VARCHAR(255),
+ADD COLUMN tiktok VARCHAR(255),
+ADD COLUMN youtube VARCHAR(255);
