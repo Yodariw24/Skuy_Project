@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from 'framer-motion'
+import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion'
 import api from '../api/axios' 
 import { 
-  Sun, Moon, Play, Sparkles, Heart, ArrowRight, Trophy, Target, Zap, 
-  HelpCircle, ChevronDown, Activity, ShieldCheck, Globe, Rocket, Wallet, Monitor, Video 
+  Sun, Moon, Sparkles, ArrowRight, Trophy, Target, Zap, 
+  HelpCircle, ChevronDown, ShieldCheck, Wallet, Monitor, Video, Gamepad2
 } from 'lucide-react'
 
 const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
@@ -75,7 +75,6 @@ function HomePage() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, springConfig);
   const navBg = useTransform(scrollYProgress, [0, 0.05], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(8, 8, 10, 0.95)" : "rgba(255, 255, 255, 0.95)"]);
-  const pacmanX = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
 
   useEffect(() => {
     const fetchStreamers = async () => {
@@ -93,18 +92,8 @@ function HomePage() {
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-[#08080a] text-white' : 'bg-[#F8FAFF] text-slate-900'} transition-colors duration-700 font-sans selection:bg-violet-600 selection:text-white overflow-x-hidden relative`}>
       
-      {/* PACMAN PROGRESS NODE */}
-      <div className="fixed top-0 left-0 right-0 h-1.5 bg-slate-900/5 dark:bg-white/5 z-[1000] overflow-hidden">
-        <motion.div className="h-full bg-violet-600 origin-left" style={{ scaleX }} />
-        <motion.div 
-          className="absolute top-[-8px] text-2xl z-[1001]"
-          style={{ left: pacmanX }}
-        >
-          <motion.div animate={{ rotate: [0, -30, 0] }} transition={{ repeat: Infinity, duration: 0.3 }}>
-            🍕
-          </motion.div>
-        </motion.div>
-      </div>
+      {/* SULTAN PROGRESS BAR */}
+      <motion.div className="fixed top-0 left-0 right-0 h-1.5 bg-violet-600 z-[1000] origin-left" style={{ scaleX }} />
 
       {/* --- NAVBAR --- */}
       <div className="fixed top-0 left-0 right-0 z-[100] p-6 flex justify-center">
@@ -153,9 +142,24 @@ function HomePage() {
 
       {/* --- FEATURES GRID --- */}
       <section className="max-w-7xl mx-auto px-6 py-32 relative z-10 text-left">
+        {/* Copywriting Fitur */}
+        <Reveal>
+          <div className="mb-20 space-y-4">
+            <div className="flex items-center gap-3">
+               <div className="w-12 h-12 bg-violet-600 text-white rounded-2xl flex items-center justify-center border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000]">
+                  <motion.div animate={{ rotate: [0, 15, -15, 0] }} transition={{ repeat: Infinity, duration: 2 }}>
+                    <Gamepad2 size={24} />
+                  </motion.div>
+               </div>
+               <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter">THE <span className="text-violet-600">ULTIMATE</span> PROTOCOL</h2>
+            </div>
+            <p className="text-lg font-bold text-slate-400 italic max-w-2xl">Bukan sekadar dashboard. Ini adalah pusat kendali streaming lo buat naik ke level Sultan. Canggih, kaku, dan tanpa ampun.</p>
+          </div>
+        </Reveal>
+
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-white/5' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
-            <div className="flex justify-between items-start mb-20">
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-white/5 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.1)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
+            <div className="flex justify-between items-start mb-20 relative z-10">
               <div className="space-y-6">
                 <div className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2 rounded-full w-fit">
                    <Zap size={12} className="text-violet-400" />
@@ -165,15 +169,18 @@ function HomePage() {
               </div>
               <div className="p-8 bg-violet-600 text-white rounded-[2.5rem] shadow-[6px_6px_0px_0px_#000] rotate-12 border-4 border-slate-950"><Wallet size={50} /></div>
             </div>
-            <p className="text-slate-500 font-bold text-lg italic max-w-md leading-relaxed">Terima energi dukungan secepat kilat dengan notifikasi real-time di layar stream lo.</p>
+            <p className="text-slate-500 font-bold text-lg italic max-w-md leading-relaxed relative z-10">Terima energi dukungan secepat kilat dengan notifikasi real-time di layar stream lo.</p>
+            {/* Background Icon Gamer Decor */}
+            <Gamepad2 size={200} className="absolute -bottom-10 -right-10 opacity-[0.03] text-slate-400 rotate-12" />
           </motion.div>
 
-          <motion.div whileHover={{ y: -10 }} className="md:col-span-4 p-12 rounded-[4rem] border-4 border-slate-950 bg-slate-950 text-white flex flex-col justify-between shadow-[15px_15px_0px_0px_rgba(255,255,255,0.1)] group">
-            <div className="space-y-6">
+          <motion.div whileHover={{ y: -10 }} className="md:col-span-4 p-12 rounded-[4rem] border-4 border-slate-950 bg-slate-950 text-white flex flex-col justify-between shadow-[15px_15px_0px_0px_rgba(255,255,255,0.1)] group overflow-hidden relative">
+            <div className="space-y-6 relative z-10">
                <Monitor size={40} className="text-violet-500" />
                <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Overlay <br/> Master</h3>
             </div>
-            <p className="text-slate-400 font-bold italic mt-10">Widget alert paling estetik yang bisa lo kustomisasi sesuka hati lewat dashboard.</p>
+            <p className="text-slate-400 font-bold italic mt-10 relative z-10">Widget alert paling estetik yang bisa lo kustomisasi sesuka hati lewat dashboard.</p>
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </motion.div>
 
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-white/5' : 'bg-white shadow-[15px_15px_0px_0px_#EF4444]'}`}>
@@ -246,9 +253,8 @@ function HomePage() {
         <FAQItem darkMode={darkMode} question="Support pembayaran apa aja?" answer="Semua QRIS, E-Wallet (Dana, OVO, GoPay), sampe Bank Transfer Sultan kita sikat habis tanpa delay!" />
       </section>
 
-      {/* --- FOOTER SULTAN (VIOLET EDITION) --- */}
+      {/* --- FOOTER SULTAN (VIOLET BRUTALISM) --- */}
       <footer className="bg-violet-600 text-white border-t-8 border-slate-950 py-20 relative overflow-hidden">
-        {/* Pacman Ghost Decor Background */}
         <div className="absolute top-0 right-0 opacity-10 rotate-12 scale-150 pointer-events-none">
            <Zap size={300} fill="white" />
         </div>
@@ -277,9 +283,9 @@ function HomePage() {
           </div>
         </div>
         
-        <div className="max-w-7xl mx-auto px-10 mt-16 pt-8 border-t-2 border-white/20 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] font-black uppercase tracking-[0.5em] text-violet-100 italic relative z-10">
+        <div className="max-w-7xl mx-auto px-10 mt-16 pt-8 border-t-2 border-white/20 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] font-black uppercase tracking-[0.5em] text-violet-100 italic relative z-10 text-center md:text-left">
            <p>© 2026 Skuy.GG Engine • Karawang Industrial Pride</p>
-           <p>Engineered by Ari Wirayuda</p>
+           <p className="md:ml-auto">Engineered by Ari Wirayuda</p>
         </div>
       </footer>
 
