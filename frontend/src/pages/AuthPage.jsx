@@ -11,8 +11,6 @@ import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import Swal from 'sweetalert2';
 
-const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
-
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -28,7 +26,7 @@ function AuthPage() {
   
   const navigate = useNavigate();
 
-  // --- HELPER: SULTAN SLIM TOAST ---
+  // ✅ SULTAN SLIM TOAST (Pojok Kanan Atas)
   const showSultanToast = (title, icon = 'success') => {
     const Toast = Swal.mixin({
       toast: true,
@@ -36,7 +34,7 @@ function AuthPage() {
       showConfirmButton: false,
       timer: 4000,
       timerProgressBar: true,
-      customClass: { popup: 'skuy-slim-toast', title: 'skuy-toast-content' }
+      customClass: { popup: 'skuy-slim-toast border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] rounded-2xl', title: 'skuy-toast-content font-black italic uppercase text-[10px] tracking-widest' }
     });
     Toast.fire({ icon, title });
   };
@@ -83,7 +81,9 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      // ✅ FIX: Jangan tulis /api/ lagi di sini. Axios sudah otomatis menangani.
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
+      
       const cleanData = {
         ...formData,
         phone_number: formData.phone_number ? formData.phone_number.replace(/\D/g, '') : ''
@@ -102,11 +102,12 @@ function AuthPage() {
           navigate('/dashboard');
         } else {
           setIsLogin(true);
+          // Berhasil daftar, kasih popup keren
           Swal.fire({
             title: "SQUAD ACTIVE!",
             text: "Berhasil daftar! Login sekarang, Ri.",
             icon: "success",
-            customClass: { popup: 'skuy-border skuy-shadow rounded-[2rem]' }
+            customClass: { popup: 'skuy-border skuy-shadow rounded-[2rem] border-4 border-slate-950' }
           });
         }
       }
@@ -143,7 +144,6 @@ function AuthPage() {
       >
         <div className="absolute top-0 right-0 p-8 opacity-5 rotate-12"><Zap size={400} fill="white" /></div>
         
-        {/* Top: Back Home Button */}
         <div className="relative z-10">
           <Link 
             to="/" 
@@ -153,16 +153,16 @@ function AuthPage() {
             <span className="text-[10px] font-black uppercase tracking-widest">Back to Markas</span>
           </Link>
 
-          <div className="flex items-center gap-3 mb-10">
+          <div className="flex items-center gap-3 mb-10 text-left">
             <div className="w-12 h-12 bg-[#7C3AED] rounded-2xl flex items-center justify-center font-black text-2xl italic border-2 border-white/20 rotate-3 shadow-xl">S</div>
             <span className="font-black italic text-2xl tracking-tighter uppercase text-white">SKUY<span className="text-[#7C3AED]">.GG</span></span>
           </div>
           
-          <h2 className="text-6xl font-black italic uppercase leading-[0.85] tracking-tighter mb-8 text-white">
+          <h2 className="text-6xl font-black italic uppercase leading-[0.85] tracking-tighter mb-8 text-white text-left">
             JOIN THE <br /> <span className="text-[#7C3AED]">ELITE</span> <br /> SQUAD
           </h2>
           
-          <div className="space-y-4">
+          <div className="space-y-4 text-left">
             {[
               { icon: <MessageSquare size={18}/>, text: 'Dual-Channel Authentication' },
               { icon: <ShieldCheck size={18}/>, text: 'Railway Cloud Sync Node' },
@@ -175,22 +175,19 @@ function AuthPage() {
           </div>
         </div>
 
-        {/* Bottom Info */}
-        <div className="relative z-10 pt-10 border-t border-white/10">
+        <div className="relative z-10 pt-10 border-t border-white/10 text-left">
            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500 italic leading-relaxed">
              © 2026 SKUYY.GG ENGINE • CRAFTED IN KARAWANG
            </p>
         </div>
       </motion.div>
 
-      {/* --- RIGHT SIDE: AUTH FORM (SCROLLABLE) --- */}
+      {/* --- RIGHT SIDE: AUTH FORM --- */}
       <div className="flex-1 h-screen overflow-y-auto bg-white flex flex-col relative">
-        
-        {/* Mobile Nav Only */}
         <div className="lg:hidden p-6 flex justify-between items-center border-b-4 border-slate-50">
            <div className="flex items-center gap-2">
               <Zap className="text-violet-600" size={24} />
-              <span className="font-black italic uppercase text-xl">SKUY.GG</span>
+              <span className="font-black italic uppercase text-xl text-slate-950">SKUY.GG</span>
            </div>
            <Link to="/" className="p-3 bg-slate-100 rounded-xl"><ArrowLeft size={20}/></Link>
         </div>
@@ -200,10 +197,10 @@ function AuthPage() {
             {!show2FA ? (
               <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
                 <div className="mb-10 text-left">
-                  <h3 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
+                  <h3 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none text-left">
                     {isLogin ? 'GATE: LOGIN' : 'NODE: REGISTER'}
                   </h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-4 italic">Protocol Authorization Required</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-4 italic text-left">Protocol Authorization Required</p>
                 </div>
 
                 {isLogin && (
@@ -213,7 +210,7 @@ function AuthPage() {
                     </div>
                     <div className="relative flex items-center justify-center my-8">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t-4 border-slate-50"></div></div>
-                      <span className="relative bg-white px-6 text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] italic">Manual Access</span>
+                      <span className="relative bg-white px-6 text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] italic text-center">Manual Access</span>
                     </div>
                   </div>
                 )}
@@ -258,7 +255,7 @@ function AuthPage() {
                 </div>
                 <div className="space-y-3">
                   <h4 className="text-4xl font-black italic uppercase tracking-tighter">SULTAN VERIFY</h4>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic leading-relaxed">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic leading-relaxed text-center">
                     Security Code sent to your WhatsApp & Email.
                   </p>
                 </div>
@@ -276,8 +273,8 @@ function AuthPage() {
                   >
                     {loading ? <Loader2 className="animate-spin" /> : 'AUTHORIZE ACCESS'}
                   </button>
-                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[10px] font-black uppercase text-[#7C3AED] hover:underline tracking-[0.2em] italic block mx-auto">Resend Security Code</button>
-                  <button onClick={() => {setShow2FA(false); setOtp('');}} className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 tracking-[0.2em] italic block mx-auto">Abort Login</button>
+                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[10px] font-black uppercase text-[#7C3AED] hover:underline tracking-[0.2em] italic block mx-auto text-center">Resend Security Code</button>
+                  <button onClick={() => {setShow2FA(false); setOtp('');}} className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 tracking-[0.2em] italic block mx-auto text-center">Abort Login</button>
                 </div>
               </motion.div>
             )}

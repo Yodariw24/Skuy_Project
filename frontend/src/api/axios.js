@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * KONFIGURASI AXIOS SKUY.GG v2.6 🛡️
+ * KONFIGURASI AXIOS SKUY.GG v2.7 🛡️
  * Anti-Illegal Path & Auto-Sanitize Protocol
  */
 const api = axios.create({
@@ -33,10 +33,17 @@ const api = axios.create({
  */
 api.interceptors.request.use(
   (config) => {
-    // 🛡️ 1. Basmi Double Prefix Secara Paksa
-    // Jika config.url adalah "/api/user", kita ubah jadi "/user" karena baseURL sudah punya "/api"
-    if (config.url && config.url.startsWith('/api')) {
-      config.url = config.url.replace(/^\/api/, '');
+    // 🛡️ 1. Basmi Double Prefix & Double Slash
+    if (config.url) {
+      // Jika user ngetik "/api/user", bersihkan jadi "/user"
+      if (config.url.startsWith('/api')) {
+        config.url = config.url.replace(/^\/api/, '');
+      }
+      
+      // Pastikan url dimulai dengan satu slash "/"
+      if (!config.url.startsWith('/')) {
+        config.url = `/${config.url}`;
+      }
     }
 
     // 🛡️ 2. Sultan Token Injection
@@ -60,9 +67,8 @@ api.interceptors.request.use(
  * Emergency Protocol: Auto-Logout & Clean Logging
  */
 api.interceptors.response.use(
-  (res) => res, // Gunakan 'res' agar tidak bentrok nama variabel di bawah
+  (res) => res,
   (error) => {
-    // Ambil info response dan config dari object error
     const errRes = error.response;
     const errConfig = error.config;
 
@@ -76,13 +82,13 @@ api.interceptors.response.use(
       }
     }
 
-    // 🚨 2. DETEKSI JALUR ILEGAL (404)
+    // 🚨 2. DETEKSI JALUR ILEGAL / PUTUS (404)
     if (errRes && errRes.status === 404) {
       console.group("%c🕵️ Jalur Putus (404)", "color: red; font-weight: bold;");
-      console.error(`Method: [${errConfig.method.toUpperCase()}]`);
+      console.error(`Method: [${errConfig.method?.toUpperCase()}]`);
       console.error(`Endpoint: ${errConfig.url}`);
-      console.error(`Full URL: ${errConfig.baseURL}${errConfig.url}`);
-      console.warn("Saran Ri: Cek rute di Backend (Express) atau hapus '/api' di pemanggilan fungsi Frontend.");
+      console.error(`Full Request URL: ${errConfig.baseURL}${errConfig.url}`);
+      console.warn("Saran Ri: Cek rute di app.js Backend atau hapus '/api' di pemanggilan fungsi Frontend.");
       console.groupEnd();
     }
 
