@@ -10,7 +10,7 @@ import {
     getAllStreamers, 
     getStreamerByUsername, 
     updateBankInfo,
-    updateProfileInfo // ✅ Gunakan fungsi yang sudah kita perbaiki di Controller
+    updateProfileInfo 
 } from '../controllers/streamerController.js';
 import * as widgetController from '../controllers/widgetController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -18,7 +18,7 @@ import { protect } from '../middleware/authMiddleware.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- 1. MULTER CONFIG (Avatar Upload) ---
+// --- 1. MULTER CONFIG ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadPath = path.join(__dirname, '../uploads/');
@@ -39,13 +39,14 @@ const upload = multer({
 
 // --- 2. ENDPOINTS ---
 
-// ✅ 1. DASHBOARD SYNC (Ambil Data Lengkap termasuk No WA & Saldo)
+// ✅ 1. DASHBOARD SYNC (DITAMBAHKAN KOLOM BANK)
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
         const query = `
             SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, 
                    s.full_name, s.display_name, s.profile_picture, s.theme_color, s.bio, 
                    s.instagram, s.tiktok, s.youtube, s.phone_number,
+                   s.bank_name, s.bank_account_number, s.bank_account_name, -- 👈 DATA BANK DITAMBAHKAN
                    COALESCE(b.total_saldo, 0) as total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
@@ -59,6 +60,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
             res.status(404).json({ success: false, message: "Sultan tidak terdaftar." });
         }
     } catch (err) { 
+        console.error("Dashboard Sync Error:", err.message);
         res.status(500).json({ success: false, message: "Gagal sinkron pangkalan data." }); 
     }
 });
@@ -74,7 +76,6 @@ router.post('/upload-avatar', protect, upload.single('image'), async (req, res) 
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// ✅ Gunakan Controller yang sudah kita perbaiki tadi (Bisa handle update phone_number)
 router.put('/update-profile', protect, updateProfileInfo);
 
 // ✅ 3. THEME & VISUAL
@@ -86,14 +87,14 @@ router.put('/update-theme', protect, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// ✅ 4. WIDGETS (OBS SOURCE)
+// ✅ 4. WIDGETS
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', protect, widgetController.updateSettings);
 
 // ✅ 5. BANK INFO
 router.put('/bank/:id', protect, updateBankInfo);
 
-// ✅ 6. RUTE UMUM (Public Data)
+// ✅ 6. PUBLIC ROUTES
 router.get('/public/:username', getStreamerByUsername);
 router.get('/list', getAllStreamers);
 
