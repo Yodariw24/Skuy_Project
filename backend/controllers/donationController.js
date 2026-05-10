@@ -1,42 +1,35 @@
-// --- 1. AMBIL RIWAYAT DOMPET (SULTAN SYNC FOR EARNINGSVIEW) ---
+// --- 1. AMBIL RIWAYAT DOMPET (SULTAN SYNC) ---
 export const getWalletHistory = async (req, res) => {
   const { id } = req.params;
   try {
     const query = `
       SELECT 
-        id, 
-        amount, 
+        id, amount, 
         donatur_name::TEXT AS description, 
         'IN'::TEXT AS type, 
         created_date AS created_at, 
         status::TEXT 
       FROM donations 
       WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS'
-      
       UNION ALL
-      
       SELECT 
-        id, 
-        amount, 
+        id, amount, 
         'Penarikan Saldo'::TEXT AS description, 
         'OUT'::TEXT AS type, 
         created_at, 
         status::TEXT 
       FROM withdrawals 
       WHERE streamer_id = $1
-      
       ORDER BY created_at DESC
     `;
     const result = await req.db.query(query, [id]);
-    // Key 'history' harus ada agar FE tidak error saat .filter atau .map
     res.json({ success: true, history: result.rows }); 
   } catch (err) {
-    console.error("🔥 WALLET HISTORY ERROR:", err.message);
     res.status(500).json({ success: false, history: [] });
   }
 };
 
-// --- 2. HITUNG TOTAL SALDO BERSIH (LIVE CALCULATION) ---
+// --- 2. HITUNG SALDO LIVE ---
 export const getStreamerBalance = async (req, res) => {
   const { id } = req.params;
   try {
@@ -54,13 +47,11 @@ export const getStreamerBalance = async (req, res) => {
   }
 };
 
-// --- 3. WITHDRAW REQUEST (SULTAN PAYOUT) ---
+// --- 3. WITHDRAW REQUEST ---
 export const withdrawBalance = async (req, res) => {
   const { userId, amount, bank } = req.body; 
   const targetId = userId || req.params.id;
-
   try {
-    // Proteksi Saldo
     const balanceRes = await req.db.query(`
       SELECT 
         (SELECT COALESCE(SUM(amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
@@ -68,66 +59,66 @@ export const withdrawBalance = async (req, res) => {
       AS current_balance`, [targetId]);
     
     const currentBalance = parseInt(balanceRes.rows[0].current_balance) || 0;
-
-    if (amount > currentBalance) {
-        return res.status(400).json({ success: false, message: "Saldo tidak cukup, Ri!" });
-    }
+    if (amount > currentBalance) return res.status(400).json({ success: false, message: "Saldo tidak cukup!" });
 
     const formattedBank = typeof bank === 'object' ? JSON.stringify(bank) : String(bank);
-    
     const result = await req.db.query(
       "INSERT INTO withdrawals (streamer_id, amount, bank_info, status, created_at) VALUES ($1, $2, $3, 'PENDING', NOW()) RETURNING *",
       [targetId, amount, formattedBank]
     );
-    res.json({ success: true, message: "WD Sultan diproses!", data: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+    res.json({ success: true, message: "WD Diproses!", data: result.rows[0] });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 4. CREATE NEW DONATION (INITIAL PENDING) ---
+// --- 4. CREATE NEW DONATION (DENGAN LOGIC TIERING) ---
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
+  
+  // 🔥 LOGIC TIERING SULTAN
+  let tier = 'STANDARD';
+  if (amount >= 1000000) tier = 'MYTHIC';
+  else if (amount >= 500000) tier = 'GOLD';
+  else if (amount >= 100000) tier = 'SILVER';
+
   try {
     const result = await req.db.query(
-      `INSERT INTO donations (streamer_id, donatur_name, donatur_email, message, amount, payment_method, status, created_date) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', NOW()) RETURNING *`,
-      [streamer_id, donatur_name, donatur_email, message, amount, payment_method]
+      `INSERT INTO donations (streamer_id, donatur_name, donatur_email, message, amount, payment_method, status, tier, created_date) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, NOW()) RETURNING *`,
+      [streamer_id, donatur_name, donatur_email, message, amount, payment_method, tier]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 5. UPDATE DONATION STATUS (WITH SOCKET.IO TRIGGER) ---
+// --- 5. UPDATE DONATION STATUS (SIMULASI FAKE QR SUCCESS) ---
 export const updateDonationStatus = async (req, res) => {
   const { id } = req.params; 
-  const { status } = req.body;
+  const { status } = req.body; // 'SUCCESS' atau 'REJECTED'
   try {
     const result = await req.db.query(
       "UPDATE donations SET status = $1 WHERE id = $2 RETURNING *", 
       [status.toUpperCase(), id]
     );
 
-    if (status.toUpperCase() === 'SUCCESS' && result.rows[0]) {
-        const donation = result.rows[0];
-        // Emit ke channel spesifik streamer
+    const donation = result.rows[0];
+
+    if (status.toUpperCase() === 'SUCCESS' && donation) {
+        // 🔥 TRIGGER SOCKET DENGAN DATA TIER UNTUK ANIMASI FE
         if (req.io) {
             req.io.emit(`new-donation-${donation.streamer_id}`, {
                 donatur_name: donation.donatur_name,
                 amount: donation.amount,
-                message: donation.message
+                message: donation.message,
+                tier: donation.tier || 'STANDARD', // Kirim Tier-nya
+                trigger_effect: true
             });
         }
     }
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+    res.json({ success: true, data: donation });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 6. RIWAYAT PUBLIK (FOR PROFILE PAGE) ---
+// --- 6. RIWAYAT PUBLIK & LIST ---
 export const getPublicHistory = async (req, res) => {
   const { id } = req.params;
   try {
@@ -136,21 +127,13 @@ export const getPublicHistory = async (req, res) => {
       [id]
     );
     res.json({ success: true, data: result.rows });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 7. ✅ ANTIDOTE CRASH: AMBIL SEMUA DONASI BY STREAMER ---
-// Fungsi ini wajib ada karena dipanggil di donationRoutes.js
 export const getDonationsByStreamer = async (req, res) => {
   const { id } = req.params;
   try {
-    const query = `SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`;
-    const result = await req.db.query(query, [id]);
+    const result = await req.db.query(`SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`, [id]);
     res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error("🔥 GET LIST ERROR:", err.message);
-    res.status(500).json({ success: false, data: [] });
-  }
+  } catch (err) { res.status(500).json({ success: false, data: [] }); }
 };
