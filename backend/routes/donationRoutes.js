@@ -1,7 +1,7 @@
 import express from 'express';
 const router = express.Router();
 
-// Import semua fungsi dari Controller (Termasuk logic Tiering terbaru)
+// Import semua fungsi dari Controller (Termasuk logic Tiering & Real-time)
 import { 
     createDonation, 
     getDonationsByStreamer, 
@@ -69,6 +69,7 @@ router.get('/public-history/:id', getPublicHistory);
 router.post('/create', validateDonation, createDonation); 
 
 // Rute untuk simulasi/konfirmasi pembayaran (Fake QR Success Trigger)
+// Jalur ini yang akan lo tembak dari PaymentModal.jsx
 router.put('/status/:id', updateDonationStatus); 
 
 export default router;

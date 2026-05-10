@@ -41,7 +41,7 @@ const upload = multer({
 
 /**
  * ✅ WALLET HISTORY NODE
- * Fix Error 404: Mendaftarkan jalur agar sinkron dengan /api/wallet/history/:id di index.js
+ * FIX: Ganti user_id menjadi streamer_id agar sinkron dengan Database Railway lo.
  */
 router.get('/wallet/history/:id', protect, async (req, res) => {
     try {
@@ -49,7 +49,7 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
         const query = `
             SELECT id, amount, status, created_at, bank_info 
             FROM withdrawals 
-            WHERE user_id = $1 
+            WHERE streamer_id = $1 
             ORDER BY created_at DESC
         `;
         const result = await req.db.query(query, [id]);
@@ -62,7 +62,7 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
 
 /**
  * ✅ DASHBOARD SYNC
- * Mengambil data profil lengkap termasuk nomor WhatsApp & info Bank Sultan
+ * Mengambil data profil lengkap termasuk info Bank & Saldo
  */
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
