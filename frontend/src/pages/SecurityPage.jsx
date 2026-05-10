@@ -10,54 +10,62 @@ const SecurityPage = () => {
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // ✅ SULTAN SLIM TOAST (Pojok Kanan Atas)
+  // ✅ SULTAN SLIM TOAST PROTOCOL
+  // Muncul di pojok kanan atas, durasi 3 detik, dan TIDAK nge-blok input OTP.
   const showSultanToast = (title, icon = 'success') => {
-    const Toast = Swal.mixin({
+    Swal.fire({
       toast: true,
       position: 'top-end',
+      icon: icon,
+      title: title,
       showConfirmButton: false,
-      timer: 4000,
+      timer: 3000,
       timerProgressBar: true,
+      background: '#ffffff',
       customClass: {
-        popup: 'skuy-slim-toast border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] rounded-2xl',
-        title: 'skuy-toast-content font-black italic uppercase text-[11px] tracking-widest'
+        popup: 'border-4 border-slate-950 shadow-[4px_4px_0px_0px_#7C3AED] rounded-2xl',
+        title: 'skuy-toast-content font-black italic uppercase text-[10px] tracking-widest'
       }
     });
-    Toast.fire({ icon, title });
   };
 
-  // ✅ AUTO-RESET
+  // ✅ AUTO-SYNC Status
   useEffect(() => {
     if (user?.is_two_fa_enabled) {
       setIsVerifying(false);
     }
   }, [user]);
 
-  // --- 1. REQUEST OTP ---
+  // --- 1. REQUEST OTP NODE ---
   const handleRequestOTP = async () => {
     if (!user?.id) return;
     
     if (!user?.phone_number || user?.phone_number.trim() === "") {
-      return showSultanToast('<b>WA BELUM SET!</b> <span>Lengkapi profil dulu, Ri!</span>', 'warning');
+      return showSultanToast('<b>WA BELUM SET!</b> <span>Isi nomor WA di profil dulu.</span>', 'warning');
     }
 
     setLoading(true);
     try {
+      // ✅ Trigger setup-2fa ke backend
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
+      
       if (res.data.success) {
-        setIsVerifying(true);
-        showSultanToast('<b>KODE TERKIRIM 🚀</b> <span>Cek WhatsApp lo sekarang!</span>', 'info');
+        setIsVerifying(true); // Membuka form input di SecurityView secara otomatis
+        showSultanToast('<b>KODE TERKIRIM 🚀</b> <span>Cek WhatsApp lo, Ri!</span>', 'info');
       }
     } catch (err) {
-      showSultanToast('<b>ENGINE ERROR</b> <span>Server keamanan ngadat.</span>', 'error');
+      showSultanToast('<b>ENGINE ERROR</b> <span>Gagal kontak server keamanan.</span>', 'error');
     } finally { 
       setLoading(false); 
     }
   };
 
-  // --- 2. VERIFIKASI AKTIVASI ---
+  // --- 2. VERIFY & ACTIVATE NODE ---
   const handleVerifyOTP = async () => {
-    if (!otp || otp.length < 6) return;
+    if (!otp || otp.length < 6) {
+      return showSultanToast('<b>DIGIT KURANG!</b> <span>Masukin 6 digit kode.</span>', 'warning');
+    }
+
     setLoading(true);
     try {
       const res = await api.post('/auth/verify-2fa', { 
@@ -82,7 +90,7 @@ const SecurityPage = () => {
     }
   };
 
-  // --- 3. DISABLE 2FA (Tetap pakai Confirm Pop-up tapi Proporsional) ---
+  // --- 3. DISABLE 2FA (Master Key Protocol) ---
   const handleDisable2FA = async () => {
     Swal.fire({
       title: 'COPOT PROTEKSI?',
@@ -91,17 +99,18 @@ const SecurityPage = () => {
       showCancelButton: true,
       confirmButtonText: 'IYA, CABUT',
       cancelButtonText: 'BATAL',
+      buttonsStyling: false,
       customClass: {
-        popup: 'skuy-popup rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#EF4444]',
+        popup: 'skuy-popup rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#EF4444] p-8',
         title: 'font-black italic uppercase tracking-tighter',
-        confirmButton: 'bg-red-500 text-white px-8 py-3 rounded-xl font-black uppercase italic text-[10px] mx-2',
+        confirmButton: 'bg-red-500 text-white px-8 py-3 rounded-xl font-black uppercase italic text-[10px] mx-2 shadow-[4px_4px_0px_0px_#000]',
         cancelButton: 'bg-slate-100 text-slate-500 px-8 py-3 rounded-xl font-black uppercase italic text-[10px] mx-2'
-      },
-      buttonsStyling: false
+      }
     }).then(async (result) => {
       if (result.isConfirmed) {
         setLoading(true);
         try {
+          // ✅ Gunakan Master Key bypass
           const res = await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); 
           if (res.data.success) {
             const updatedUser = { ...user, is_two_fa_enabled: false };
@@ -110,7 +119,7 @@ const SecurityPage = () => {
             showSultanToast('<b>PROTECTION OFF</b> <span>Sistem keamanan dicabut.</span>', 'warning');
           }
         } catch (err) {
-          showSultanToast('<b>FAILED</b> <span>Gagal copot proteksi.</span>', 'error');
+          showSultanToast('<b>FAILED</b> <span>Gagal mematikan protokol.</span>', 'error');
         } finally {
           setLoading(false);
         }
@@ -130,6 +139,7 @@ const SecurityPage = () => {
           onGenerateQR={handleRequestOTP} 
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
+          onCancel={() => setIsVerifying(false)} // Tambahkan fungsi cancel
         />
       </div>
     </div>
