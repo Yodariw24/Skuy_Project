@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import socket from '../../api/socket'; // Pastikan path socket lo bener
+// Pastikan path ini benar: naik 2 tingkat (../../) ke folder api
+import socket from '../../api/socket'; 
 import { Sparkles, Zap, Trophy, Crown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -7,8 +8,12 @@ export default function DonationAlert({ streamerId }) {
   const [activeDonation, setActiveDonation] = useState(null);
 
   useEffect(() => {
+    if (!streamerId) return;
+
+    const eventName = `new-donation-${streamerId}`;
+
     // Dengerin sinyal meledak dari backend
-    socket.on(`new-donation-${streamerId}`, (data) => {
+    socket.on(eventName, (data) => {
       setActiveDonation(data);
       
       // Notif ilang otomatis setelah 5 detik
@@ -17,7 +22,10 @@ export default function DonationAlert({ streamerId }) {
       }, 5000);
     });
 
-    return () => socket.off(`new-donation-${streamerId}`);
+    // Cleanup: matiin listener pas komponen ilang
+    return () => {
+      socket.off(eventName);
+    };
   }, [streamerId]);
 
   if (!activeDonation) return null;
@@ -43,11 +51,11 @@ export default function DonationAlert({ streamerId }) {
         initial={{ y: -100, opacity: 0, scale: 0.5 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: -100, opacity: 0, scale: 0.5 }}
-        className={`fixed top-10 left-1/2 -translate-x-1/2 z-[999] p-8 rounded-[3rem] w-full max-w-lg border-b-[10px] ${tierStyles[activeDonation.tier]}`}
+        className={`fixed top-10 left-1/2 -translate-x-1/2 z-[999] p-8 rounded-[3rem] w-full max-w-lg border-b-[10px] ${tierStyles[activeDonation.tier] || tierStyles.STANDARD}`}
       >
         <div className="flex flex-col items-center text-center gap-4">
           <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md">
-            {icons[activeDonation.tier]}
+            {icons[activeDonation.tier] || icons.STANDARD}
           </div>
           
           <div className="space-y-1">
