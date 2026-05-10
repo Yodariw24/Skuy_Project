@@ -25,7 +25,7 @@ function AuthPage() {
   
   const navigate = useNavigate();
 
-  // ✅ SULTAN SLIM TOAST
+  // ✅ SULTAN SLIM TOAST (Clean Style)
   const showSultanToast = (title, icon = 'success') => {
     const Toast = Swal.mixin({
       toast: true,
@@ -34,8 +34,8 @@ function AuthPage() {
       timer: 4000,
       timerProgressBar: true,
       customClass: { 
-        popup: 'border-2 border-white/10 bg-[#0c0c0c]/90 backdrop-blur-xl rounded-2xl shadow-2xl', 
-        title: 'font-sans font-bold text-white text-xs' 
+        popup: 'border-4 border-slate-950 bg-white rounded-2xl shadow-[6px_6px_0px_0px_#000]', 
+        title: 'font-sans font-black uppercase text-slate-950 text-[10px] tracking-widest' 
       }
     });
     Toast.fire({ icon, title });
@@ -128,129 +128,132 @@ function AuthPage() {
   };
 
   return (
-    <div className="h-screen w-full bg-[#050505] flex items-center justify-center font-sans overflow-hidden">
+    <div className="h-screen w-full bg-[#F4F7FF] flex items-center justify-center font-sans overflow-hidden">
       
-      {/* Background Ambience */}
+      {/* Dynamic Light Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-full h-full bg-[radial-gradient(circle_at_center,#1e1b4b_0%,transparent_50%)] opacity-40" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 contrast-150" />
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-200/50 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px]" />
       </div>
 
-      <div className="w-full max-w-[1000px] h-[600px] bg-[#0c0c0c]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_0_100px_-30px_rgba(124,58,237,0.4)] z-10 flex overflow-hidden">
+      <div className="w-full max-w-[1050px] h-[640px] bg-white border-4 border-slate-950 rounded-[3rem] shadow-[20px_20px_0px_0px_#000] z-10 flex overflow-hidden">
         
-        {/* --- LEFT SIDE: Visual Branding --- */}
-        <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-violet-600 to-indigo-700 p-12 flex-col justify-between relative">
+        {/* --- LEFT SIDE: THE VIBE (Electric Violet) --- */}
+        <div className="hidden lg:flex w-[45%] bg-violet-600 p-12 flex-col justify-between relative border-r-4 border-slate-950">
+          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
+          
           <div className="relative z-10">
-            <Link to="/" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors mb-12 group">
+            <Link to="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-all mb-16 group">
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span className="text-xs font-bold uppercase tracking-widest">Back to Hub</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Back to Markas</span>
             </Link>
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-2xl">
-                <Zap size={22} className="text-violet-600 fill-current" />
+            <div className="flex items-center gap-3 mb-10">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-[4px_4px_0px_0px_#000] border-2 border-slate-950">
+                <Zap size={24} className="text-violet-600 fill-current" />
               </div>
-              <span className="text-xl font-black italic tracking-tighter text-white uppercase">SKUY<span className="opacity-50">.GG</span></span>
+              <span className="text-2xl font-black italic tracking-tighter text-white uppercase">SKUY<span className="opacity-50">.GG</span></span>
             </div>
-            <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter leading-[0.9] mb-8">
-              Empowering <br /> Digital <span className="text-white/40">Sultans.</span>
+            <h2 className="text-6xl font-black text-white italic uppercase tracking-tighter leading-[0.85] mb-10">
+              Empowering <br /> Digital <span className="text-slate-950">Sultans.</span>
             </h2>
-            <div className="space-y-4">
-              {['Dual-Channel OTP Security', 'Military-Grade Encryption', 'Sultan Dashboard v3.2'].map((feat, i) => (
-                <div key={i} className="flex items-center gap-3 text-white/80 text-[10px] font-black uppercase tracking-widest">
-                  <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center border border-white/10"><Check size={12} strokeWidth={4} /></div>
+            <div className="space-y-5">
+              {['Dual-Channel OTP', 'End-to-End Encrypted', 'Sultan Dashboard v3.2'].map((feat, i) => (
+                <div key={i} className="flex items-center gap-4 text-white text-[10px] font-black uppercase tracking-widest">
+                  <div className="w-6 h-6 rounded-lg bg-slate-950 text-white flex items-center justify-center border-2 border-white/10 shadow-lg"><Check size={14} strokeWidth={4} /></div>
                   {feat}
                 </div>
               ))}
             </div>
           </div>
-          <p className="relative z-10 text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">© 2026 SKUYY.GG ENGINE</p>
+          <p className="relative z-10 text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">CRAFTED IN KARAWANG • 2026</p>
         </div>
 
-        {/* --- RIGHT SIDE: Form Node --- */}
-        <main className="flex-1 p-12 flex flex-col justify-center bg-[#0c0c0c] relative">
+        {/* --- RIGHT SIDE: THE FORM (Clean & Sharp) --- */}
+        <main className="flex-1 p-12 flex flex-col justify-center bg-white relative">
           <AnimatePresence mode="wait">
             {!show2FA ? (
-              <motion.div key="auth" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-[340px] mx-auto w-full">
-                <div className="mb-10">
-                  <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-2">
+              <motion.div key="auth" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-[360px] mx-auto w-full">
+                <div className="mb-10 text-left">
+                  <h3 className="text-4xl font-black text-slate-950 italic uppercase tracking-tighter leading-none">
                     {isLogin ? 'IGNITION START' : 'DEPLOY NODE'}
                   </h3>
-                  <p className="text-white/30 text-[10px] font-black uppercase tracking-widest italic">Authorization Required</p>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3 italic">
+                    {isLogin ? 'Authorized Access Only' : 'Register New Creator Node'}
+                  </p>
                 </div>
 
                 <form className="space-y-4" onSubmit={handleSubmit}>
                   {!isLogin && (
-                    <>
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="relative group">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
-                        <input type="text" placeholder="USERNAME" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" onChange={(e) => setFormData({...formData, username: e.target.value})} />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors" size={18}/>
+                        <input type="text" placeholder="USERNAME SULTAN" required className="w-full bg-slate-50 border-4 border-slate-100 p-4 pl-12 rounded-2xl font-black text-xs outline-none focus:border-slate-950 focus:bg-white transition-all placeholder:text-slate-200 italic" onChange={(e) => setFormData({...formData, username: e.target.value})} />
                       </div>
                       <div className="relative group">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
-                        <input type="text" placeholder="WHATSAPP (08...)" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors" size={18}/>
+                        <input type="text" placeholder="WHATSAPP (08...)" required className="w-full bg-slate-50 border-4 border-slate-100 p-4 pl-12 rounded-2xl font-black text-xs outline-none focus:border-slate-950 focus:bg-white transition-all placeholder:text-slate-200 italic" onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
                       </div>
-                    </>
+                    </div>
                   )}
                   
                   <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
-                    <input type="email" placeholder="EMAIL NODE" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors" size={18}/>
+                    <input type="email" placeholder="EMAIL ADDRESS" required className="w-full bg-slate-50 border-4 border-slate-100 p-4 pl-12 rounded-2xl font-black text-xs outline-none focus:border-slate-950 focus:bg-white transition-all placeholder:text-slate-200 italic" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                   </div>
                   
                   <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
-                    <input type="password" placeholder="SECURE PASSWORD" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors" size={18}/>
+                    <input type="password" placeholder="SECURE PASSWORD" required className="w-full bg-slate-50 border-4 border-slate-100 p-4 pl-12 rounded-2xl font-black text-xs outline-none focus:border-slate-950 focus:bg-white transition-all placeholder:text-slate-200 italic" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
                   </div>
 
-                  <button className="w-full bg-white text-black py-4 rounded-xl font-black uppercase italic tracking-widest text-xs hover:bg-violet-500 hover:text-white transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-white/5">
-                    {loading ? <Loader2 className="animate-spin" size={16} /> : (isLogin ? 'VALIDATE SESSION' : 'ACTIVATE ENGINE')}
-                    <Rocket size={16} />
+                  <button className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic tracking-widest text-xs shadow-[6px_6px_0px_0px_#7C3AED] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 border-4 border-slate-950">
+                    {loading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'VALIDATE SESSION' : 'ACTIVATE ENGINE')}
+                    <Rocket size={18} />
                   </button>
                 </form>
 
                 {isLogin && (
                   <div className="mt-8 flex flex-col items-center">
                     <div className="relative w-full flex items-center justify-center mb-6">
-                      <div className="w-full border-t border-white/5"></div>
-                      <span className="absolute bg-[#0c0c0c] px-4 text-[9px] font-black text-white/20 uppercase tracking-[0.3em] italic">Or Auth Protocol</span>
+                      <div className="w-full border-t-4 border-slate-50"></div>
+                      <span className="absolute bg-white px-4 text-[9px] font-black text-slate-200 uppercase tracking-[0.4em] italic">Or Auth Protocol</span>
                     </div>
-                    <div className="inline-block p-[1px] bg-gradient-to-r from-violet-500/50 to-fuchsia-500/50 rounded-xl overflow-hidden hover:scale-105 transition-transform">
-                      <div className="bg-[#0c0c0c] rounded-[11px] px-1 py-1">
-                        <GoogleLogin onSuccess={handleGoogleSuccess} theme="dark" shape="pill" width="260px" />
-                      </div>
+                    
+                    <div className="border-4 border-slate-950 rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_#000] hover:scale-105 transition-transform">
+                      <GoogleLogin onSuccess={handleGoogleSuccess} theme="outline" shape="square" width="280px" />
                     </div>
                   </div>
                 )}
 
-                <p className="mt-10 text-center text-[10px] font-bold uppercase tracking-widest text-white/30 italic">
+                <p className="mt-8 text-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic">
                   {isLogin ? "Access Denied?" : "Ready to launch?"}{" "}
-                  <button onClick={() => setIsLogin(!isLogin)} className="text-white hover:text-violet-400 transition-colors underline underline-offset-4 decoration-violet-500">
+                  <button onClick={() => setIsLogin(!isLogin)} className="text-violet-600 underline underline-offset-8 decoration-4 hover:text-slate-950 transition-colors">
                     {isLogin ? 'Create Node' : 'Login Portal'}
                   </button>
                 </p>
               </motion.div>
             ) : (
-              /* --- 2FA STATE --- */
+              /* --- 2FA STATE (Clean & Secure) --- */
               <motion.div key="2fa" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-[340px] mx-auto w-full text-center space-y-10">
-                <div className="w-20 h-20 bg-violet-600/20 text-violet-500 rounded-3xl mx-auto flex items-center justify-center border border-violet-500/30 shadow-[0_0_40px_rgba(124,58,237,0.2)]">
-                  <ShieldCheck size={40} strokeWidth={2.5} />
+                <div className="w-20 h-20 bg-violet-50 text-violet-600 rounded-3xl mx-auto flex items-center justify-center border-4 border-slate-950 shadow-[8px_8px_0px_0px_#000] rotate-3">
+                  <ShieldCheck size={40} strokeWidth={3} />
                 </div>
-                <div>
-                  <h4 className="text-3xl font-black italic uppercase text-white tracking-tighter">SULTAN VERIFY</h4>
-                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] italic mt-2">Cek WhatsApp lo sekarang, Ri!</p>
+                <div className="text-center">
+                  <h4 className="text-3xl font-black italic uppercase text-slate-950 tracking-tighter leading-none">SULTAN VERIFY</h4>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic mt-3">Input 6-digit OTP dari WhatsApp lo</p>
                 </div>
                 
                 <input 
                   type="text" maxLength="6" placeholder="000000" autoFocus
-                  className="w-full bg-white/[0.03] border border-white/10 p-6 rounded-2xl text-center text-5xl font-black tracking-[0.3em] text-white outline-none focus:border-violet-500/50 transition-all placeholder:text-white/5"
+                  className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-6xl font-black tracking-[0.2em] text-slate-950 outline-none focus:bg-white focus:shadow-[10px_10px_0px_0px_#7C3AED] transition-all placeholder:text-slate-100"
                   value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 />
 
                 <div className="space-y-4">
-                  <button onClick={handleVerify2FALogin} disabled={loading} className="w-full bg-white text-black py-5 rounded-xl font-black uppercase italic tracking-widest text-xs hover:bg-violet-500 hover:text-white transition-all flex items-center justify-center gap-2">
+                  <button onClick={handleVerify2FALogin} disabled={loading} className="w-full bg-slate-950 text-white py-5 rounded-2xl font-black uppercase italic shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 border-4 border-slate-950">
                     {loading ? <Loader2 className="animate-spin" /> : 'AUTHORIZE ACCESS'}
                   </button>
-                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-white/20 hover:text-white tracking-widest transition-colors italic">Resend Security Protocol</button>
+                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-violet-600 hover:underline tracking-widest transition-colors italic">Resend Security Protocol</button>
                 </div>
               </motion.div>
             )}
