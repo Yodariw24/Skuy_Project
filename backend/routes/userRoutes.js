@@ -18,7 +18,7 @@ import { protect } from '../middleware/authMiddleware.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- 1. MULTER CONFIG (Avatar Node) ---
+// --- 1. MULTER CONFIG ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadPath = path.join(__dirname, '../uploads/');
@@ -39,6 +39,25 @@ const upload = multer({
 
 // --- 2. ENDPOINTS ---
 
+// ✅ FIX JALUR: Agar /api/wallet/history/:id tidak Error 404
+// Karena di index.js lo pake app.use('/api', apiRouter), rute ini jadi /api/wallet/history
+router.get('/wallet/history/:id', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT id, amount, status, created_at, bank_info 
+            FROM withdrawals 
+            WHERE user_id = $1 
+            ORDER BY created_at DESC
+        `;
+        const result = await req.db.query(query, [id]);
+        res.json({ success: true, history: result.rows });
+    } catch (err) {
+        console.error("❌ Wallet History Error:", err.message);
+        res.status(500).json({ success: false, message: "Gagal mengambil riwayat." });
+    }
+});
+
 // ✅ 1. DASHBOARD SYNC (Kunci Utama Sinkronisasi Data Bank & Saldo)
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
@@ -46,7 +65,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
             SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, 
                    s.full_name, s.display_name, s.profile_picture, s.theme_color, s.bio, 
                    s.instagram, s.tiktok, s.youtube, s.phone_number,
-                   s.bank_name, s.bank_account_number, s.bank_account_name, -- 👈 SYNC DATA BANK
+                   s.bank_name, s.bank_account_number, s.bank_account_name,
                    COALESCE(b.total_saldo, 0) as total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
@@ -65,26 +84,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
     }
 });
 
-// ✅ 2. WALLET HISTORY NODE (Fix Error 404 Jalur Tidak Terdaftar)
-router.get('/wallet/history/:id', protect, async (req, res) => {
-    try {
-        const { id } = req.params;
-        // Kita ambil data dari tabel withdrawals (sesuai screenshot database lo)
-        const query = `
-            SELECT id, amount, status, created_at, bank_info 
-            FROM withdrawals 
-            WHERE user_id = $1 
-            ORDER BY created_at DESC
-        `;
-        const result = await req.db.query(query, [id]);
-        res.json({ success: true, history: result.rows });
-    } catch (err) {
-        console.error("❌ Wallet History Error:", err.message);
-        res.status(500).json({ success: false, message: "Gagal mengambil riwayat transaksi." });
-    }
-});
-
-// ✅ 3. PROFIL & AVATAR ACTIONS
+// ✅ 2. PROFIL & AVATAR ACTIONS
 router.post('/upload-avatar', protect, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: "Mana fotonya Ri?" });
     try {
@@ -97,7 +97,7 @@ router.post('/upload-avatar', protect, upload.single('image'), async (req, res) 
 
 router.put('/update-profile', protect, updateProfileInfo);
 
-// ✅ 4. THEME & VISUAL
+// ✅ 3. THEME & VISUAL
 router.put('/update-theme', protect, async (req, res) => {
     const { theme_color } = req.body;
     try {
@@ -106,14 +106,14 @@ router.put('/update-theme', protect, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// ✅ 5. WIDGETS (OBS SOURCE)
+// ✅ 4. WIDGETS (OBS SOURCE)
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', protect, widgetController.updateSettings);
 
-// ✅ 6. BANK INFO (Update Rekening)
+// ✅ 5. BANK INFO (Update Rekening)
 router.put('/bank/:id', protect, updateBankInfo);
 
-// ✅ 7. RUTE UMUM (Public Data)
+// ✅ 6. RUTE UMUM (Public Data)
 router.get('/public/:username', getStreamerByUsername);
 router.get('/list', getAllStreamers);
 
