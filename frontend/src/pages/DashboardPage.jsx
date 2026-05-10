@@ -9,7 +9,8 @@ import AppearanceView from '../components/dashboard/AppearanceView'
 import ActivityFeed from '../components/dashboard/ActivityFeed' 
 import EditBankModal from '../components/dashboard/EditBankModal' 
 
-// ✅ IMPORT VIEWS BARU (Siapkan file-file ini nanti)
+// ✅ IMPORT ALERT & VIEWS
+import DonationAlert from '../components/dashboard/DonationAlert'
 import TipAlertView from '../components/dashboard/views/TipAlertView'
 import MediaShareView from '../components/dashboard/views/MediaShareView'
 import MilestoneView from '../components/dashboard/views/MilestoneView'
@@ -28,13 +29,20 @@ function DashboardPage() {
     const [loading2FA, setLoading2FA] = useState(false)
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isBankModalOpen, setIsBankModalOpen] = useState(false)
-    const [bankData, setBankData] = useState({ bank_name: '', account_number: '', account_name: '' })
+    
+    // Sync state bank agar selalu update setelah modal di-save
+    const [bankData, setBankData] = useState({ 
+        bank_name: '', 
+        bank_account_number: '', 
+        bank_account_name: '' 
+    })
 
     const fetchDashboardData = useCallback(async () => {
         try {
             const savedUser = JSON.parse(localStorage.getItem('user'));
             if (!savedUser?.id) throw new Error("Sesi Berakhir");
 
+            // ✅ AMBIL DATA TERBARU DARI ENGINE
             const res = await api.get('/user/dashboard-sync');
             
             if (res.data.success) {
@@ -42,17 +50,21 @@ function DashboardPage() {
                 setUser(userData);
                 setBalance(userData.total_saldo || 0);
                 
+                // Sinkronkan data bank dari database ke state local
                 setBankData({
-                    bank_name: userData.bank_name || 'Belum Diatur',
-                    account_number: userData.account_number || '-',
-                    account_name: userData.account_name || '-'
+                    bank_name: userData.bank_name || '',
+                    bank_account_number: userData.bank_account_number || '',
+                    bank_account_name: userData.bank_account_name || ''
                 });
 
                 localStorage.setItem('user', JSON.stringify(userData));
             }
         } catch (err) {
             console.error("❌ Sync Error Dashboard:", err.message);
-            if (err.response?.status === 401) navigate('/auth');
+            if (err.response?.status === 401) {
+                localStorage.clear();
+                navigate('/auth');
+            }
         } finally {
             setIsInitialLoading(false);
         }
@@ -70,13 +82,18 @@ function DashboardPage() {
     // --- 2. LOGIKA DUAL-OTP ---
     const handleRequestOTP = async () => {
         if (!user?.phone_number) {
-            return Swal.fire("WA KOSONG", "Isi nomor WhatsApp dulu di profil, Ri!", "warning");
+            return Swal.fire({
+                title: "WA KOSONG",
+                text: "Isi nomor WhatsApp dulu di profil, Ri!",
+                icon: "warning",
+                confirmButtonColor: "#7C3AED"
+            });
         }
         setLoading2FA(true);
         try {
             const res = await api.post('/auth/setup-2fa', { userId: user.id });
             if (res.data.success) {
-                Swal.fire("KODE MELUNCUR", "Cek WhatsApp lo & Email ariwirayuda24!", "info");
+                Swal.fire("KODE MELUNCUR", "Cek WhatsApp lo & Email!", "info");
             }
         } catch (err) {
             Swal.fire("ERROR", "Gagal kontak server keamanan.", "error");
@@ -89,17 +106,25 @@ function DashboardPage() {
     const handleSaveBank = async (e) => {
         e.preventDefault();
         try {
+            // Gunakan ID dari user state
             const res = await api.put(`/user/bank/${user.id}`, bankData);
             if (res.data.success) {
-                Swal.fire("SINKRON!", "Data bank berhasil disimpan.", "success");
+                Swal.fire({
+                    title: "SINKRON!",
+                    text: "Data bank berhasil disimpan.",
+                    icon: "success",
+                    timer: 2000,
+                    showConfirmButton: false
+                });
                 setIsBankModalOpen(false);
-                fetchDashboardData();
+                fetchDashboardData(); // Refresh data saldo dan profil
             }
         } catch (err) {
             Swal.fire("ERROR", "Gagal update data bank.", "error");
         }
     };
 
+    // Loading State Sultan
     if (isInitialLoading || !user) {
         return (
             <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
@@ -112,14 +137,18 @@ function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left">
-            {/* Sidebar sekarang mandiri, gak butuh props menu lagi */}
+        <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left relative overflow-hidden">
+            
+            {/* 🔥 REAL-TIME ALERT PROTOCOL */}
+            {/* Dipasang di sini agar melayang di atas semua tab */}
+            <DonationAlert streamerId={user?.id} />
+            
             <Sidebar user={user} />
             
             <main className="flex-1 p-6 md:p-12 overflow-y-auto">
                 <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-6 duration-700">
                     
-                    {/* ✅ DYNAMIC CONTENT HUB (Sultan UX) */}
+                    {/* ✅ DYNAMIC CONTENT HUB */}
                     {tab === 'wallet' && (
                         <EarningsView 
                             user={user} 
@@ -129,7 +158,7 @@ function DashboardPage() {
                         />
                     )}
                     
-                    {tab === 'activity' && <ActivityFeed />}
+                    {tab === 'activity' && <ActivityFeed user={user} />}
                     {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
                     {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
                     
@@ -143,7 +172,7 @@ function DashboardPage() {
                         />
                     )}
 
-                    {/* --- OVERLAY SETUP PAGES --- */}
+                    {/* --- SETUP VIEWS --- */}
                     {tab === 'tip' && <TipAlertView user={user} />}
                     {tab === 'mediashare' && <MediaShareView user={user} />}
                     {tab === 'milestone' && <MilestoneView user={user} />}
@@ -152,6 +181,7 @@ function DashboardPage() {
                 </div>
             </main>
 
+            {/* MODAL BANK SULTAN */}
             <EditBankModal 
                 isOpen={isBankModalOpen}
                 onClose={() => setIsBankModalOpen(false)}
