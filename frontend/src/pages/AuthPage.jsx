@@ -3,9 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios'; 
 import { 
-  Loader2, ShieldCheck, Mail, Lock, User, 
-  ArrowLeft, ChevronRight, MessageSquare, Zap, 
-  Phone, Sparkles, Rocket 
+  Loader2, Mail, Lock, User, ArrowLeft, 
+  ChevronRight, Zap, Phone, Rocket, Check, ShieldCheck, Sparkles
 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
@@ -26,7 +25,7 @@ function AuthPage() {
   
   const navigate = useNavigate();
 
-  // ✅ SULTAN SLIM TOAST (Pojok Kanan Atas)
+  // ✅ SULTAN SLIM TOAST
   const showSultanToast = (title, icon = 'success') => {
     const Toast = Swal.mixin({
       toast: true,
@@ -34,7 +33,10 @@ function AuthPage() {
       showConfirmButton: false,
       timer: 4000,
       timerProgressBar: true,
-      customClass: { popup: 'skuy-slim-toast border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] rounded-2xl', title: 'skuy-toast-content font-black italic uppercase text-[10px] tracking-widest' }
+      customClass: { 
+        popup: 'border-2 border-white/10 bg-[#0c0c0c]/90 backdrop-blur-xl rounded-2xl shadow-2xl', 
+        title: 'font-sans font-bold text-white text-xs' 
+      }
     });
     Toast.fire({ icon, title });
   };
@@ -46,9 +48,9 @@ function AuthPage() {
   const triggerSendOTP = async (userId) => {
     try {
       await api.post('/auth/send-otp', { userId });
-      showSultanToast('<b>SECURITY SENT</b> <span>Cek WA & Email!</span>', 'info');
+      showSultanToast('SECURITY KODE TERKIRIM KE WA!', 'info');
     } catch (err) {
-      showSultanToast('<b>FAILED</b> <span>Gagal kirim OTP.</span>', 'error');
+      showSultanToast('GAGAL KIRIM OTP!', 'error');
     }
   };
 
@@ -73,7 +75,7 @@ function AuthPage() {
         navigate('/dashboard');
       }
     } catch (err) {
-      showSultanToast('<b>AUTH ERROR</b> <span>Google Sync Gagal.</span>', 'error');
+      showSultanToast('GOOGLE AUTH FAILED!', 'error');
     } finally { setLoading(false); }
   };
 
@@ -81,9 +83,7 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // ✅ FIX: Jangan tulis /api/ lagi di sini. Axios sudah otomatis menangani.
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      
       const cleanData = {
         ...formData,
         phone_number: formData.phone_number ? formData.phone_number.replace(/\D/g, '') : ''
@@ -102,18 +102,12 @@ function AuthPage() {
           navigate('/dashboard');
         } else {
           setIsLogin(true);
-          // Berhasil daftar, kasih popup keren
-          Swal.fire({
-            title: "SQUAD ACTIVE!",
-            text: "Berhasil daftar! Login sekarang, Ri.",
-            icon: "success",
-            customClass: { popup: 'skuy-border skuy-shadow rounded-[2rem] border-4 border-slate-950' }
-          });
+          showSultanToast('AKUN BERHASIL DIDEPLOY!', 'success');
         }
       }
     } catch (err) {
       const msg = err.response?.data?.message || "Engine Error";
-      showSultanToast(`<b>ACCESS DENIED</b> <span>${msg}</span>`, 'error');
+      showSultanToast(msg.toUpperCase(), 'error');
     } finally { setLoading(false); }
   };
 
@@ -128,158 +122,140 @@ function AuthPage() {
         navigate('/dashboard');
       }
     } catch (err) {
-      showSultanToast('<b>INVALID CODE</b> <span>OTP Salah!</span>', 'error');
+      showSultanToast('OTP SALAH!', 'error');
       setOtp('');
     } finally { setLoading(false); }
   };
 
   return (
-    <div className="h-screen w-full bg-[#F8FAFF] flex overflow-hidden font-sans">
+    <div className="h-screen w-full bg-[#050505] flex items-center justify-center font-sans overflow-hidden">
       
-      {/* --- LEFT SIDEBAR: FIXED & PROPORSIONAL --- */}
-      <motion.div 
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className="hidden lg:flex w-[450px] bg-slate-950 p-12 flex-col justify-between relative overflow-hidden border-r-8 border-slate-950"
-      >
-        <div className="absolute top-0 right-0 p-8 opacity-5 rotate-12"><Zap size={400} fill="white" /></div>
+      {/* Background Ambience */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-full h-full bg-[radial-gradient(circle_at_center,#1e1b4b_0%,transparent_50%)] opacity-40" />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 contrast-150" />
+      </div>
+
+      <div className="w-full max-w-[1000px] h-[600px] bg-[#0c0c0c]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_0_100px_-30px_rgba(124,58,237,0.4)] z-10 flex overflow-hidden">
         
-        <div className="relative z-10">
-          <Link 
-            to="/" 
-            className="inline-flex items-center gap-2 bg-white/5 text-white px-5 py-2.5 rounded-2xl border-2 border-white/10 hover:bg-violet-600 transition-all group mb-12 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Back to Markas</span>
-          </Link>
-
-          <div className="flex items-center gap-3 mb-10 text-left">
-            <div className="w-12 h-12 bg-[#7C3AED] rounded-2xl flex items-center justify-center font-black text-2xl italic border-2 border-white/20 rotate-3 shadow-xl">S</div>
-            <span className="font-black italic text-2xl tracking-tighter uppercase text-white">SKUY<span className="text-[#7C3AED]">.GG</span></span>
-          </div>
-          
-          <h2 className="text-6xl font-black italic uppercase leading-[0.85] tracking-tighter mb-8 text-white text-left">
-            JOIN THE <br /> <span className="text-[#7C3AED]">ELITE</span> <br /> SQUAD
-          </h2>
-          
-          <div className="space-y-4 text-left">
-            {[
-              { icon: <MessageSquare size={18}/>, text: 'Dual-Channel Authentication' },
-              { icon: <ShieldCheck size={18}/>, text: 'Railway Cloud Sync Node' },
-              { icon: <Sparkles size={18}/>, text: 'Neo-Brutalism Interface' }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-4 text-slate-400 font-black italic text-[10px] uppercase tracking-widest">
-                <span className="text-[#7C3AED] p-2 bg-white/5 rounded-xl border border-white/5">{item.icon}</span> {item.text}
+        {/* --- LEFT SIDE: Visual Branding --- */}
+        <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-violet-600 to-indigo-700 p-12 flex-col justify-between relative">
+          <div className="relative z-10">
+            <Link to="/" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors mb-12 group">
+              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-widest">Back to Hub</span>
+            </Link>
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-2xl">
+                <Zap size={22} className="text-violet-600 fill-current" />
               </div>
-            ))}
+              <span className="text-xl font-black italic tracking-tighter text-white uppercase">SKUY<span className="opacity-50">.GG</span></span>
+            </div>
+            <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter leading-[0.9] mb-8">
+              Empowering <br /> Digital <span className="text-white/40">Sultans.</span>
+            </h2>
+            <div className="space-y-4">
+              {['Dual-Channel OTP Security', 'Military-Grade Encryption', 'Sultan Dashboard v3.2'].map((feat, i) => (
+                <div key={i} className="flex items-center gap-3 text-white/80 text-[10px] font-black uppercase tracking-widest">
+                  <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center border border-white/10"><Check size={12} strokeWidth={4} /></div>
+                  {feat}
+                </div>
+              ))}
+            </div>
           </div>
+          <p className="relative z-10 text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">© 2026 SKUYY.GG ENGINE</p>
         </div>
 
-        <div className="relative z-10 pt-10 border-t border-white/10 text-left">
-           <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500 italic leading-relaxed">
-             © 2026 SKUYY.GG ENGINE • CRAFTED IN KARAWANG
-           </p>
-        </div>
-      </motion.div>
-
-      {/* --- RIGHT SIDE: AUTH FORM --- */}
-      <div className="flex-1 h-screen overflow-y-auto bg-white flex flex-col relative">
-        <div className="lg:hidden p-6 flex justify-between items-center border-b-4 border-slate-50">
-           <div className="flex items-center gap-2">
-              <Zap className="text-violet-600" size={24} />
-              <span className="font-black italic uppercase text-xl text-slate-950">SKUY.GG</span>
-           </div>
-           <Link to="/" className="p-3 bg-slate-100 rounded-xl"><ArrowLeft size={20}/></Link>
-        </div>
-
-        <div className="max-w-md w-full mx-auto px-8 py-20 my-auto">
+        {/* --- RIGHT SIDE: Form Node --- */}
+        <main className="flex-1 p-12 flex flex-col justify-center bg-[#0c0c0c] relative">
           <AnimatePresence mode="wait">
             {!show2FA ? (
-              <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <div className="mb-10 text-left">
-                  <h3 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none text-left">
-                    {isLogin ? 'GATE: LOGIN' : 'NODE: REGISTER'}
+              <motion.div key="auth" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-[340px] mx-auto w-full">
+                <div className="mb-10">
+                  <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-2">
+                    {isLogin ? 'IGNITION START' : 'DEPLOY NODE'}
                   </h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-4 italic text-left">Protocol Authorization Required</p>
+                  <p className="text-white/30 text-[10px] font-black uppercase tracking-widest italic">Authorization Required</p>
                 </div>
 
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                  {!isLogin && (
+                    <>
+                      <div className="relative group">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
+                        <input type="text" placeholder="USERNAME" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" onChange={(e) => setFormData({...formData, username: e.target.value})} />
+                      </div>
+                      <div className="relative group">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
+                        <input type="text" placeholder="WHATSAPP (08...)" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
+                      </div>
+                    </>
+                  )}
+                  
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
+                    <input type="email" placeholder="EMAIL NODE" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                  </div>
+                  
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-violet-500 transition-colors" size={16}/>
+                    <input type="password" placeholder="SECURE PASSWORD" required className="w-full bg-white/[0.03] border border-white/10 p-4 pl-12 rounded-xl text-white text-xs font-bold outline-none focus:border-violet-500/50 transition-all placeholder:text-white/10 italic" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                  </div>
+
+                  <button className="w-full bg-white text-black py-4 rounded-xl font-black uppercase italic tracking-widest text-xs hover:bg-violet-500 hover:text-white transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-white/5">
+                    {loading ? <Loader2 className="animate-spin" size={16} /> : (isLogin ? 'VALIDATE SESSION' : 'ACTIVATE ENGINE')}
+                    <Rocket size={16} />
+                  </button>
+                </form>
+
                 {isLogin && (
-                  <div className="mb-8">
-                    <div className="border-4 border-slate-950 rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_#000] active:translate-y-1 transition-all">
-                      <GoogleLogin onSuccess={handleGoogleSuccess} theme="filled_black" width="100%" shape="square" />
+                  <div className="mt-8 flex flex-col items-center">
+                    <div className="relative w-full flex items-center justify-center mb-6">
+                      <div className="w-full border-t border-white/5"></div>
+                      <span className="absolute bg-[#0c0c0c] px-4 text-[9px] font-black text-white/20 uppercase tracking-[0.3em] italic">Or Auth Protocol</span>
                     </div>
-                    <div className="relative flex items-center justify-center my-8">
-                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t-4 border-slate-50"></div></div>
-                      <span className="relative bg-white px-6 text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] italic text-center">Manual Access</span>
+                    <div className="inline-block p-[1px] bg-gradient-to-r from-violet-500/50 to-fuchsia-500/50 rounded-xl overflow-hidden hover:scale-105 transition-transform">
+                      <div className="bg-[#0c0c0c] rounded-[11px] px-1 py-1">
+                        <GoogleLogin onSuccess={handleGoogleSuccess} theme="dark" shape="pill" width="260px" />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <form className="space-y-5" onSubmit={handleSubmit}>
-                  {!isLogin && (
-                    <div className="grid grid-cols-1 gap-5">
-                      <div className="relative group">
-                        <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#7C3AED]" size={18}/>
-                        <input type="text" placeholder="Username" required className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black focus:bg-white focus:border-slate-950 outline-none transition-all text-sm italic" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
-                      </div>
-                      <div className="relative group">
-                        <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#7C3AED]" size={18}/>
-                        <input type="text" placeholder="WA (0812...)" required className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black focus:bg-white focus:border-slate-950 outline-none transition-all text-sm italic" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="relative group">
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#7C3AED]" size={18}/>
-                    <input type="email" placeholder="Email Address" required className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black focus:bg-white focus:border-slate-950 outline-none transition-all text-sm italic" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                  </div>
-                  
-                  <div className="relative group">
-                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#7C3AED]" size={18}/>
-                    <input type="password" placeholder="Password" required className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black focus:bg-white focus:border-slate-950 outline-none transition-all text-sm italic" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
-                  </div>
-
-                  <button type="submit" disabled={loading} className="w-full bg-[#7C3AED] text-white py-6 rounded-2xl font-black uppercase italic tracking-widest text-base shadow-[0_8px_0_0_#4c1d95] active:translate-y-2 active:shadow-none transition-all flex items-center justify-center gap-3 mt-4 border-4 border-slate-950">
-                    {loading ? <Loader2 className="animate-spin" /> : <>{isLogin ? 'IGNITION START' : 'DEPLOY NODE'} <Rocket size={22} /></>}
+                <p className="mt-10 text-center text-[10px] font-bold uppercase tracking-widest text-white/30 italic">
+                  {isLogin ? "Access Denied?" : "Ready to launch?"}{" "}
+                  <button onClick={() => setIsLogin(!isLogin)} className="text-white hover:text-violet-400 transition-colors underline underline-offset-4 decoration-violet-500">
+                    {isLogin ? 'Create Node' : 'Login Portal'}
                   </button>
-                </form>
-
-                <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-10 text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-violet-600 transition-all text-center italic">
-                  {isLogin ? "// Create New Sultan Account" : "// Back to Login Portal"}
-                </button>
+                </p>
               </motion.div>
             ) : (
-              <motion.div key="2fa" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center space-y-10">
-                <div className="w-20 h-20 bg-violet-50 text-[#7C3AED] rounded-3xl mx-auto flex items-center justify-center border-4 border-slate-950 shadow-[8px_8px_0px_0px_#000] rotate-3">
-                  <MessageSquare size={36} strokeWidth={2.5} />
+              /* --- 2FA STATE --- */
+              <motion.div key="2fa" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-[340px] mx-auto w-full text-center space-y-10">
+                <div className="w-20 h-20 bg-violet-600/20 text-violet-500 rounded-3xl mx-auto flex items-center justify-center border border-violet-500/30 shadow-[0_0_40px_rgba(124,58,237,0.2)]">
+                  <ShieldCheck size={40} strokeWidth={2.5} />
                 </div>
-                <div className="space-y-3">
-                  <h4 className="text-4xl font-black italic uppercase tracking-tighter">SULTAN VERIFY</h4>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic leading-relaxed text-center">
-                    Security Code sent to your WhatsApp & Email.
-                  </p>
+                <div>
+                  <h4 className="text-3xl font-black italic uppercase text-white tracking-tighter">SULTAN VERIFY</h4>
+                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] italic mt-2">Cek WhatsApp lo sekarang, Ri!</p>
                 </div>
                 
                 <input 
                   type="text" maxLength="6" placeholder="000000" autoFocus
-                  className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-6xl font-black tracking-[0.2em] outline-none focus:bg-white focus:shadow-inner transition-all placeholder:text-slate-100"
+                  className="w-full bg-white/[0.03] border border-white/10 p-6 rounded-2xl text-center text-5xl font-black tracking-[0.3em] text-white outline-none focus:border-violet-500/50 transition-all placeholder:text-white/5"
                   value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 />
 
                 <div className="space-y-4">
-                  <button 
-                    onClick={handleVerify2FALogin} disabled={loading}
-                    className="w-full bg-slate-950 text-white py-6 rounded-2xl font-black uppercase italic shadow-[0_8px_0_0_#475569] active:translate-y-2 active:shadow-none transition-all flex items-center justify-center gap-3 border-2 border-white/10"
-                  >
+                  <button onClick={handleVerify2FALogin} disabled={loading} className="w-full bg-white text-black py-5 rounded-xl font-black uppercase italic tracking-widest text-xs hover:bg-violet-500 hover:text-white transition-all flex items-center justify-center gap-2">
                     {loading ? <Loader2 className="animate-spin" /> : 'AUTHORIZE ACCESS'}
                   </button>
-                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[10px] font-black uppercase text-[#7C3AED] hover:underline tracking-[0.2em] italic block mx-auto text-center">Resend Security Code</button>
-                  <button onClick={() => {setShow2FA(false); setOtp('');}} className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 tracking-[0.2em] italic block mx-auto text-center">Abort Login</button>
+                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-white/20 hover:text-white tracking-widest transition-colors italic">Resend Security Protocol</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </main>
       </div>
     </div>
   );
