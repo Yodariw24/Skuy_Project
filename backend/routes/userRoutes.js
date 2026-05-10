@@ -18,7 +18,7 @@ import { protect } from '../middleware/authMiddleware.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- 1. MULTER CONFIG ---
+// --- 1. MULTER CONFIG (Avatar Upload) ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadPath = path.join(__dirname, '../uploads/');
@@ -39,8 +39,10 @@ const upload = multer({
 
 // --- 2. ENDPOINTS ---
 
-// ✅ FIX JALUR: Agar /api/wallet/history/:id tidak Error 404
-// Karena di index.js lo pake app.use('/api', apiRouter), rute ini jadi /api/wallet/history
+/**
+ * ✅ WALLET HISTORY NODE
+ * Fix Error 404: Mendaftarkan jalur agar sinkron dengan /api/wallet/history/:id di index.js
+ */
 router.get('/wallet/history/:id', protect, async (req, res) => {
     try {
         const { id } = req.params;
@@ -54,11 +56,14 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
         res.json({ success: true, history: result.rows });
     } catch (err) {
         console.error("❌ Wallet History Error:", err.message);
-        res.status(500).json({ success: false, message: "Gagal mengambil riwayat." });
+        res.status(500).json({ success: false, message: "Gagal mengambil riwayat transaksi." });
     }
 });
 
-// ✅ 1. DASHBOARD SYNC (Kunci Utama Sinkronisasi Data Bank & Saldo)
+/**
+ * ✅ DASHBOARD SYNC
+ * Mengambil data profil lengkap termasuk nomor WhatsApp & info Bank Sultan
+ */
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
         const query = `
@@ -84,7 +89,9 @@ router.get('/dashboard-sync', protect, async (req, res) => {
     }
 });
 
-// ✅ 2. PROFIL & AVATAR ACTIONS
+/**
+ * ✅ PROFILE & BANK ACTIONS
+ */
 router.post('/upload-avatar', protect, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: "Mana fotonya Ri?" });
     try {
@@ -96,8 +103,11 @@ router.post('/upload-avatar', protect, upload.single('image'), async (req, res) 
 });
 
 router.put('/update-profile', protect, updateProfileInfo);
+router.put('/bank/:id', protect, updateBankInfo);
 
-// ✅ 3. THEME & VISUAL
+/**
+ * ✅ THEME & WIDGETS
+ */
 router.put('/update-theme', protect, async (req, res) => {
     const { theme_color } = req.body;
     try {
@@ -106,14 +116,12 @@ router.put('/update-theme', protect, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// ✅ 4. WIDGETS (OBS SOURCE)
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', protect, widgetController.updateSettings);
 
-// ✅ 5. BANK INFO (Update Rekening)
-router.put('/bank/:id', protect, updateBankInfo);
-
-// ✅ 6. RUTE UMUM (Public Data)
+/**
+ * ✅ PUBLIC ROUTES
+ */
 router.get('/public/:username', getStreamerByUsername);
 router.get('/list', getAllStreamers);
 

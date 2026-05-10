@@ -41,6 +41,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Izinkan akses tanpa origin (misal mobile) atau dari domain Vercel lo
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -77,16 +78,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- 🛡️ 4. API ROUTES (SYNCED WITH FRONTEND) ---
+// --- 🛡️ 4. API ROUTES (ULTIMATE PREFIX SYNC) ---
 
-// ✅ SOLUSI SULTAN: Gunakan Router khusus untuk prefix /api
 const apiRouter = express.Router();
 
 apiRouter.use('/auth', authRoutes); 
-apiRouter.use('/user', userRoutes);
 apiRouter.use('/donations', donationRoutes);
 
-// Pasang rute utama ke /api
+/**
+ * ✅ SOLUSI MULTI-PATH SULTAN:
+ * Kita pasang userRoutes di dua tempat sekaligus:
+ * 1. Di root ('/') supaya /api/wallet/history/:id nembak kesini (Fix Error 404 lo).
+ * 2. Di '/user' supaya rute /api/user/update-profile lo gak patah.
+ */
+apiRouter.use('/', userRoutes); 
+apiRouter.use('/user', userRoutes);
+
+// Daftarkan semua rute di bawah prefix /api
 app.use('/api', apiRouter);
 
 // Jalur Non-API (Cek Health Server)
@@ -94,16 +102,14 @@ app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
     engine: "SkuyGG Sultan Engine", 
-    version: "3.0.1", 
-    security: "Prefix Sync Active",
+    version: "3.0.5", 
+    security: "Multi-Prefix Path Synchronized",
     markas: "ariwirayuda24@gmail.com"
   });
 });
 
 // --- 🕵️ 5. 404 & ERROR HANDLER ---
-// Penanganan rute yang benar-benar tidak ada
 app.use((req, res) => {
-  // Hanya log peringatan jika bukan favicon atau rute uploads
   if (req.url !== '/favicon.ico' && !req.url.startsWith('/uploads/')) {
     console.warn(`⚠️ Jalur Tidak Terdaftar: [${req.method}] ${req.url}`);
   }
@@ -114,7 +120,6 @@ app.use((req, res) => {
   });
 });
 
-// Penanganan Internal Server Error
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Crash: ${err.message}`);
   res.status(err.status || 500).json({ 
@@ -129,7 +134,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('=========================================');
   console.log(`🚀 SKUYY.GG ENGINE RUNNING ON PORT ${PORT}`);
   console.log(`🕒 ZONE: ${process.env.TZ}`);
-  console.log(`🛡️ SECURITY: Prefix /api Sync Enabled`);
+  console.log(`🛡️ SECURITY: Prefix /api Multi-Sync Active`);
   console.log(`📧 MARKAS: ariwirayuda24@gmail.com`);
   console.log('=========================================');
 });
