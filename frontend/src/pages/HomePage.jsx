@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion'
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import api from '../api/axios' 
 import { 
-  Sun, Moon, Sparkles, ArrowRight, Trophy, Target, Zap, 
-  HelpCircle, ChevronDown, ShieldCheck, Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight
+  Sun, Moon, ArrowRight, Zap, HelpCircle, ChevronDown, ShieldCheck, 
+  Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight
 } from 'lucide-react'
 
 const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
@@ -45,7 +45,7 @@ const FAQItem = ({ question, answer, darkMode }) => {
   return (
     <motion.div 
       layout
-      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${isOpen ? 'ring-4 ring-violet-500/20' : ''} ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
+      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
     >
       <motion.button 
         layout
@@ -57,13 +57,11 @@ const FAQItem = ({ question, answer, darkMode }) => {
           <ChevronDown size={22} className="text-violet-600" strokeWidth={3} />
         </motion.div>
       </motion.button>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="px-8 pb-8">
-            <p className="text-sm text-slate-400 font-bold italic leading-relaxed border-t-2 border-slate-100 dark:border-white/5 pt-6">"{answer}"</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div className="px-8 pb-8">
+          <p className="text-sm text-slate-400 font-bold italic leading-relaxed border-t-2 border-slate-100 dark:border-white/5 pt-6">"{answer}"</p>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -77,7 +75,6 @@ function HomePage() {
   const scaleX = useSpring(scrollYProgress, springConfig);
   const navBg = useTransform(scrollYProgress, [0, 0.05], ["rgba(255, 255, 255, 0)", darkMode ? "rgba(10, 10, 14, 0.95)" : "rgba(255, 255, 255, 0.95)"]);
 
-  // 📡 RESOLVE API BASE URL UNTUK RENDERING ASSET LIVE DARI RAILWAY
   const API_BASE = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.split('/api')[0].replace(/\/$/, "")
     : 'https://skuyproject-production.up.railway.app';
@@ -89,20 +86,14 @@ function HomePage() {
         const data = res.data.success ? (res.data.streamers || res.data.data) : (Array.isArray(res.data) ? res.data : []);
         setStreamers(data); 
       } catch (err) {
-        console.warn("⚠️ Menggunakan Local Backup Node Identity.");
         setStreamers([
           { id: 1, username: 'gibran', display_name: 'Gibran', bio: 'Engine Architect' },
-          { id: 2, username: 'ariwirayuda', display_name: 'Ari W', bio: 'Dev' }
+          { id: 2, username: 'ariwirayuda', display_name: 'Ari W', bio: 'Dev Operator' }
         ]);
       }
     }
     fetchStreamers()
   }, []);
-
-  // Mekanisme penggandaan list array data agar track gerak kontinu tidak terputus di resolusi monitor besar
-  const marqueeListTrack1 = streamers.length > 0 ? [...streamers, ...streamers, ...streamers, ...streamers] : [];
-  // Baris track kedua dibalik susunannya biar variasinya acak estetik
-  const marqueeListTrack2 = streamers.length > 0 ? [...streamers, ...streamers, ...streamers, ...streamers].reverse() : [];
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-[#0a0a0e] text-white' : 'bg-[#F8FAFF] text-slate-900'} transition-colors duration-700 font-sans selection:bg-violet-600 selection:text-white overflow-x-hidden relative`}>
@@ -158,95 +149,63 @@ function HomePage() {
         </Reveal>
       </section>
 
-      {/* --- 💎 THE ELITE SQUAD HUB (EXPLORE STYLE + BORDERLESS 2-TRACK MARQUEE) --- */}
-      <section className="py-20 text-center relative z-10 w-full overflow-hidden bg-transparent">
+      {/* --- 💎 THE ELITE SQUAD HUB (CLEAN PREMIUM STATIC GRID) --- */}
+      <section className="max-w-7xl mx-auto px-6 py-20 text-center relative z-10">
         <Reveal>
-          {/* Copywriting Murni Bawaan Ditambah Aksen Judul Gaya Explore Hub */}
-          <div className="flex flex-col items-center mb-16 px-6">
+          <div className="flex flex-col items-center mb-20">
              <div className="w-20 h-2 bg-violet-600 rounded-full mb-8 shadow-lg" />
              <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter">ELITE <span className="text-violet-600">SQUAD</span></h2>
              <p className="text-slate-400 font-black uppercase tracking-[0.5em] text-[10px] mt-4 italic">Verified Creators on Railway Node</p>
           </div>
         </Reveal>
 
-        {/* TRACK BARISAN 1: GERAK KE KIRI (KOTAK ASPEK SEMPURNA 🔲) */}
-        {marqueeListTrack1.length > 0 && (
-          <div className="w-full space-y-6 flex flex-col items-center">
-            
-            <div className="w-full flex overflow-hidden relative py-2">
-              <div className="flex w-max gap-6 animate-[marqueeLeft_35s_linear_infinite] hover:[animation-play-state:paused]">
-                {marqueeListTrack1.map((s, idx) => {
-                  const targetAvatar = s.profile_picture 
-                    ? `${API_BASE}/uploads/${s.profile_picture}`
-                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
+        {/* 🔲 FAANG STYLE STATIC GRID: Kotak Sempurna, Elegan, Gak Bikin Pusing */}
+        {streamers.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+            {streamers.slice(0, 8).map((s, idx) => {
+              const targetAvatar = s.profile_picture 
+                ? `${API_BASE}/uploads/${s.profile_picture}`
+                : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
 
-                  return (
-                    <div 
-                      key={`track1-node-${s.id}-${idx}`}
-                      onClick={() => navigate(`/${s.username}`)}
-                      className={`w-48 h-48 aspect-square shrink-0 p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex flex-col justify-between items-center text-center ${darkMode ? 'bg-slate-900' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
-                    >
-                      <div className="w-16 h-16 rounded-full border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0">
-                        <img 
-                          src={targetAvatar} 
-                          alt={s.username} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
-                        />
-                      </div>
-                      <div className="w-full min-w-0">
-                        <h4 className="font-black italic text-sm uppercase tracking-tight truncate leading-none mb-1 px-1">
-                          {s.display_name || s.full_name || s.username}
-                        </h4>
-                        <p className="text-[9px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
-                      </div>
-                      <ChevronRight size={14} className="text-violet-600 opacity-60" strokeWidth={3} />
+              return (
+                <Reveal key={`grid-node-${s.id || idx}`}>
+                  <div 
+                    onClick={() => navigate(`/${s.username}`)}
+                    className={`w-full aspect-square p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[8px_8px_0px_0px_#7C3AED] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between items-center text-center group ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
+                  >
+                    {/* Lingkaran Foto Real-time */}
+                    <div className="w-20 h-20 rounded-full border-2 border-slate-950 overflow-hidden shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0 transition-transform group-hover:scale-105 duration-300">
+                      <img 
+                        src={targetAvatar} 
+                        alt={s.username} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
+                      />
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* TRACK BARISAN 2: GERAK REVERSE KE KANAN (KOTAK ASPEK SEMPURNA 🔲) */}
-            <div className="w-full flex overflow-hidden relative py-2">
-              <div className="flex w-max gap-6 animate-[marqueeRight_35s_linear_infinite] hover:[animation-play-state:paused]">
-                {marqueeListTrack2.map((s, idx) => {
-                  const targetAvatar = s.profile_picture 
-                    ? `${API_BASE}/uploads/${s.profile_picture}`
-                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
-
-                  return (
-                    <div 
-                      key={`track2-node-${s.id}-${idx}`}
-                      onClick={() => navigate(`/${s.username}`)}
-                      className={`w-48 h-48 aspect-square shrink-0 p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex flex-col justify-between items-center text-center ${darkMode ? 'bg-slate-900' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
-                    >
-                      <div className="w-16 h-16 rounded-full border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0">
-                        <img 
-                          src={targetAvatar} 
-                          alt={s.username} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
-                        />
-                      </div>
-                      <div className="w-full min-w-0">
-                        <h4 className="font-black italic text-sm uppercase tracking-tight truncate leading-none mb-1 px-1">
-                          {s.display_name || s.full_name || s.username}
-                        </h4>
-                        <p className="text-[9px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
-                      </div>
-                      <ChevronRight size={14} className="text-violet-600 opacity-60" strokeWidth={3} />
+                    
+                    {/* Metadata */}
+                    <div className="w-full min-w-0 my-2">
+                      <h4 className="font-black italic text-base uppercase tracking-tight truncate leading-none mb-1 px-1 group-hover:text-violet-600 transition-colors">
+                        {s.display_name || s.full_name || s.username}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
+                    {/* Action Hub Indicator */}
+                    <div className="text-violet-600 text-[10px] font-black uppercase tracking-widest italic flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                      INSPECT NODE <ChevronRight size={12} strokeWidth={3} />
+                    </div>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
+        ) : (
+          <p className="text-slate-400 italic font-bold">Scanning active creator nodes...</p>
         )}
 
-        {/* LINK GATEWAY UTK MELIHAT SELURUH KREATOR (EXPLORE REDIRECT DENGAN TOMBOL PREMIUM) */}
-        <div className="max-w-7xl mx-auto text-center mt-16 px-6">
+        {/* LINK GATEWAY UTK MELIHAT LEBIH BANYAK (EXPLORE REDIRECT) */}
+        <div className="text-center mt-16">
           <Link 
             to="/explore" 
             className={`inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest italic px-10 py-4 rounded-xl border-4 border-slate-950 ${darkMode ? 'bg-slate-900 text-violet-400 hover:bg-slate-800 hover:border-violet-500' : 'bg-white text-violet-600 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none'} transition-all`}
@@ -366,22 +325,10 @@ function HomePage() {
         </div>
       </footer>
 
-      {/* --- STYLING BLOCK SCROLLBAR & FAANG DUAL-MARQUEE ANIMATION --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
         html { scroll-behavior: smooth; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        
-        @keyframes marqueeLeft {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-25%); }
-        }
-
-        @keyframes marqueeRight {
-          0% { transform: translateX(-25%); }
-          100% { transform: translateX(0); }
-        }
-        
         ::-webkit-scrollbar { width: 10px; }
         ::-webkit-scrollbar-track { background: ${darkMode ? '#0a0a0e' : '#f8faff'}; }
         ::-webkit-scrollbar-thumb { background: #7c3aed; border: 3px solid ${darkMode ? '#0a0a0e' : '#f8faff'}; border-radius: 10px; }
