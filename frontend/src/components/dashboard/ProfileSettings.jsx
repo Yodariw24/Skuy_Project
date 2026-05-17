@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion' // ✅ FIXED: Diimpor ke sini agar terbebas dari ReferenceError!
+import { motion } from 'framer-motion' // ✅ FIXED: Terbebas dari ReferenceError
 import api from '../../api/axios' 
 import * as Icon from 'lucide-react' 
 import EditBankModal from './EditBankModal' 
@@ -39,7 +39,7 @@ export default function ProfileSettings({ user, setUser }) {
     bank_name: '', bank_account_number: '', bank_account_name: ''
   });
 
-  // 🚨 REAKTIF LOADING STATE TERPISAH
+  // 🚨 REAKTIF LOADING STATE TERPISAH (ANTI LOCKED BUTTON SYSTEM)
   const [loadingText, setLoadingText] = useState(false);
   const [loadingPhoto, setLoadingPhoto] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' })
@@ -97,7 +97,7 @@ export default function ProfileSettings({ user, setUser }) {
   };
 
   // ==========================================
-  // 📸 ACTION HANDLING 1: GANTI FOTO PROFIL DENGAN EMBEDDED REALTIME LOCK
+  // 📸 ACTION HANDLING 1: GANTI FOTO PROFIL (PERMANEN & RESET LOADING)
   // ==========================================
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
@@ -117,13 +117,13 @@ export default function ProfileSettings({ user, setUser }) {
     } catch (err) {
       setStatus({ type: 'error', message: 'Upload Failed.' });
     } finally { 
-      setLoadingPhoto(false); 
+      setLoadingPhoto(false); // ✅ UNLOCK: Tombol foto bisa digunakan kembali
       setTimeout(() => setStatus({ type: '', message: '' }), 3000); 
     }
   }
 
   // ==========================================
-  // 🗑️ ACTION HANDLING 2: HAPUS FOTO PROFIL PERMANEN KEMBALI KE DICEBEAR
+  // 🗑️ ACTION HANDLING 2: HAPUS FOTO PROFIL (PERMANEN & RESET LOADING)
   // ==========================================
   const handleDeletePhoto = async () => {
     const confirm = await Swal.fire({
@@ -156,13 +156,13 @@ export default function ProfileSettings({ user, setUser }) {
     } catch (err) {
       setStatus({ type: 'error', message: 'Gagal menghapus avatar.' });
     } finally {
-      setLoadingPhoto(false);
+      setLoadingPhoto(false); // ✅ UNLOCK: Tombol hapus foto terbuka kembali
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     }
   }
 
   // ==========================================
-  // 📝 ACTION HANDLING 3: UPDATE BIO DATA & TEXT DATA
+  // 📝 ACTION HANDLING 3: UPDATE BIO DATA & TEXT DATA (MULTI-SAVE FIX)
   // ==========================================
   const handleUpdateTextData = async (e) => {
     e.preventDefault();
@@ -178,16 +178,17 @@ export default function ProfileSettings({ user, setUser }) {
     } catch (err) {
       setStatus({ type: 'error', message: 'Update Failed.' });
     } finally { 
-      setLoadingText(false); 
+      setLoadingText(false); // ✅ UNLOCK CRITICAL: Mengembalikan tombol info profil agar bisa diklik berulang kali!
       setTimeout(() => setStatus({ type: '', message: '' }), 3000); 
     }
   }
 
   // ==========================================
-  // 🏦 ACTION HANDLING 4: UPDATE DATA LINK REKENING BANK SULTAN
+  // 🏦 ACTION HANDLING 4: UPDATE DATA LINK REKENING BANK
   // ==========================================
   const handleUpdateBank = async (e) => {
     e.preventDefault();
+    setLoadingText(true);
     try {
       const res = await api.put(`/user/bank/${user.id}`, bankFormData);
       if (res.data.success) {
@@ -199,7 +200,10 @@ export default function ProfileSettings({ user, setUser }) {
       }
     } catch (err) {
       setStatus({ type: 'error', message: 'Gagal update data bank.' });
-    } finally { setTimeout(() => setStatus({ type: '', message: '' }), 3000); }
+    } finally { 
+      setLoadingText(false); // ✅ UNLOCK: Membuka kunci operasional data bank kembali
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000); 
+    }
   }
 
   return (
