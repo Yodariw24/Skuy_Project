@@ -2,23 +2,68 @@ import { useEffect, useState, useCallback } from 'react'
 import api from '../../api/axios' 
 import { 
   Clock, Heart, RefreshCcw, Zap, 
-  Crown, Sparkles, Share2, CheckCircle2, TrendingUp 
+  Crown, Sparkles, Share2, CheckCircle2, ShieldCheck, Gem, User
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Swal from 'sweetalert2'
+
+// 🎨 COMPONENT TIER CONFIGURATION SHIELD WITH PREMIUM ICONS
+const tierConfig = {
+  MYTHIC: {
+    bg: 'bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-rose-500/10',
+    border: 'border-amber-500',
+    shadow: 'hover:shadow-[16px_16px_0px_0px_#F59E0B]',
+    text: 'text-amber-500',
+    badge: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-2 border-amber-600',
+    badgeText: 'Mythic Donatur 🔥',
+    iconBg: 'bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 text-white animate-bounce shadow-amber-200',
+    icon: <Crown size={38} strokeWidth={3} />
+  },
+  GOLD: {
+    bg: 'bg-gradient-to-br from-yellow-500/5 via-amber-500/5 to-orange-500/5',
+    border: 'border-amber-400',
+    shadow: 'hover:shadow-[16px_16px_0px_0px_#D97706]',
+    text: 'text-amber-600',
+    badge: 'bg-amber-50 text-amber-800 border-2 border-amber-300',
+    badgeText: 'Gold Tier 🌟',
+    iconBg: 'bg-amber-100 text-amber-600 border-2 border-amber-300',
+    icon: <Sparkles size={38} strokeWidth={3} />
+  },
+  SILVER: {
+    bg: 'bg-gradient-to-br from-slate-100 via-zinc-50 to-white',
+    border: 'border-slate-400',
+    shadow: 'hover:shadow-[16px_16px_0px_0px_#64748B]',
+    text: 'text-slate-600',
+    badge: 'bg-slate-100 text-slate-800 border-2 border-slate-300',
+    badgeText: 'Silver Tier 💎',
+    iconBg: 'bg-slate-100 text-slate-600 border-2 border-slate-300',
+    icon: <Gem size={38} strokeWidth={3} />
+  },
+  STANDARD: {
+    bg: 'bg-white',
+    border: 'border-slate-950',
+    shadow: 'hover:shadow-[16px_16px_0px_0px_#7C3AED]',
+    text: 'text-violet-600',
+    badge: 'bg-violet-50 text-violet-700 border-2 border-violet-200',
+    badgeText: 'Standard Tier ✨',
+    iconBg: 'bg-violet-50 text-violet-600 border-2 border-violet-100',
+    icon: <Heart size={38} strokeWidth={3} fill="currentColor" />
+  }
+};
 
 function ActivityFeed() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // --- 1. FETCH DATA DARI RAILWAY ---
+  // --- 1. FETCH DATA LIVE FROM NODE RAILWAY ---
   const fetchHistory = useCallback(async (isAuto = false) => {
     if (!isAuto) setLoading(true);
     else setIsRefreshing(true);
 
     try {
-      // ✅ Interceptor di axios.js udah otomatis nempel user_token, jadi aman Ri
-      const res = await api.get('/user/activity-feed');
+      // ✅ FIX ENDPOINT: Sesuai rute privat dashboard /donations/activity-feed di backend lo
+      const res = await api.get('/api/donations/activity-feed');
       
       if (res.data && res.data.success) {
         setHistory(res.data.donations || []);
@@ -33,8 +78,8 @@ function ActivityFeed() {
 
   useEffect(() => {
     fetchHistory();
-    // 🚀 GACOR MODE: Auto-refresh tiap 30 detik biar gak ketinggalan notif cuan
-    const interval = setInterval(() => fetchHistory(true), 30000);
+    // 🚀 AUTOMATED REFRESH RUN: Sync background tiap 15 detik biar responsif tanpa bikin berat server
+    const interval = setInterval(() => fetchHistory(true), 15000);
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
@@ -55,7 +100,7 @@ function ActivityFeed() {
   return (
     <div className="max-w-4xl mx-auto pb-24 px-2 font-sans text-left">
       
-      {/* --- HEADER SULTAN --- */}
+      {/* --- HEADER SULTAN HUB --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-14 gap-6 px-2">
         <div>
           <div className="flex items-center gap-3 mb-4">
@@ -66,7 +111,7 @@ function ActivityFeed() {
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] italic">Railway Live Stream Ops</span>
           </div>
           <h1 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">
-            Recent <span className="text-violet-600">Support</span>
+            Live <span className="text-violet-600">Activity</span> Feed
           </h1>
         </div>
         
@@ -101,71 +146,79 @@ function ActivityFeed() {
           </div>
         ) : history.length > 0 ? (
           <AnimatePresence mode='popLayout'>
-            {history.map((item, i) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: i * 0.05, type: 'spring', stiffness: 100 }}
-                key={item.id} 
-                className={`group relative bg-white p-8 md:p-12 rounded-[3.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-start md:items-center gap-10 hover:translate-y-[-4px] hover:translate-x-[-4px] hover:shadow-[16px_16px_0px_0px_#7C3AED] transition-all duration-500 overflow-hidden ${item.amount >= 100000 ? 'bg-amber-50/30' : ''}`}
-              >
-                {/* Background Decoration */}
-                <div className="absolute -top-4 -right-4 p-8 opacity-[0.05] group-hover:opacity-20 transition-all group-hover:rotate-12 group-hover:scale-150">
-                   {item.amount >= 100000 ? <Crown size={120} /> : <Heart size={120} />}
-                </div>
+            {history.map((item, i) => {
+              // 🛡️ DYNAMIC TIER RESOLVER: Menangkap kasta transaksi dari field database
+              const currentTier = item.tier?.toUpperCase() || 'STANDARD';
+              const cfg = tierConfig[currentTier] || tierConfig.STANDARD;
 
-                {/* Left Side: Avatar/Icon */}
-                <div className="relative shrink-0">
-                  <div className={`w-24 h-24 rounded-[2.5rem] border-4 border-slate-950 flex items-center justify-center transition-all duration-500 shadow-[6px_6px_0px_0px_#000] ${
-                    item.amount >= 100000 
-                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white rotate-6 group-hover:rotate-0' 
-                    : 'bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white'
-                  }`}>
-                    {item.amount >= 100000 ? <Crown size={40} strokeWidth={3} /> : <Heart size={40} strokeWidth={3} />}
+              return (
+                <motion.div 
+                  initial={{ opacity: 0, x: -30, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                  transition={{ delay: Math.min(i * 0.05, 0.3), type: 'spring', stiffness: 120 }}
+                  key={item.id} 
+                  className={`group relative p-8 md:p-12 rounded-[3.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-start md:items-center gap-10 hover:translate-y-[-4px] hover:translate-x-[-4px] ${cfg.shadow} ${cfg.bg} border-4 ${item.tier ? 'border-slate-950' : 'border-slate-950'} transition-all duration-500 overflow-hidden`}
+                >
+                  {/* Floating Translucent Background Icon */}
+                  <div className="absolute -top-6 -right-6 p-8 opacity-[0.03] group-hover:opacity-10 text-slate-950 transition-all group-hover:rotate-12 group-hover:scale-150 pointer-events-none">
+                     {cfg.icon}
                   </div>
-                </div>
-                
-                {/* Right Side: Info */}
-                <div className="flex-1 w-full min-w-0 z-10">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-                    <div>
-                      <h3 className="font-black italic text-slate-950 uppercase tracking-tighter text-3xl leading-none mb-4 flex items-center gap-3">
-                        {item.donatur_name}
-                        {item.amount >= 100000 && <Sparkles size={20} className="text-amber-500 animate-pulse" />}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5 bg-slate-100 px-3 py-2 rounded-xl text-slate-600">
-                          <Clock size={14} strokeWidth={3} /> {formatRelativeTime(item.created_at)}
-                        </span>
-                        <span className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
-                          <CheckCircle2 size={14} strokeWidth={3} /> Verified
-                        </span>
+
+                  {/* Left Side: Avatar Box / Dynamic Tier Icon */}
+                  <div className="relative shrink-0">
+                    <div className={`w-24 h-24 rounded-[2.5rem] border-4 border-slate-950 flex items-center justify-center transition-all duration-500 shadow-[6px_6px_0px_0px_#000] ${cfg.iconBg} group-hover:scale-105`}>
+                      {cfg.icon}
+                    </div>
+                  </div>
+                  
+                  {/* Right Side: Information Panel */}
+                  <div className="flex-1 w-full min-w-0 z-10">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-4 mb-4">
+                          <h3 className="font-black italic text-slate-950 uppercase tracking-tighter text-3xl leading-none flex items-center gap-2">
+                            <User size={20} className="text-slate-400" strokeWidth={3} /> {item.donatur_name}
+                          </h3>
+                          {/* 🎖️ DYNAMIC BADGE SULTAN TIER */}
+                          <span className={`text-[9px] font-black uppercase px-4 py-1.5 rounded-full shadow-sm tracking-widest ${cfg.badge}`}>
+                            {cfg.badgeText}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                          {/* ✅ SINKRON POSTGRESQL: Membaca field created_date dari database */}
+                          <span className="flex items-center gap-1.5 bg-slate-100 px-3 py-2 rounded-xl text-slate-600 border border-slate-200">
+                            <Clock size={14} strokeWidth={3} /> {formatRelativeTime(item.created_date)}
+                          </span>
+                          <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl border border-emerald-200 font-black">
+                            <CheckCircle2 size={14} strokeWidth={3} /> SUCCESS PAYMENT
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* NOMINAL PANEL BOX */}
+                      <div className="bg-slate-950 p-5 md:p-7 rounded-[2.2rem] shadow-[6px_6px_0px_0px_#000] transform group-hover:rotate-2 group-hover:scale-105 transition-all duration-300 border-2 border-slate-900">
+                        <p className={`text-2xl md:text-4xl font-black italic tracking-tighter leading-none ${cfg.text}`}>
+                          Rp {Number(item.gross_amount || item.amount).toLocaleString('id-ID')}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="bg-slate-950 p-5 md:p-7 rounded-[2.2rem] shadow-[6px_6px_0px_0px_#7C3AED] transform group-hover:rotate-2 transition-transform">
-                      <p className={`text-2xl md:text-4xl font-black italic tracking-tighter leading-none ${
-                        item.amount >= 100000 ? 'text-amber-400' : 'text-violet-400'
-                      }`}>
-                        Rp {Number(item.amount).toLocaleString('id-ID')}
-                      </p>
-                    </div>
+                    {item.message && (
+                      <div className="relative p-5 bg-white rounded-2xl border-l-8 border-slate-950 italic group-hover:bg-slate-50/30 transition-colors border border-slate-100 shadow-inner">
+                        <p className="text-base text-slate-700 font-bold leading-relaxed">
+                          "{item.message}"
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  {item.message && (
-                    <div className="relative p-5 bg-slate-50 rounded-2xl border-l-8 border-slate-950 italic group-hover:bg-white transition-colors">
-                      <p className="text-base text-slate-700 font-bold leading-relaxed">
-                        "{item.message}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         ) : (
-          /* --- EMPTY STATE --- */
+          /* --- EMPTY STATE HUB --- */
           <div className="bg-white rounded-[4rem] border-4 border-slate-950 py-32 text-center flex flex-col items-center shadow-[16px_16px_0px_0px_#f1f5f9] group">
             <div className="w-28 h-28 bg-slate-100 rounded-[2.5rem] flex items-center justify-center mb-10 border-4 border-slate-950 group-hover:rotate-12 transition-all duration-500">
               <Zap size={48} className="text-slate-300 group-hover:text-violet-600 animate-pulse" />
@@ -179,6 +232,12 @@ function ActivityFeed() {
                   const user = JSON.parse(localStorage.getItem('user'));
                   if (user) {
                     navigator.clipboard.writeText(`https://skuy-project.vercel.app/${user.username}`);
+                    Swal.fire({
+                      title: 'BERHASIL',
+                      text: 'Link profil publik lo udah dicopy, gass sebar, Ri!',
+                      icon: 'success',
+                      customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_#7C3AED]' }
+                    });
                   }
                 }}
                 className="flex items-center gap-3 mx-auto bg-[#7C3AED] text-white px-10 py-5 rounded-2xl text-xs font-black uppercase italic tracking-[0.2em] shadow-[0_6px_0_0_#4c1d95] active:translate-y-1 active:shadow-none border-2 border-slate-950 transition-all"

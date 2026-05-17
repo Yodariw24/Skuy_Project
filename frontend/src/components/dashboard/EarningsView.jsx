@@ -9,47 +9,64 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import Swal from 'sweetalert2'
 
-function EarningsView({ user, balance, showBalance, setShowBalance, bankData, openEditModal }) {
+function EarningsView({ user, showBalance, setShowBalance, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [transactions, setTransactions] = useState([])
+  const [balance, setBalance] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  const fetchHistory = async () => {
+  // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE
+  const fetchWalletData = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/wallet/history/${user.id}`);
       
-      if (res.data && Array.isArray(res.data.history)) {
-        setTransactions(res.data.history);
+      // ✅ FIX SINKRONISASI ENDPOINT: Menembak rute privat & publik yang tepat di Backend
+      const [resHistory, resBalance] = await Promise.all([
+        api.get(`/api/donations/history/${user.id}`), // Mengambil riwayat gabungan IN/OUT
+        api.get(`/api/donations/balance/${user.id}`)  // Mengambil hitungan saldo net_amount
+      ]);
+      
+      if (resHistory.data && Array.isArray(resHistory.data.history)) {
+        setTransactions(resHistory.data.history);
       } else {
         setTransactions([]);
       }
+
+      if (resBalance.data && resBalance.data.success) {
+        setBalance(resBalance.data.total_saldo);
+      }
     } catch (err) {
-      console.warn("History empty or node sync issues, Ri.");
+      console.warn("⚠️ Gagal sinkronisasi data dengan Node Railway:", err.message);
       setTransactions([]); 
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { fetchHistory(); }, [user?.id]);
+  useEffect(() => { 
+    if (user?.id) {
+      fetchWalletData(); 
+    }
+  }, [user?.id]);
 
+  // 📊 FILTER ENGINE LOGS
   const filteredTransactions = (Array.isArray(transactions) ? transactions : []).filter(tx => {
     if (filter === 'Semua') return true;
-    if (filter === 'Donasi Masuk') return tx.type === 'IN' || tx.type === 'donation';
-    if (filter === 'Penarikan Saldo') return tx.type === 'OUT' || tx.type === 'withdrawal';
+    if (filter === 'Donasi Masuk') return tx.type === 'IN';
+    if (filter === 'Penarikan Saldo') return tx.type === 'OUT';
     return true;
   });
 
+  // 💰 PROSEDUR WITHDRAW REQUEST
   const handleWithdraw = async () => {
     if (!withdrawAmount || withdrawAmount < 10000) {
       return Swal.fire({
         title: 'DITOLAK',
-        text: 'Minimal penarikan Rp 10.000, Ri!',
+        text: 'Minimal penarikan dana Rp 10.000, Ri!',
         icon: 'error',
         customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_#EF4444]' }
       });
@@ -57,25 +74,30 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
     if (Number(withdrawAmount) > Number(balance)) {
       return Swal.fire({
         title: 'SALDO KURANG',
-        text: 'Saldo lo gak cukup buat ditarik segitu!',
+        text: 'Dompet lo gak cukup buat ditarik segitu!',
         icon: 'warning',
         customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_#F59E0B]' }
       });
     }
 
     try {
-      await api.post('/wallet/withdraw', { userId: user.id, amount: parseInt(withdrawAmount), bank: bankData });
+      await api.post('/api/donations/withdraw', { 
+        userId: user.id, 
+        amount: parseInt(withdrawAmount), 
+        bank: bankData 
+      });
+      
       Swal.fire({ 
         title: 'GACOR!', 
-        text: 'Permintaan tarik saldo dikirim ke admin!', 
+        text: 'Permintaan tarik saldo terkirim, nantikan instruksi admin!', 
         icon: 'success',
         customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_#10B981]' }
       });
       setIsWithdrawModalOpen(false);
       setWithdrawAmount('');
-      fetchHistory(); 
+      fetchWalletData(); // Auto-refresh data live saldo setelah WD
     } catch (err) { 
-      Swal.fire('ERROR', 'Engine gagal proses penarikan.', 'error'); 
+      Swal.fire('ERROR', 'Engine gagal memproses transfer penarikan.', 'error'); 
     }
   };
 
@@ -164,9 +186,9 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
                   {isFilterOpen && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-full bg-white border-4 border-slate-950 rounded-[2rem] shadow-[8px_8px_0px_0px_#000] z-50 p-3">
                       {['Semua', 'Donasi Masuk', 'Penarikan Saldo'].map((item) => (
-                        <button key={item} onClick={() => { setFilter(item); setIsFilterOpen(false); }} className={`w-full text-left px-5 py-4 text-[10px] font-black uppercase rounded-xl mb-1 transition-colors ${filter === item ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <motion.button whileHover={{ x: 4 }} key={item} onClick={() => { setFilter(item); setIsFilterOpen(false); }} className={`w-full text-left px-5 py-4 text-[10px] font-black uppercase rounded-xl mb-1 transition-colors ${filter === item ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                           {item}
-                        </button>
+                        </motion.button>
                       ))}
                     </motion.div>
                   )}
@@ -183,23 +205,25 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               ) : filteredTransactions.length > 0 ? (
                 <div className="space-y-6">
                   {filteredTransactions.map((tx) => (
-                    <div key={tx.id} className="group flex flex-col md:flex-row md:items-center justify-between p-8 rounded-[2.5rem] bg-white border-4 border-transparent hover:border-slate-950 hover:shadow-[8px_8px_0px_0px_#F1F5F9] transition-all">
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={tx.id} className="group flex flex-col md:flex-row md:items-center justify-between p-8 rounded-[2.5rem] bg-white border-4 border-transparent hover:border-slate-950 hover:shadow-[8px_8px_0px_0px_#F1F5F9] transition-all">
                       <div className="flex items-center gap-6">
-                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.type === 'IN' || tx.type === 'donation' ? 'bg-emerald-500' : 'bg-rose-500'} text-white`}>
-                          {tx.type === 'IN' || tx.type === 'donation' ? <ArrowDownLeft size={22} strokeWidth={3} /> : <ArrowUpRight size={22} strokeWidth={3} />}
+                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'} text-white`}>
+                          {tx.type === 'IN' ? <ArrowDownLeft size={22} strokeWidth={3} /> : <ArrowUpRight size={22} strokeWidth={3} />}
                         </div>
                         <div>
-                          <p className="font-black text-slate-950 uppercase italic tracking-tighter text-base mb-1">{tx.description || tx.message || 'System Entry'}</p>
+                          <p className="font-black text-slate-950 uppercase italic tracking-tighter text-base mb-1">{tx.description || 'System Entry'}</p>
                           <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-2 italic tracking-widest"><Clock size={12} /> {new Date(tx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
                       </div>
                       <div className="text-right mt-5 md:mt-0">
-                         <p className={`text-3xl font-black italic tracking-tighter ${tx.type === 'IN' || tx.type === 'donation' ? 'text-emerald-600' : 'text-slate-950'}`}>
-                           {tx.type === 'IN' || tx.type === 'donation' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
+                         <p className={`text-3xl font-black italic tracking-tighter ${tx.type === 'IN' ? 'text-emerald-600' : 'text-slate-950'}`}>
+                           {tx.type === 'IN' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
                          </p>
-                         <p className="text-[8px] font-black uppercase text-slate-300 tracking-[0.2em] mt-1">Transaction Verified</p>
+                         <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full border-2 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : tx.status?.toUpperCase() === 'PENDING' ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-rose-600 bg-rose-50 border-rose-200'} tracking-[0.1em] mt-2 inline-block`}>
+                           {tx.status || 'Verified'}
+                         </span>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               ) : (
@@ -214,7 +238,6 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
 
         {/* SIDEBAR RIGHT */}
         <div className="lg:col-span-4 space-y-10">
-          
           {/* PUBLIC LINK CARD */}
           <div className="bg-white rounded-[3rem] p-10 border-4 border-slate-950 shadow-[12px_12px_0px_0px_#7C3AED]">
             <h4 className="text-[11px] font-black uppercase text-slate-400 mb-8 tracking-[0.3em] flex items-center gap-3 italic">
@@ -248,7 +271,6 @@ function EarningsView({ user, balance, showBalance, setShowBalance, bankData, op
               )}
             </div>
           </div>
-          
         </div>
       </div>
 
