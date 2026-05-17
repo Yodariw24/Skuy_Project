@@ -55,24 +55,26 @@ function AuthPage() {
     }
   };
 
-  // 🛡️ SYNC ENGINE: Menarik profile paling seger (beserta streamer_id) sebelum lempar ke dashboard
+  // 🛡️ RE-ENGINEERING SYNC ENGINE: Jalur Pintas Mengunci Streamer ID Tanpa Memanggil Rute 404
   const secureSultanSession = async (token, fallbackUser) => {
     try {
-      // Set token sementara ke header biar lolos auth middleware backend
       localStorage.setItem('user_token', token);
       
-      // Tembak endpoint profile yang diproteksi middleware buat dapet streamer_id asli database
-      const res = await api.get('/api/donations/profile/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // 🚀 DECODE TOKEN: Ambil data ID dari payload token asli bawaan backend
+      const decodedToken = jwtDecode(token);
       
-      if (res.data && res.data.success) {
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-      } else {
-        localStorage.setItem('user', JSON.stringify(fallbackUser));
-      }
+      // Susun objek user yang komplit dan aman tanpa merusak struktur database
+      const completeUser = {
+        ...fallbackUser,
+        id: fallbackUser?.id || decodedToken?.id,
+        // Cari streamer_id dari response data atau token, fallback teraman gunakan ID user asli
+        streamer_id: fallbackUser?.streamer_id || decodedToken?.streamer_id || fallbackUser?.id || decodedToken?.id
+      };
+      
+      localStorage.setItem('user', JSON.stringify(completeUser));
+      console.log("🔥 SESSION LOCKED: Sesi kasta Streamer aman! ID:", completeUser.streamer_id);
     } catch (err) {
-      console.warn("⚠️ Menggunakan session lokal bawaan auth kedorong:", err.message);
+      console.warn("⚠️ Gagal sinkronisasi token dengan payload decoder:", err.message);
       localStorage.setItem('user', JSON.stringify(fallbackUser));
     }
   };
@@ -158,7 +160,7 @@ function AuthPage() {
 
       <div className="w-full max-w-[1050px] h-[640px] bg-white border-4 border-slate-950 rounded-[3rem] shadow-[20px_20px_0px_0px_#000] z-10 flex overflow-hidden mx-4">
         
-        {/* --- LEFT SIDE: THE VIBE --- */}
+        {/* --- LEFT SIDE --- */}
         <div className="hidden lg:flex w-[45%] bg-violet-600 p-12 flex-col justify-between relative border-r-4 border-slate-950">
           <div className="relative z-10">
             <Link to="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-all mb-16 group">
@@ -186,7 +188,7 @@ function AuthPage() {
           <p className="relative z-10 text-[10px] font-black text-white/40 uppercase tracking-[0.4em] text-left">CRAFTED IN KARAWANG • 2026</p>
         </div>
 
-        {/* --- RIGHT SIDE: THE FORM --- */}
+        {/* --- RIGHT SIDE --- */}
         <main className="flex-1 p-12 flex flex-col justify-center bg-white relative overflow-y-auto">
           <AnimatePresence mode="wait">
             {!show2FA ? (
