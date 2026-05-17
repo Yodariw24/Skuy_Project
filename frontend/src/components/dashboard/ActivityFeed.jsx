@@ -230,9 +230,9 @@ function ActivityFeed() {
               </p>
               <button 
                 onClick={() => {
-                  const user = JSON.parse(localStorage.getItem('user'));
-                  if (user) {
-                    navigator.clipboard.writeText(`https://skuy-project.vercel.app/${user.username}`);
+                  const userSession = JSON.parse(localStorage.getItem('user'));
+                  if (userSession) {
+                    navigator.clipboard.writeText(`https://skuy-project.vercel.app/${userSession.username}`);
                     Swal.fire({
                       title: 'BERHASIL',
                       text: 'Link profil publik lo udah dicopy, gass sebar, Ri!',

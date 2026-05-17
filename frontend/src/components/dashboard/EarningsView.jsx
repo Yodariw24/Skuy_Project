@@ -18,19 +18,22 @@ function EarningsView({ user, bankData, openEditModal }) {
   const [balance, setBalance] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  // 🛡️ LOCK LOKAL STATE: Mengamankan fungsi Show/Hide balance agar langsung berfungsi saat diklik
+  // 🛡️ LOCK LOKAL STATE: Mengamankan fitur Show/Hide balance biar berfungsi mandiri saat diklik
   const [localShowBalance, setLocalShowBalance] = useState(false)
 
   // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE
   const fetchWalletData = async () => {
-    if (!user?.id) return;
+    // 💡 SOLUSI MUTLAK ID: Menangkap streamer_id database, jika kosong fallback ke user.id
+    const targetStreamerId = user?.streamer_id || user?.id;
+    
+    if (!targetStreamerId) return;
     try {
       setLoading(true);
       
-      // ✅ FIX SINKRONISASI ENDPOINT: Menembak rute privat & publik yang tepat di Backend
+      // ✅ FIX ENDPOINT PARAMETERS: Mengirimkan Streamer ID asli agar data dari Postgres terpanggil sempurna
       const [resHistory, resBalance] = await Promise.all([
-        api.get(`/api/donations/history/${user.id}`), // Mengambil riwayat gabungan IN/OUT
-        api.get(`/api/donations/balance/${user.id}`)  // Mengambil hitungan saldo net_amount
+        api.get(`/api/donations/history/${targetStreamerId}`), 
+        api.get(`/api/donations/balance/${targetStreamerId}`)  
       ]);
       
       if (resHistory.data && Array.isArray(resHistory.data.history)) {
@@ -66,6 +69,8 @@ function EarningsView({ user, bankData, openEditModal }) {
 
   // 💰 PROSEDUR WITHDRAW REQUEST
   const handleWithdraw = async () => {
+    const targetStreamerId = user?.streamer_id || user?.id;
+
     if (!withdrawAmount || withdrawAmount < 10000) {
       return Swal.fire({
         title: 'DITOLAK',
@@ -85,7 +90,7 @@ function EarningsView({ user, bankData, openEditModal }) {
 
     try {
       await api.post('/api/donations/withdraw', { 
-        userId: user.id, 
+        userId: targetStreamerId, // Mengirimkan ID penarik saldo yang valid
         amount: parseInt(withdrawAmount), 
         bank: bankData 
       });
@@ -98,7 +103,7 @@ function EarningsView({ user, bankData, openEditModal }) {
       });
       setIsWithdrawModalOpen(false);
       setWithdrawAmount('');
-      fetchWalletData(); // Auto-refresh data live saldo setelah WD
+      fetchWalletData(); 
     } catch (err) { 
       Swal.fire('ERROR', 'Engine gagal memproses transfer penarikan.', 'error'); 
     }
@@ -150,9 +155,11 @@ function EarningsView({ user, bankData, openEditModal }) {
             <div className="relative z-10 flex flex-col justify-between min-h-[200px]">
               <div className="flex justify-between items-start">
                 <div className="p-4 bg-slate-950 text-white rounded-2xl border-2 border-white/10 shadow-xl"><Wallet size={32} /></div>
+                
+                {/* 👁️ CONTROL BUTTON USING AUTONOMOUS LOCAL STATE */}
                 <button 
                   onClick={() => setLocalShowBalance(!localShowBalance)} 
-                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2确定 active:scale-95"
+                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center"
                 >
                   {localShowBalance ? 'Hide Balance' : 'Show Balance'}
                 </button>
