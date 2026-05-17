@@ -35,40 +35,32 @@ function DashboardPage() {
         bank_account_name: '' 
     })
 
+    // 📡 1. ENGINE UTAMA SINKRONISASI DATA PROFIL
     const fetchDashboardData = useCallback(async () => {
         try {
             const savedUser = JSON.parse(localStorage.getItem('user'));
             if (!savedUser?.id) throw new Error("Sesi Berakhir");
 
-            // ✅ AMBIL DATA DARI ENGINE UTAMA
             const res = await api.get('/user/dashboard-sync');
             
             if (res.data.success) {
-                // 🛡️ LOCK MERGE SYSTEM: Gabungkan data baru dari server dengan data streamer_id lama agar tidak terhapus
+                // 🛡️ LOCK MERGE SYSTEM: Amankan streamer_id dari ancaman data kosong
                 const userData = {
                     ...savedUser,
                     ...res.data.user,
-                    streamer_id: savedUser.streamer_id || res.data.user.streamer_id
+                    id: res.data.user.id || savedUser.id,
+                    streamer_id: res.data.user.streamer_id || savedUser.streamer_id || res.data.user.id || savedUser.id
                 };
 
                 setUser(userData);
                 
-                // Sinkronkan data bank dari database ke state local
                 setBankData({
                     bank_name: userData.bank_name || '',
                     bank_account_number: userData.bank_account_number || userData.account_number || '',
                     bank_account_name: userData.bank_account_name || userData.account_name || ''
                 });
 
-                // ✅ Amankan data gabungan sultan ke localStorage
                 localStorage.setItem('user', JSON.stringify(userData));
-
-                // Tarik data saldo live murni langsung dari hitungan database core kita
-                const targetId = userData.streamer_id || userData.id;
-                const balanceRes = await api.get(`/api/donations/balance/${targetId}`);
-                if (balanceRes.data && balanceRes.data.success) {
-                    setBalance(balanceRes.data.total_saldo);
-                }
             }
         } catch (err) {
             console.error("❌ Sync Error Dashboard:", err.message);
@@ -81,6 +73,24 @@ function DashboardPage() {
         }
     }, [navigate]);
 
+    // 💰 2. ENGINE KHUSUS RE-FETCH SALDO LIVE
+    const fetchLiveBalance = useCallback(async () => {
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        const targetId = user?.streamer_id || savedUser?.streamer_id || user?.id || savedUser?.id;
+        
+        if (!targetId) return;
+
+        try {
+            const balanceRes = await api.get(`/api/donations/balance/${targetId}`);
+            if (balanceRes.data && balanceRes.data.success) {
+                setBalance(balanceRes.data.total_saldo);
+            }
+        } catch (err) {
+            console.warn("⚠️ Gagal pancing saldo murni database:", err.message);
+        }
+    }, [user]);
+
+    // 🔄 RE-ACTIVE CALLER: Jalankan sinkronisasi profil saat pertama kali masuk
     useEffect(() => {
         const token = localStorage.getItem('user_token');
         if (!token) {
@@ -90,7 +100,15 @@ function DashboardPage() {
         }
     }, [fetchDashboardData, navigate]);
 
-    // --- 2. LOGIKA DUAL-OTP ---
+    // 🔄 TAB MONITOR TRIGGER: Paksa ambil saldo terbaru setiap kali user pindah tab ke 'wallet'
+    useEffect(() => {
+        if (user?.id) {
+            fetchLiveBalance();
+        }
+    }, [tab, user?.id, fetchLiveBalance]);
+
+
+    // --- LOGIKA DUAL-OTP ---
     const handleRequestOTP = async () => {
         if (!user?.phone_number) {
             return Swal.fire({
@@ -113,7 +131,7 @@ function DashboardPage() {
         }
     };
 
-    // --- 3. MODAL BANK ---
+    // --- MODAL BANK ---
     const handleSaveBank = async (e) => {
         e.preventDefault();
         try {
