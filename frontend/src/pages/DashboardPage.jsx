@@ -9,13 +9,12 @@ import AppearanceView from '../components/dashboard/AppearanceView'
 import ActivityFeed from '../components/dashboard/ActivityFeed' 
 import EditBankModal from '../components/dashboard/EditBankModal' 
 
-// ✅ IMPORT ALERT, VIEWS & EXPLORE COMPONENT
+// ✅ IMPORT ALERT & SUB-VIEWS (MURNI OPERASIONAL STREAM)
 import DonationAlert from '../components/dashboard/DonationAlert'
 import TipAlertView from '../components/dashboard/views/TipAlertView'
 import MediaShareView from '../components/dashboard/views/MediaShareView'
 import MilestoneView from '../components/dashboard/views/MilestoneView'
 import LeaderboardView from '../components/dashboard/views/LeaderboardView'
-import Explore from './Explore' // Injeksi jalur Explore Hub jika diakses via sub-tab
 
 import Swal from 'sweetalert2'
 
@@ -101,7 +100,7 @@ function DashboardPage() {
         }
     }, [fetchDashboardData, navigate]);
 
-    // 🔄 TAB MONITOR TRIGGER: Paksa ambil saldo terbaru setiap kali user pindah tab ke 'wallet'
+    // 🔄 TAB MONITOR TRIGGER: Paksa ambil saldo terbaru setiap kali user berada/pindah ke tab 'wallet'
     useEffect(() => {
         if (user?.id) {
             fetchLiveBalance();
@@ -198,9 +197,6 @@ function DashboardPage() {
                             loading={loading2FA}
                         />
                     )}
-
-                    {/* ✅ DYNAMIC EXPLORE VIEW ROUTER SINKRON */}
-                    {tab === 'explore' && <Explore />}
 
                     {/* --- SETUP VIEWS --- */}
                     {tab === 'tip' && <TipAlertView user={user} />}

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Wallet, LogIn, Activity, Tv, LogOut, User, Zap, 
   ChevronRight, ShieldCheck, Bell, Target, Video, 
-  Trophy, Palette, MessageSquare, Compass 
+  Trophy, Palette, MessageSquare 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
@@ -39,18 +39,16 @@ function Sidebar({ user }) {
     ];
     const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
     
-    <div className="text-left font-bold italic text-slate-600 leading-relaxed">
-      {Swal.fire({
-        title: 'SKUY TIPS 💡',
-        html: `<div class="text-left font-bold italic text-slate-600 leading-relaxed">${randomTip}</div>`,
-        icon: 'info',
-        buttonsStyling: false,
-        customClass: {
-          popup: 'rounded-[2rem] border-4 border-slate-950 bg-white shadow-[8px_8px_0px_0px_#000]',
-          confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black uppercase italic border-2 border-slate-950'
-        }
-      })}
-    </div>
+    Swal.fire({
+      title: 'SKUY TIPS 💡',
+      html: `<div class="text-left font-bold italic text-slate-600 leading-relaxed">${randomTip}</div>`,
+      icon: 'info',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'rounded-[2rem] border-4 border-slate-950 bg-white shadow-[8px_8px_0px_0px_#000]',
+        confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black uppercase italic border-2 border-slate-950'
+      }
+    });
   };
 
   const logout = async () => {
@@ -139,13 +137,6 @@ function Sidebar({ user }) {
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
             <NavButton id="tips" icon={LogIn} label="Tips Sultan" onClickCustom={handleShowTips} />
-            {/* 🚀 EXPLORE HUB BUTTON PROTOCOL */}
-            <NavButton 
-              id="explore" 
-              icon={Compass} 
-              label="Explore Hub" 
-              onClickCustom={() => navigate('/explore')} 
-            />
           </nav>
         </div>
 
