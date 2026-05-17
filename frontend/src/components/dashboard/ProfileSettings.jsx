@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { motion } from 'framer-motion' // ✅ FIXED: Diimpor ke sini agar terbebas dari ReferenceError!
 import api from '../../api/axios' 
 import * as Icon from 'lucide-react' 
 import EditBankModal from './EditBankModal' 
@@ -38,7 +39,7 @@ export default function ProfileSettings({ user, setUser }) {
     bank_name: '', bank_account_number: '', bank_account_name: ''
   });
 
-  // 🚨 LOADING STATE TERPISAH UNTUK AKSI SPESIFIK
+  // 🚨 REAKTIF LOADING STATE TERPISAH
   const [loadingText, setLoadingText] = useState(false);
   const [loadingPhoto, setLoadingPhoto] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' })
@@ -48,7 +49,7 @@ export default function ProfileSettings({ user, setUser }) {
     ? import.meta.env.VITE_API_URL.split('/api')[0].replace(/\/$/, "")
     : 'https://skuyproject-production.up.railway.app';
 
-  // 📡 FETCH DAFTAR KATEGORI
+  // 📡 FETCH LIST KATEGORI AKTIF
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -61,7 +62,7 @@ export default function ProfileSettings({ user, setUser }) {
     fetchCategories();
   }, []);
 
-  // 📡 SINKRONISASI DATA UTAMA USER KE LOCAL STATE FORM
+  // 📡 SINKRONISASI DATA DAN LOCK STATE PANGKALAN UTAMA
   useEffect(() => {
     if (user) {
       setFormData({
@@ -96,7 +97,7 @@ export default function ProfileSettings({ user, setUser }) {
   };
 
   // ==========================================
-  // 📸 GERBANG OPERATIONS 1: UPDATE FOTO PROFIL
+  // 📸 ACTION HANDLING 1: GANTI FOTO PROFIL DENGAN EMBEDDED REALTIME LOCK
   // ==========================================
   const handleUploadPhoto = async (e) => {
     const file = e.target.files[0];
@@ -122,7 +123,7 @@ export default function ProfileSettings({ user, setUser }) {
   }
 
   // ==========================================
-  // 🗑️ GERBANG OPERATIONS 2: HAPUS FOTO PROFIL
+  // 🗑️ ACTION HANDLING 2: HAPUS FOTO PROFIL PERMANEN KEMBALI KE DICEBEAR
   // ==========================================
   const handleDeletePhoto = async () => {
     const confirm = await Swal.fire({
@@ -161,7 +162,7 @@ export default function ProfileSettings({ user, setUser }) {
   }
 
   // ==========================================
-  // 📝 GERBANG OPERATIONS 3: UPDATE DATA TEKS INFO
+  // 📝 ACTION HANDLING 3: UPDATE BIO DATA & TEXT DATA
   // ==========================================
   const handleUpdateTextData = async (e) => {
     e.preventDefault();
@@ -183,7 +184,7 @@ export default function ProfileSettings({ user, setUser }) {
   }
 
   // ==========================================
-  // 🏦 GERBANG OPERATIONS 4: UPDATE DATA REKENING
+  // 🏦 ACTION HANDLING 4: UPDATE DATA LINK REKENING BANK SULTAN
   // ==========================================
   const handleUpdateBank = async (e) => {
     e.preventDefault();
@@ -203,7 +204,7 @@ export default function ProfileSettings({ user, setUser }) {
 
   return (
     <div className="max-w-5xl mx-auto font-sans text-slate-900 pb-20 text-left">
-      {/* Top Alert Status */}
+      {/* Alert status rendering */}
       {status.message && (
         <div className={`fixed top-10 right-10 z-[100] px-8 py-4 rounded-[2rem] shadow-2xl animate-in slide-in-from-right border-4 border-slate-950 ${status.type === 'success' ? 'bg-slate-900 text-violet-400' : 'bg-red-500 text-white'} font-black text-[10px] uppercase italic tracking-widest flex items-center gap-3`}>
           <Icon.Zap size={14} className="animate-pulse" />
@@ -221,12 +222,12 @@ export default function ProfileSettings({ user, setUser }) {
               <p className="text-[10px] text-violet-600 font-bold italic lowercase">{currentUrl}/{user.username}</p>
             </div>
           </div>
-          <button type="button" onClick={() => { navigator.clipboard.writeText(`${currentUrl}/{user.username}`); setStatus({ type: 'success', message: 'Link Copied!' }); }} className="px-5 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-black text-[10px] uppercase border border-slate-100 hover:bg-slate-100 transition-all flex items-center gap-2"><Icon.Copy size={14} /> Copy Link</button>
+          <button type="button" onClick={() => { navigator.clipboard.writeText(`${currentUrl}/${user.username}`); setStatus({ type: 'success', message: 'Link Copied!' }); }} className="px-5 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-black text-[10px] uppercase border border-slate-100 hover:bg-slate-100 transition-all flex items-center gap-2"><Icon.Copy size={14} /> Copy Link</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        {/* PANEL KIRI: MANAGEMENT FORMS (TEXT DATA) */}
+        {/* PANEL MANAGEMENT FORM DATA INFRASTRUCTURE */}
         <div className="lg:col-span-2 space-y-8">
           <form onSubmit={handleUpdateTextData} className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
             <div className="flex items-center gap-3 mb-2">
@@ -237,7 +238,7 @@ export default function ProfileSettings({ user, setUser }) {
             <FormInput label="Display Nickname" iconName="Tag" placeholder="Ari Wirayuda" value={formData.display_name} onChange={(e) => setFormData({...formData, display_name: e.target.value})} />
             <FormInput label="WhatsApp Number" iconName="Phone" helpText="REQUIRED FOR 2FA" placeholder="0812xxxxxxxx" value={formData.phone_number} onChange={handlePhoneChange} />
             
-            {/* Dropdown Seleksi Kategori */}
+            {/* Opsi Seleksi Kategori Genre */}
             <div className="w-full">
               <div className="flex items-center justify-between mb-2 px-1 text-left">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block">Kategori Konten Streaming 🎮</label>
@@ -266,14 +267,14 @@ export default function ProfileSettings({ user, setUser }) {
 
             <FormInput label="Bio Description" iconName="FileText" textArea placeholder="Tell your donors about yourself..." value={formData.bio} onChange={(e) => setFormData({...formData, bio: e.target.value})} />
 
-            {/* 📝 SAVE ACTION BUTTON 1: INDEPENDEN UNTUK TEKS INFO */}
+            {/* 📝 SAVE TRIGGER TEKS PROFIL */}
             <button type="submit" disabled={loadingText} className="w-full py-4 bg-slate-950 text-white rounded-[1.5rem] font-black uppercase text-[11px] italic tracking-[0.2em] shadow-xl hover:bg-violet-600 transition-all flex items-center justify-center gap-3">
               {loadingText ? <Icon.Loader2 className="animate-spin" size={14} /> : <Icon.Save size={14} />}
               {loadingText ? 'SYNCHRONIZING INFO...' : 'SAVE PROFILE INFO'}
             </button>
           </form>
 
-          {/* Infrastructure / Bank Node */}
+          {/* Infrastructure / Bank Node Card */}
           <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#f1f5f9] flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="p-4 bg-slate-950 text-white rounded-[1.5rem] shadow-xl"><Icon.Landmark size={24} /></div>
@@ -282,17 +283,13 @@ export default function ProfileSettings({ user, setUser }) {
                 <p className="text-[10px] text-slate-400 font-bold italic uppercase">{user.bank_name ? `${user.bank_name} • Linked` : 'NOT CONFIGURED'}</p>
               </div>
             </div>
-            <button 
-              type="button" 
-              onClick={() => setIsBankModalOpen(true)}
-              className="px-8 py-4 bg-white border-4 border-slate-950 text-slate-950 rounded-2xl font-black text-[10px] uppercase italic tracking-widest hover:bg-slate-950 hover:text-white transition-all active:translate-y-1 shadow-[4px_4px_0px_0px_#000]"
-            >
+            <button type="button" onClick={() => setIsBankModalOpen(true)} className="px-8 py-4 bg-white border-4 border-slate-950 text-slate-950 rounded-2xl font-black text-[10px] uppercase italic tracking-widest hover:bg-slate-950 hover:text-white transition-all active:translate-y-1 shadow-[4px_4px_0px_0px_#000]">
               {user.bank_name ? 'UPDATE REKENING' : 'SETUP BANK'}
             </button>
           </div>
         </div>
 
-        {/* PANEL KANAN STICKY: MEDIA CONTAINER (FOTO PROFIL) */}
+        {/* CONTAINER MEDIA INTERFACE (FOTO PROFIL) */}
         <div className="space-y-6 lg:sticky lg:top-8">
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 italic">Identity Photo Node</h3>
@@ -310,24 +307,14 @@ export default function ProfileSettings({ user, setUser }) {
               </div>
             </div>
 
-            {/* 📸 MEDIA ACTION BUTTONS 2: MANAJEMEN FOTO TERISOLASI */}
+            {/* MANAGEMENT FOTO CONTAINER */}
             <div className="w-full flex flex-col gap-2.5">
-              <button 
-                type="button" 
-                disabled={loadingPhoto}
-                onClick={() => fileInputRef.current.click()} 
-                className="w-full py-3 bg-slate-50 text-slate-700 rounded-xl font-black text-[10px] uppercase border border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2"
-              >
+              <button type="button" disabled={loadingPhoto} onClick={() => fileInputRef.current.click()} className="w-full py-3 bg-slate-50 text-slate-700 rounded-xl font-black text-[10px] uppercase border border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2">
                 <Icon.Camera size={14}/> Change Photo
               </button>
 
               {formData.profile_picture && (
-                <button 
-                  type="button" 
-                  disabled={loadingPhoto}
-                  onClick={handleDeletePhoto} 
-                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase border border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2"
-                >
+                <button type="button" disabled={loadingPhoto} onClick={handleDeletePhoto} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase border border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2">
                   <Icon.Trash2 size={14}/> Remove Current Photo
                 </button>
               )}
@@ -338,15 +325,8 @@ export default function ProfileSettings({ user, setUser }) {
         </div>
       </div>
 
-      {/* MODAL BANK */}
-      <EditBankModal 
-        isOpen={isBankModalOpen}
-        onClose={() => setIsBankModalOpen(false)}
-        formData={bankFormData}
-        setFormData={setBankFormData}
-        onSave={handleUpdateBank}
-        loading={loadingText}
-      />
+      {/* BANNER EDIT REKENING */}
+      <EditBankModal isOpen={isBankModalOpen} onClose={() => setIsBankModalOpen(false)} formData={bankFormData} setFormData={setBankFormData} onSave={handleUpdateBank} loading={loadingText} />
     </div>
   )
 }
