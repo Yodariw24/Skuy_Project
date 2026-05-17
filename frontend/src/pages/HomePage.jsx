@@ -45,7 +45,7 @@ const FAQItem = ({ question, answer, darkMode }) => {
   return (
     <motion.div 
       layout
-      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
+      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${isOpen ? 'ring-4 ring-violet-500/20' : ''} ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
     >
       <motion.button 
         layout
@@ -86,19 +86,23 @@ function HomePage() {
     const fetchStreamers = async () => {
       try {
         const res = await api.get('/user/list');
-        // Mendukung multi-payload array data streamers bawaan saas lo, Ri!
         const data = res.data.success ? (res.data.streamers || res.data.data) : (Array.isArray(res.data) ? res.data : []);
         setStreamers(data); 
       } catch (err) {
         console.warn("⚠️ Menggunakan Local Backup Node Identity.");
-        setStreamers([{ id: 1, username: 'gibran', display_name: 'Gibran Account', bio: 'Engine Architect' }]);
+        setStreamers([
+          { id: 1, username: 'gibran', display_name: 'Gibran', bio: 'Engine Architect' },
+          { id: 2, username: 'ariwirayuda', display_name: 'Ari W', bio: 'Dev' }
+        ]);
       }
     }
     fetchStreamers()
   }, []);
 
-  // Mekanisme penggandaan array agar lintasan baris animasi berjalan mulus tanpa patah di ujung layar
-  const activeMarqueeList = streamers.length > 0 ? [...streamers, ...streamers, ...streamers, ...streamers] : [];
+  // Mekanisme penggandaan list array data agar track gerak kontinu tidak terputus di resolusi monitor besar
+  const marqueeListTrack1 = streamers.length > 0 ? [...streamers, ...streamers, ...streamers, ...streamers] : [];
+  // Baris track kedua dibalik susunannya biar variasinya acak estetik
+  const marqueeListTrack2 = streamers.length > 0 ? [...streamers, ...streamers, ...streamers, ...streamers].reverse() : [];
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-[#0a0a0e] text-white' : 'bg-[#F8FAFF] text-slate-900'} transition-colors duration-700 font-sans selection:bg-violet-600 selection:text-white overflow-x-hidden relative`}>
@@ -154,53 +158,103 @@ function HomePage() {
         </Reveal>
       </section>
 
-      {/* --- PREMIUM STREAMERS RUNNING MARQUEE --- */}
-      {activeMarqueeList.length > 0 && (
-        <section className="py-12 bg-slate-950/5 dark:bg-white/[0.02] border-y-4 border-slate-950 overflow-hidden relative mb-20">
-          <div className="flex w-max gap-8 animate-[marquee_30s_linear_infinite] hover:[animation-play-state:paused] py-2">
-            {activeMarqueeList.map((s, idx) => {
-              // Fix Point Validasi Image: Mengunci rute server uploads secara real-time
-              const targetAvatar = s.profile_picture 
-                ? `${API_BASE}/uploads/${s.profile_picture}`
-                : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
-
-              return (
-                <div 
-                  key={`marquee-node-${s.id}-${idx}`}
-                  onClick={() => navigate(`/${s.username}`)} // ✅ TARGET DONATE LIVE PORTAL
-                  className={`w-72 shrink-0 p-5 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex items-center gap-4 ${darkMode ? 'bg-slate-900 border-white/20' : 'bg-white shadow-[4px_4px_0px_0px_#000]'}`}
-                >
-                  <div className="w-16 h-16 bg-violet-100 rounded-2xl border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] shrink-0">
-                    <img 
-                      src={targetAvatar} 
-                      alt={s.username} 
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <h4 className="font-black italic text-base uppercase tracking-tight truncate leading-none mb-1">
-                      {s.display_name || s.full_name || s.username}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate">@{s.username}</p>
-                  </div>
-                  <ChevronRight size={16} className="text-violet-600 shrink-0 ml-auto" strokeWidth={3} />
-                </div>
-              );
-            })}
+      {/* --- 💎 THE ELITE SQUAD HUB (EXPLORE STYLE + BORDERLESS 2-TRACK MARQUEE) --- */}
+      <section className="py-20 text-center relative z-10 w-full overflow-hidden bg-transparent">
+        <Reveal>
+          {/* Copywriting Murni Bawaan Ditambah Aksen Judul Gaya Explore Hub */}
+          <div className="flex flex-col items-center mb-16 px-6">
+             <div className="w-20 h-2 bg-violet-600 rounded-full mb-8 shadow-lg" />
+             <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter">ELITE <span className="text-violet-600">SQUAD</span></h2>
+             <p className="text-slate-400 font-black uppercase tracking-[0.5em] text-[10px] mt-4 italic">Verified Creators on Railway Node</p>
           </div>
+        </Reveal>
 
-          {/* LINK GATEWAY EXPLORE HUB */}
-          <div className="max-w-7xl mx-auto text-center mt-12">
-            <Link 
-              to="/explore" 
-              className={`inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest italic px-8 py-3.5 rounded-xl border-4 border-slate-950 ${darkMode ? 'bg-slate-900 text-violet-400 hover:bg-slate-800 hover:border-violet-500' : 'bg-white text-violet-600 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none'} transition-all`}
-            >
-              Explore More Creators <ArrowRight size={14} strokeWidth={3} />
-            </Link>
+        {/* TRACK BARISAN 1: GERAK KE KIRI (KOTAK ASPEK SEMPURNA 🔲) */}
+        {marqueeListTrack1.length > 0 && (
+          <div className="w-full space-y-6 flex flex-col items-center">
+            
+            <div className="w-full flex overflow-hidden relative py-2">
+              <div className="flex w-max gap-6 animate-[marqueeLeft_35s_linear_infinite] hover:[animation-play-state:paused]">
+                {marqueeListTrack1.map((s, idx) => {
+                  const targetAvatar = s.profile_picture 
+                    ? `${API_BASE}/uploads/${s.profile_picture}`
+                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
+
+                  return (
+                    <div 
+                      key={`track1-node-${s.id}-${idx}`}
+                      onClick={() => navigate(`/${s.username}`)}
+                      className={`w-48 h-48 aspect-square shrink-0 p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex flex-col justify-between items-center text-center ${darkMode ? 'bg-slate-900' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
+                    >
+                      <div className="w-16 h-16 rounded-full border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0">
+                        <img 
+                          src={targetAvatar} 
+                          alt={s.username} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
+                        />
+                      </div>
+                      <div className="w-full min-w-0">
+                        <h4 className="font-black italic text-sm uppercase tracking-tight truncate leading-none mb-1 px-1">
+                          {s.display_name || s.full_name || s.username}
+                        </h4>
+                        <p className="text-[9px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-violet-600 opacity-60" strokeWidth={3} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* TRACK BARISAN 2: GERAK REVERSE KE KANAN (KOTAK ASPEK SEMPURNA 🔲) */}
+            <div className="w-full flex overflow-hidden relative py-2">
+              <div className="flex w-max gap-6 animate-[marqueeRight_35s_linear_infinite] hover:[animation-play-state:paused]">
+                {marqueeListTrack2.map((s, idx) => {
+                  const targetAvatar = s.profile_picture 
+                    ? `${API_BASE}/uploads/${s.profile_picture}`
+                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
+
+                  return (
+                    <div 
+                      key={`track2-node-${s.id}-${idx}`}
+                      onClick={() => navigate(`/${s.username}`)}
+                      className={`w-48 h-48 aspect-square shrink-0 p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex flex-col justify-between items-center text-center ${darkMode ? 'bg-slate-900' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
+                    >
+                      <div className="w-16 h-16 rounded-full border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0">
+                        <img 
+                          src={targetAvatar} 
+                          alt={s.username} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`; }}
+                        />
+                      </div>
+                      <div className="w-full min-w-0">
+                        <h4 className="font-black italic text-sm uppercase tracking-tight truncate leading-none mb-1 px-1">
+                          {s.display_name || s.full_name || s.username}
+                        </h4>
+                        <p className="text-[9px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-violet-600 opacity-60" strokeWidth={3} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
-        </section>
-      )}
+        )}
+
+        {/* LINK GATEWAY UTK MELIHAT SELURUH KREATOR (EXPLORE REDIRECT DENGAN TOMBOL PREMIUM) */}
+        <div className="max-w-7xl mx-auto text-center mt-16 px-6">
+          <Link 
+            to="/explore" 
+            className={`inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest italic px-10 py-4 rounded-xl border-4 border-slate-950 ${darkMode ? 'bg-slate-900 text-violet-400 hover:bg-slate-800 hover:border-violet-500' : 'bg-white text-violet-600 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none'} transition-all`}
+          >
+            Explore More Creators <ArrowRight size={14} strokeWidth={3} />
+          </Link>
+        </div>
+      </section>
 
       {/* --- FEATURES GRID --- */}
       <section className="max-w-7xl mx-auto px-6 py-32 relative z-10 text-center">
@@ -221,7 +275,7 @@ function HomePage() {
         </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 text-left">
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-slate-900 border-white/10 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-slate-900 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
             <div className="flex justify-between items-start mb-20 relative z-10">
               <div className="space-y-6">
                 <div className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2 rounded-full w-fit">
@@ -312,15 +366,20 @@ function HomePage() {
         </div>
       </footer>
 
-      {/* --- STYLING BLOCK SCROLLBAR & MARQUEE KEYFRAMES --- */}
+      {/* --- STYLING BLOCK SCROLLBAR & FAANG DUAL-MARQUEE ANIMATION --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
         html { scroll-behavior: smooth; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        @keyframes marquee {
+        @keyframes marqueeLeft {
           0% { transform: translateX(0); }
           100% { transform: translateX(-25%); }
+        }
+
+        @keyframes marqueeRight {
+          0% { transform: translateX(-25%); }
+          100% { transform: translateX(0); }
         }
         
         ::-webkit-scrollbar { width: 10px; }
