@@ -19,7 +19,6 @@ import LeaderboardView from '../components/dashboard/views/LeaderboardView'
 import Swal from 'sweetalert2'
 
 function DashboardPage() {
-    // ✅ SYNC LOGIC: Nangkep parameter :tab dari URL
     const { tab = 'wallet' } = useParams();
     const navigate = useNavigate();
 
@@ -30,7 +29,6 @@ function DashboardPage() {
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isBankModalOpen, setIsBankModalOpen] = useState(false)
     
-    // Sync state bank agar selalu update setelah modal di-save
     const [bankData, setBankData] = useState({ 
         bank_name: '', 
         bank_account_number: '', 
@@ -42,22 +40,35 @@ function DashboardPage() {
             const savedUser = JSON.parse(localStorage.getItem('user'));
             if (!savedUser?.id) throw new Error("Sesi Berakhir");
 
-            // ✅ AMBIL DATA TERBARU DARI ENGINE
+            // ✅ AMBIL DATA DARI ENGINE UTAMA
             const res = await api.get('/user/dashboard-sync');
             
             if (res.data.success) {
-                const userData = res.data.user;
+                // 🛡️ LOCK MERGE SYSTEM: Gabungkan data baru dari server dengan data streamer_id lama agar tidak terhapus
+                const userData = {
+                    ...savedUser,
+                    ...res.data.user,
+                    streamer_id: savedUser.streamer_id || res.data.user.streamer_id
+                };
+
                 setUser(userData);
-                setBalance(userData.total_saldo || 0);
                 
                 // Sinkronkan data bank dari database ke state local
                 setBankData({
                     bank_name: userData.bank_name || '',
-                    bank_account_number: userData.bank_account_number || '',
-                    bank_account_name: userData.bank_account_name || ''
+                    bank_account_number: userData.bank_account_number || userData.account_number || '',
+                    bank_account_name: userData.bank_account_name || userData.account_name || ''
                 });
 
+                // ✅ Amankan data gabungan sultan ke localStorage
                 localStorage.setItem('user', JSON.stringify(userData));
+
+                // Tarik data saldo live murni langsung dari hitungan database core kita
+                const targetId = userData.streamer_id || userData.id;
+                const balanceRes = await api.get(`/api/donations/balance/${targetId}`);
+                if (balanceRes.data && balanceRes.data.success) {
+                    setBalance(balanceRes.data.total_saldo);
+                }
             }
         } catch (err) {
             console.error("❌ Sync Error Dashboard:", err.message);
@@ -106,7 +117,6 @@ function DashboardPage() {
     const handleSaveBank = async (e) => {
         e.preventDefault();
         try {
-            // Gunakan ID dari user state
             const res = await api.put(`/user/bank/${user.id}`, bankData);
             if (res.data.success) {
                 Swal.fire({
@@ -117,14 +127,13 @@ function DashboardPage() {
                     showConfirmButton: false
                 });
                 setIsBankModalOpen(false);
-                fetchDashboardData(); // Refresh data saldo dan profil
+                fetchDashboardData(); 
             }
         } catch (err) {
             Swal.fire("ERROR", "Gagal update data bank.", "error");
         }
     };
 
-    // Loading State Sultan
     if (isInitialLoading || !user) {
         return (
             <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
@@ -140,8 +149,7 @@ function DashboardPage() {
         <div className="min-h-screen bg-[#F8FAFF] flex font-sans text-left relative overflow-hidden">
             
             {/* 🔥 REAL-TIME ALERT PROTOCOL */}
-            {/* Dipasang di sini agar melayang di atas semua tab */}
-            <DonationAlert streamerId={user?.id} />
+            <DonationAlert streamerId={user?.streamer_id || user?.id} />
             
             <Sidebar user={user} />
             
@@ -158,6 +166,7 @@ function DashboardPage() {
                         />
                     )}
                     
+                    {/* ✅ MELEMPAR PROPS USER YANG SUDAH TERKUNCI AMAN */}
                     {tab === 'activity' && <ActivityFeed user={user} />}
                     {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
                     {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}

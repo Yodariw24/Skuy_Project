@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios'; 
 import { 
   Loader2, Mail, Lock, User, ArrowLeft, 
-  ChevronRight, Zap, Phone, Rocket, Check, 
+  Zap, Phone, Rocket, Check, 
   ShieldCheck, Eye, EyeOff 
 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
@@ -15,7 +15,7 @@ function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // State buat mata PW
+  const [showPassword, setShowPassword] = useState(false); 
   const [otp, setOtp] = useState('');
   const [tempUserId, setTempUserId] = useState(null);
   const [formData, setFormData] = useState({ 
@@ -55,6 +55,28 @@ function AuthPage() {
     }
   };
 
+  // 🛡️ SYNC ENGINE: Menarik profile paling seger (beserta streamer_id) sebelum lempar ke dashboard
+  const secureSultanSession = async (token, fallbackUser) => {
+    try {
+      // Set token sementara ke header biar lolos auth middleware backend
+      localStorage.setItem('user_token', token);
+      
+      // Tembak endpoint profile yang diproteksi middleware buat dapet streamer_id asli database
+      const res = await api.get('/api/donations/profile/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data && res.data.success) {
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+      } else {
+        localStorage.setItem('user', JSON.stringify(fallbackUser));
+      }
+    } catch (err) {
+      console.warn("⚠️ Menggunakan session lokal bawaan auth kedorong:", err.message);
+      localStorage.setItem('user', JSON.stringify(fallbackUser));
+    }
+  };
+
   const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
     try {
@@ -71,8 +93,7 @@ function AuthPage() {
         setShow2FA(true);
         await triggerSendOTP(res.data.userId);
       } else if (res.data.success) {
-        localStorage.setItem('user_token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
+        await secureSultanSession(res.data.token, res.data.user);
         navigate('/dashboard');
       }
     } catch (err) {
@@ -98,8 +119,7 @@ function AuthPage() {
         await triggerSendOTP(res.data.userId);
       } else if (res.data.success) {
         if (isLogin) {
-          localStorage.setItem('user_token', res.data.token);
-          localStorage.setItem('user', JSON.stringify(res.data.user));
+          await secureSultanSession(res.data.token, res.data.user);
           navigate('/dashboard');
         } else {
           setIsLogin(true);
@@ -118,8 +138,7 @@ function AuthPage() {
     try {
       const res = await api.post('/auth/verify-2fa', { userId: tempUserId, token: otp });
       if (res.data.success) {
-        localStorage.setItem('user_token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
+        await secureSultanSession(res.data.token, res.data.user);
         navigate('/dashboard');
       }
     } catch (err) {
@@ -208,7 +227,6 @@ function AuthPage() {
                       className="w-full bg-white border-4 border-slate-950 p-5 pl-12 pr-14 rounded-2xl font-bold text-sm outline-none focus:shadow-[6px_6px_0px_0px_#7C3AED] transition-all placeholder:text-slate-300 italic" 
                       value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} 
                     />
-                    {/* BUTTON MATA SULTAN */}
                     <button 
                       type="button" 
                       onClick={() => setShowPassword(!showPassword)}
