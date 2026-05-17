@@ -16,6 +16,35 @@ import { validateDonation } from '../middleware/validator.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 /**
+ * 🛡️ INTERNAL MIDDLEWARE: AUTOMATED ID CONVERTER INTERCEPTOR
+ * Fungsi sakti untuk menjamin req.user.streamer_id selalu terisi 
+ * berdasarkan data join asli database sebelum dilempar ke controller.
+ */
+const injectStreamerId = async (req, res, next) => {
+    try {
+        if (!req.user?.id) return next();
+        
+        // Pancing ID streamer asli dari database berdasarkan User ID yang sedang aktif login
+        const streamerCheck = await req.db.query(
+            "SELECT id FROM streamers WHERE user_id = $1", 
+            [req.user.id]
+        );
+        
+        if (streamerCheck.rows.length > 0) {
+            // Kunci streamer_id asli ke dalam object request session
+            req.user.streamer_id = streamerCheck.rows[0].id;
+        } else {
+            // Fallback darurat jika user ternyata belum terdaftar sebagai streamer
+            req.user.streamer_id = req.user.id;
+        }
+        next();
+    } catch (err) {
+        console.error("🔥 Interceptor ID Error:", err.message);
+        next();
+    }
+};
+
+/**
  * --- 1. PUBLIC PROFILE PROTOCOL (Gate Jualan Sultan) ---
  * No Auth Needed: Untuk donatur melihat profil kreator sebelum nyawer
  */
@@ -51,19 +80,18 @@ router.get('/public-history/:id', getPublicHistory);
 
 /**
  * --- 3. SULTAN PRIVACY ROUTES (Auth Required) ---
- * Rute eksklusif yang benar-benar sensitif wajib pakai Token Sultan (Login)
+ * Rute eksklusif yang benar-benar sensitif wajib lolos verifikasi token & inject ID
  */
-router.post('/withdraw', protect, withdrawBalance); 
-router.get('/history/:id', protect, getWalletHistory); 
-router.get('/list/:id', protect, getDonationsByStreamer); 
+router.post('/withdraw', protect, injectStreamerId, withdrawBalance); 
+router.get('/history/:id', protect, injectStreamerId, getWalletHistory); 
+router.get('/list/:id', protect, injectStreamerId, getDonationsByStreamer); 
 
 /**
  * --- 4. REFINED ACTIVITY FEED (Auth Required) ---
- * ✅ FIXED: Menggunakan req.user.streamer_id bawaan Token agar data kasta donatur langsung tembus!
+ * Menggunakan req.user.streamer_id bawaan token & interceptor agar logs lancar jaya!
  */
-router.get('/activity-feed', protect, async (req, res) => {
+router.get('/activity-feed', protect, injectStreamerId, async (req, res) => {
     try {
-        // 🛡️ SAKTI: Ambil ID Kasta Streamer hasil query sync authMiddleware lo, Ri!
         const targetStreamerId = req.user.streamer_id || req.user.id;
 
         const result = await req.db.query(

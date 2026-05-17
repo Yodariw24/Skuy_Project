@@ -42,17 +42,21 @@ const upload = multer({
 
 /**
  * ✅ WALLET HISTORY NODE
+ * FIXED: Kebal bentrok ID, otomatis melacak log withdrawals berdasarkan Streamer ID asli dari tabel relation
  */
 router.get('/wallet/history/:id', protect, async (req, res) => {
     try {
-        const { id } = req.params;
+        // Pancing ID streamer asli berdasarkan token user agar tidak salah rute params di Postgres
+        const streamerCheck = await req.db.query("SELECT id FROM streamers WHERE user_id = $1", [req.user.id]);
+        const targetStreamerId = streamerCheck.rows.length > 0 ? streamerCheck.rows[0].id : req.params.id;
+
         const query = `
             SELECT id, amount, status, created_at, bank_info 
             FROM withdrawals 
             WHERE streamer_id = $1 
             ORDER BY created_at DESC
         `;
-        const result = await req.db.query(query, [id]);
+        const result = await req.db.query(query, [targetStreamerId]);
         res.json({ success: true, history: result.rows });
     } catch (err) {
         console.error("❌ Wallet History Error:", err.message);
@@ -62,20 +66,28 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
 
 /**
  * ✅ DASHBOARD SYNC (SaaS Pro Upgrade)
- * Menarik data role dan category_id untuk identitas SaaS
+ * FIXED: 1. Menyeleksi s.id AS streamer_id agar frontend tidak dapet undefined.
+ * 2. Menggunakan Sub-Query matematika live untuk mencocokkan total saldo bersih donasi vs withdrawals.
  */
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
         const query = `
             SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, 
-                   s.full_name, s.display_name, s.profile_picture, s.theme_color, s.bio, 
+                   s.id AS streamer_id, s.full_name, s.display_name, s.profile_picture, s.theme_color, s.bio, 
                    s.instagram, s.tiktok, s.youtube, s.phone_number,
                    s.bank_name, s.bank_account_number, s.bank_account_name,
                    s.category_id,
-                   COALESCE(b.total_saldo, 0) as total_saldo
+                   (
+                     SELECT COALESCE(SUM(net_amount), 0) 
+                     FROM donations 
+                     WHERE streamer_id = s.id AND UPPER(status) = 'SUCCESS'
+                   ) - (
+                     SELECT COALESCE(SUM(amount), 0) 
+                     FROM withdrawals 
+                     WHERE streamer_id = s.id AND UPPER(status) != 'REJECTED'
+                   ) as total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
-            LEFT JOIN balance b ON u.id = b.streamer_id
             WHERE u.id = $1
         `;
         const result = await req.db.query(query, [req.user.id]);
@@ -123,7 +135,6 @@ router.post('/widgets/update', protect, widgetController.updateSettings);
 /**
  * ✅ PUBLIC ROUTES (Discovery SaaS)
  */
-// Menampilkan semua kategori agar user bisa milih di Dashboard Settings
 router.get('/categories', async (req, res) => {
     try {
         const result = await req.db.query('SELECT * FROM categories ORDER BY name ASC');
