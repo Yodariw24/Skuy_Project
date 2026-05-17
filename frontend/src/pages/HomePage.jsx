@@ -4,7 +4,8 @@ import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import api from '../api/axios' 
 import { 
   Sun, Moon, ArrowRight, Zap, HelpCircle, ChevronDown, ShieldCheck, 
-  Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight
+  Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight,
+  Target // ✅ FIXED: Ikon Target dikunci di sini agar terbebas dari ReferenceError!
 } from 'lucide-react'
 
 const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
@@ -325,13 +326,32 @@ function HomePage() {
         </div>
       </footer>
 
+      {/* --- ✅ PREMIUM INJECTIONS: SMOOTH SCROLL ENGINE & CUSTOM SCROLLBAR --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
-        html { scroll-behavior: smooth; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: ${darkMode ? '#0a0a0e' : '#f8faff'}; }
-        ::-webkit-scrollbar-thumb { background: #7c3aed; border: 3px solid ${darkMode ? '#0a0a0e' : '#f8faff'}; border-radius: 10px; }
+        
+        /* 🚀 PRECISE SMOOTH SCROLL ENGINE ACTIVATED */
+        html { 
+          scroll-behavior: smooth !important;
+        }
+        
+        body { 
+          font-family: 'Plus Jakarta Sans', sans-serif; 
+          -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Premium Custom Scrollbar */
+        ::-webkit-scrollbar { 
+          width: 10px; 
+        }
+        ::-webkit-scrollbar-track { 
+          background: ${darkMode ? '#0a0a0e' : '#f8faff'}; 
+        }
+        ::-webkit-scrollbar-thumb { 
+          background: #7c3aed; 
+          border: 3px solid ${darkMode ? '#0a0a0e' : '#f8faff'}; 
+          border-radius: 10px; 
+        }
       `}</style>
     </div>
   )
