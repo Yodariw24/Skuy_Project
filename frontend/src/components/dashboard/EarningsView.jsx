@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios' 
 import { 
-  Copy, ExternalLink, Eye, EyeOff, Edit3, Landmark, ChevronDown, 
+  Copy, ExternalLink, Edit3, Landmark, ChevronDown, 
   Wallet, ArrowUpRight, Clock, Link as LinkIcon, 
-  History, ArrowDownLeft, Info, AlertCircle, RefreshCw, Zap
+  History, ArrowDownLeft, AlertCircle, RefreshCw, Zap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Swal from 'sweetalert2'
 
-function EarningsView({ user, showBalance, setShowBalance, bankData, openEditModal }) {
+function EarningsView({ user, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -17,6 +17,9 @@ function EarningsView({ user, showBalance, setShowBalance, bankData, openEditMod
   const [transactions, setTransactions] = useState([])
   const [balance, setBalance] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  // 🛡️ LOCK LOKAL STATE: Mengamankan fungsi Show/Hide balance agar langsung berfungsi saat diklik
+  const [localShowBalance, setLocalShowBalance] = useState(false)
 
   // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE
   const fetchWalletData = async () => {
@@ -148,17 +151,17 @@ function EarningsView({ user, showBalance, setShowBalance, bankData, openEditMod
               <div className="flex justify-between items-start">
                 <div className="p-4 bg-slate-950 text-white rounded-2xl border-2 border-white/10 shadow-xl"><Wallet size={32} /></div>
                 <button 
-                  onClick={() => setShowBalance(!showBalance)} 
-                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em]"
+                  onClick={() => setLocalShowBalance(!localShowBalance)} 
+                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2确定 active:scale-95"
                 >
-                  {showBalance ? 'Hide Balance' : 'Show Balance'}
+                  {localShowBalance ? 'Hide Balance' : 'Show Balance'}
                 </button>
               </div>
               
               <div className="mt-8">
                 <p className="text-[11px] font-black uppercase tracking-[0.4em] text-violet-200 mb-3 italic">Total Available Sultan Balance</p>
                 <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter leading-none">
-                  {showBalance ? `Rp ${Number(balance).toLocaleString('id-ID')}` : '••••••••••'}
+                  {localShowBalance ? `Rp ${Number(balance).toLocaleString('id-ID')}` : '••••••••••'}
                 </h2>
               </div>
             </div>
