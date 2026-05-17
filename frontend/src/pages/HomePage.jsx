@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'fra
 import api from '../api/axios' 
 import { 
   Sun, Moon, Sparkles, ArrowRight, Trophy, Target, Zap, 
-  HelpCircle, ChevronDown, ShieldCheck, Wallet, Monitor, Video, Gamepad2, Compass
+  HelpCircle, ChevronDown, ShieldCheck, Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight
 } from 'lucide-react'
 
 const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
@@ -16,7 +16,7 @@ const SkuyLogo = ({ darkMode }) => (
       <motion.div 
         whileHover={{ rotate: 360, scale: 1.05 }}
         transition={{ type: "spring", ...springConfig }}
-        className="w-11 h-11 bg-violet-600 border-2 border-slate-950 rounded-[1.25rem] flex items-center justify-center text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
+        className="w-11 h-11 bg-violet-600 border-4 border-slate-950 rounded-2xl flex items-center justify-center text-white shadow-[4px_4px_0px_0px_#000]"
       >
         <Zap size={20} fill="currentColor" />
       </motion.div>
@@ -45,7 +45,7 @@ const FAQItem = ({ question, answer, darkMode }) => {
   return (
     <motion.div 
       layout
-      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${isOpen ? 'ring-4 ring-violet-500/20' : ''} ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
+      className={`mb-4 rounded-[2rem] border-4 border-slate-950 overflow-hidden transition-all duration-300 ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'}`}
     >
       <motion.button 
         layout
@@ -86,7 +86,7 @@ function HomePage() {
     const fetchStreamers = async () => {
       try {
         const res = await api.get('/user/list');
-        // Ambil data array penampung kasta streamers dari engine backend lo
+        // Mendukung multi-payload array data streamers bawaan saas lo, Ri!
         const data = res.data.success ? (res.data.streamers || res.data.data) : (Array.isArray(res.data) ? res.data : []);
         setStreamers(data); 
       } catch (err) {
@@ -156,10 +156,10 @@ function HomePage() {
 
       {/* --- PREMIUM STREAMERS RUNNING MARQUEE --- */}
       {activeMarqueeList.length > 0 && (
-        <section className="py-10 bg-slate-950/5 dark:bg-white/[0.02] border-y-4 border-slate-950 overflow-hidden relative mb-20">
-          <div className="flex w-max gap-8 animate-[marquee_40s_linear_infinite] hover:[animation-play-state:paused] py-2">
+        <section className="py-12 bg-slate-950/5 dark:bg-white/[0.02] border-y-4 border-slate-950 overflow-hidden relative mb-20">
+          <div className="flex w-max gap-8 animate-[marquee_30s_linear_infinite] hover:[animation-play-state:paused] py-2">
             {activeMarqueeList.map((s, idx) => {
-              // Validasi rute gambar profil asli secara real-time dari server Railway lo, Ri!
+              // Fix Point Validasi Image: Mengunci rute server uploads secara real-time
               const targetAvatar = s.profile_picture 
                 ? `${API_BASE}/uploads/${s.profile_picture}`
                 : `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`;
@@ -167,8 +167,8 @@ function HomePage() {
               return (
                 <div 
                   key={`marquee-node-${s.id}-${idx}`}
-                  onClick={() => navigate(`/${s.username}`)} // ✅ AKSES INSTAN: KLIK LANGSUNG DONATE & INSPECT
-                  className={`w-72 shrink-0 p-5 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[4px_4px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white'}`}
+                  onClick={() => navigate(`/${s.username}`)} // ✅ TARGET DONATE LIVE PORTAL
+                  className={`w-72 shrink-0 p-5 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[6px_6px_0px_0px_#7C3AED] hover:-translate-y-1 transition-all flex items-center gap-4 ${darkMode ? 'bg-slate-900 border-white/20' : 'bg-white shadow-[4px_4px_0px_0px_#000]'}`}
                 >
                   <div className="w-16 h-16 bg-violet-100 rounded-2xl border-2 border-slate-950 overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] shrink-0">
                     <img 
@@ -190,11 +190,11 @@ function HomePage() {
             })}
           </div>
 
-          {/* LINK GATEWAY UTK MELIHAT SELURUH KREATOR (EXPLORE REDIRECT) */}
-          <div className="max-w-7xl mx-auto text-center mt-10">
+          {/* LINK GATEWAY EXPLORE HUB */}
+          <div className="max-w-7xl mx-auto text-center mt-12">
             <Link 
               to="/explore" 
-              className={`inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest italic px-8 py-3.5 rounded-xl border-4 border-slate-950 ${darkMode ? 'bg-slate-900 text-violet-400 hover:bg-slate-800' : 'bg-white text-violet-600 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none'} transition-all`}
+              className={`inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest italic px-8 py-3.5 rounded-xl border-4 border-slate-950 ${darkMode ? 'bg-slate-900 text-violet-400 hover:bg-slate-800 hover:border-violet-500' : 'bg-white text-violet-600 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none'} transition-all`}
             >
               Explore More Creators <ArrowRight size={14} strokeWidth={3} />
             </Link>
@@ -221,7 +221,7 @@ function HomePage() {
         </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 text-left">
-          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-slate-900 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
+          <motion.div whileHover={{ y: -10 }} className={`md:col-span-8 p-12 rounded-[4rem] border-4 border-slate-950 relative overflow-hidden transition-all ${darkMode ? 'bg-slate-900 border-white/10 shadow-[10px_10px_0px_0px_rgba(124,58,237,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#7C3AED]'}`}>
             <div className="flex justify-between items-start mb-20 relative z-10">
               <div className="space-y-6">
                 <div className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2 rounded-full w-fit">
