@@ -58,8 +58,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
+
+// ✅ FIXED SOCKET.IO CONFIG: Menggunakan allowedOrigins resmi dan memaksa kestabilan transport websocket/polling
 const io = new Server(server, { 
-  cors: { origin: "*", credentials: true } 
+  cors: { 
+    origin: allowedOrigins, 
+    credentials: true 
+  },
+  transports: ['websocket', 'polling']
 });
 
 io.on('connection', (socket) => {
