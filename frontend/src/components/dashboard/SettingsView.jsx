@@ -1,9 +1,10 @@
+import React from 'react'
 import { Moon, Settings, Sparkles, ShieldCheck, MessageSquare, Zap, Globe, Landmark, CheckCircle2 } from 'lucide-react'
 import ProfileSettings from './ProfileSettings'
 import { motion } from 'framer-motion'
 
 export default function SettingsView({ user, setUser }) {
-  // ✅ PENCEGAHAN BLANK SCREEN (Sultan Guard)
+  // ✅ PENCEGAHAN BLANK SCREEN (Sultan Guard Security)
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -15,9 +16,9 @@ export default function SettingsView({ user, setUser }) {
     );
   }
 
-  const isSecured = user?.is_two_fa_enabled;
-  // Logic deteksi data bank agar sinkron ke UI
-  const hasBankData = user?.bank_name && user?.bank_account_number;
+  const isSecured = !!user.is_two_fa_enabled;
+  // Memastikan UI reaktif memantau penuh keberadaan bank terdaftar
+  const hasBankData = !!(user.bank_name && (user.bank_account_number || user.account_number));
 
   return (
     <motion.div 
@@ -61,15 +62,15 @@ export default function SettingsView({ user, setUser }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        {/* LEFT: PROFILE ENGINE */}
+        {/* LEFT COMPONENT: PROFILE TEXT & FORM INFRASTRUCTURE */}
         <div className="lg:col-span-8">
           <ProfileSettings user={user} setUser={setUser} />
         </div>
 
-        {/* RIGHT: SYSTEM NODES */}
+        {/* RIGHT COMPONENT: META METRICS MONITOR */}
         <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-8">
           
-          {/* PAYOUT CONFIG STATUS (Monitor Data Bank Ri!) */}
+          {/* PAYOUT CONFIG STATUS */}
           <div className="bg-white p-10 rounded-[3.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#F1F5F9] relative overflow-hidden group">
             <div className="flex items-center gap-3 mb-8">
               <Landmark size={18} className="text-violet-600" />
@@ -85,8 +86,8 @@ export default function SettingsView({ user, setUser }) {
                   </div>
                   <div className="space-y-1">
                     <p className="text-[11px] font-black text-slate-950 uppercase italic tracking-tight leading-none">{user.bank_name}</p>
-                    <p className="text-[10px] font-bold text-slate-500 font-mono tracking-wider">{user.bank_account_number}</p>
-                    <p className="text-[9px] font-black text-slate-400 uppercase leading-none truncate">{user.bank_account_name}</p>
+                    <p className="text-[10px] font-bold text-slate-500 font-mono tracking-wider">{user.bank_account_number || user.account_number}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase leading-none truncate">{user.bank_account_name || user.account_name}</p>
                   </div>
                 </div>
               ) : (
@@ -115,7 +116,7 @@ export default function SettingsView({ user, setUser }) {
                    <div>
                       <p className="text-[8px] uppercase font-black text-slate-500 mb-2 tracking-widest italic text-left">Sultan Unique ID</p>
                       <p className="text-[11px] font-mono text-violet-400 break-all bg-white/5 p-4 rounded-2xl border-2 border-white/5 select-all hover:border-violet-500/30 transition-all text-left">
-                        {user?.id || 'UNIDENTIFIED'}
+                        {user.id || 'UNIDENTIFIED'}
                       </p>
                    </div>
                    
@@ -125,8 +126,8 @@ export default function SettingsView({ user, setUser }) {
                           <MessageSquare size={14} className="text-slate-500" />
                           <span className="text-[9px] font-black uppercase tracking-widest text-left">WhatsApp</span>
                         </div>
-                        <span className={`text-[9px] font-black uppercase italic ${user?.phone_number ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {user?.phone_number ? 'LINKED' : 'OFFLINE'}
+                        <span className={`text-[9px] font-black uppercase italic ${user.phone_number ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {user.phone_number ? 'LINKED' : 'OFFLINE'}
                         </span>
                       </div>
 
