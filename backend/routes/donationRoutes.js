@@ -15,8 +15,10 @@ import {
 import { validateDonation } from '../middleware/validator.js';
 import { protect } from '../middleware/authMiddleware.js';
 
-// --- 1. PUBLIC PROFILE PROTOCOL (Gate Jualan Sultan) ---
-// No Auth Needed: Untuk donatur melihat profil kreator sebelum nyawer
+/**
+ * --- 1. PUBLIC PROFILE PROTOCOL (Gate Jualan Sultan) ---
+ * No Auth Needed: Untuk donatur melihat profil kreator sebelum nyawer
+ */
 router.get('/profile/:username', async (req, res) => {
     const { username } = req.params;
     if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
@@ -40,23 +42,33 @@ router.get('/profile/:username', async (req, res) => {
     }
 });
 
-// --- 2. PUBLIC FINANSER & HISTORY NODES (No Auth Needed) ---
-// Dilepas dari protect agar halaman publik FE (DonationPage) bisa render data tanpa perlu login
-router.get('/balance/:id', getStreamerBalance); // ✅ FIX: Sekarang donatur bisa liat total "Power Collected"
+/**
+ * --- 2. PUBLIC FINANSER & HISTORY NODES (No Auth Needed) ---
+ * Akses publik bebas tanpa token untuk rendering di widget overlay / profil external
+ */
+router.get('/balance/:id', getStreamerBalance); 
 router.get('/public-history/:id', getPublicHistory); 
 
-// --- 3. SULTAN PRIVACY ROUTES (Auth Required) ---
-// Rute eksklusif yang benar-benar sensitif wajib pakai Token Sultan (Login)
+/**
+ * --- 3. SULTAN PRIVACY ROUTES (Auth Required) ---
+ * Rute eksklusif yang benar-benar sensitif wajib pakai Token Sultan (Login)
+ */
 router.post('/withdraw', protect, withdrawBalance); 
 router.get('/history/:id', protect, getWalletHistory); 
 router.get('/list/:id', protect, getDonationsByStreamer); 
 
-// ✅ REFINED ACTIVITY FEED: Tarik data Tier untuk efek real-time di Dashboard
+/**
+ * --- 4. REFINED ACTIVITY FEED (Auth Required) ---
+ * ✅ FIXED: Menggunakan req.user.streamer_id bawaan Token agar data kasta donatur langsung tembus!
+ */
 router.get('/activity-feed', protect, async (req, res) => {
     try {
+        // 🛡️ SAKTI: Ambil ID Kasta Streamer hasil query sync authMiddleware lo, Ri!
+        const targetStreamerId = req.user.streamer_id || req.user.id;
+
         const result = await req.db.query(
             "SELECT * FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 15",
-            [req.user.id]
+            [targetStreamerId]
         );
         res.json({ success: true, donations: result.rows });
     } catch (err) {
@@ -65,12 +77,11 @@ router.get('/activity-feed', protect, async (req, res) => {
     }
 });
 
-// --- 4. DONATION ENGINE (Transaksi Meledak Protocol) ---
-// Rute untuk user kirim donasi (Trigger Tiering Logic di Controller)
+/**
+ * --- 5. DONATION ENGINE (Transaksi Meledak Protocol) ---
+ * Jalur transaksi donasi QRIS/E-Wallet dan verifikator status sukses simulasi
+ */
 router.post('/create', validateDonation, createDonation); 
-
-// Rute untuk simulasi/konfirmasi pembayaran (Fake QR Success Trigger)
-// Jalur ini yang lo tembak dari PaymentModal.jsx
 router.put('/status/:id', updateDonationStatus); 
 
 export default router;
