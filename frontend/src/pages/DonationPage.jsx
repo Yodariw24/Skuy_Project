@@ -35,6 +35,8 @@ function DonationPage() {
   })
 
   const shortcuts = [10000, 25000, 50000, 100000];
+  
+  // ✅ SAFE THEME FALLBACK: Mengunci warna ungu jika data dari backend masih memuat/kosong
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
   // --- LOGIKA FETCH DATA SULTAN (Railway Sync) ---
@@ -47,7 +49,7 @@ function DonationPage() {
         const data = res.data.data;
         setStreamer(data);
 
-        // ✅ FIXED ENDPOINT: Menyesuaikan rute /donations/balance/:id di backend lo
+        // ✅ FIXED ENDPOINT: Sinkron dengan parameter streamer_id di backend lo
         const [resBalance, resHistory] = await Promise.all([
           api.get(`/donations/balance/${data.id}`),
           api.get(`/donations/public-history/${data.id}`)
@@ -63,7 +65,11 @@ function DonationPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [username]);
+  useEffect(() => { 
+    if (username) { 
+      fetchData(); 
+    } 
+  }, [username]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -71,7 +77,7 @@ function DonationPage() {
     
     setSubmitting(true);
     try {
-      // ✅ SINKRON: Kirim data donasi ke backend, status default 'PENDING'
+      // ✅ SINKRON: Mengirim data ke backend dengan status default 'PENDING'
       const res = await api.post('/donations/create', {
         ...formData,
         streamer_id: streamer.id,
@@ -79,9 +85,9 @@ function DonationPage() {
       });
 
       if (res.data.success) {
-        // ✅ INJECT DATA: Masukkan data donasi dari BE ke state untuk dikirim ke Modal
+        // ✅ INJECT DATA: Menyimpan data donasi untuk dikirim ke komponen modal
         setCurrentDonation(res.data.data);
-        // ✅ POP UP MODAL: Buka tampilan QR Code Simulator lo
+        // ✅ POP UP MODAL: Membuka simulator QR Code lo
         setShowQR(true);
       }
     } catch (err) { 
@@ -122,7 +128,7 @@ function DonationPage() {
         isOpen={showQR} 
         onClose={() => {
           setShowQR(false);
-          fetchData(); // ✅ AUTO-REFRESH: Tarik ulang data live saldo & riwayat setelah modal ditutup (simulasi sukses)
+          fetchData(); // ✅ AUTO-REFRESH: Memperbarui live saldo & riwayat secara real-time saat modal ditutup
         }} 
         donationData={currentDonation} 
       />
