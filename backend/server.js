@@ -94,8 +94,19 @@ apiRouter.use('/donations', donationRoutes);
 apiRouter.use('/', userRoutes); 
 apiRouter.use('/user', userRoutes);
 
-// Daftarkan semua rute di bawah prefix /api
-app.use('/api', apiRouter);
+// ⚡ DOUBLE GATEWAY GATE: Backend menerima jalur dengan /api maupun kosongan
+app.use('/api', apiRouter); 
+app.use('/', apiRouter);    
+
+// 🛡️ EMERGENCY PROTOCOL: Gembok pengaman jika request dari Axios terpotong polosan di /api
+app.use('/api', (req, res) => {
+  res.status(200).json({
+    success: false,
+    message: "Sinyal Sultan terdeteksi polosan di node /api. Silakan cek pemanggilan parameter ID/Username di Frontend lo, Ri!",
+    donations: [],
+    history: []
+  });
+});
 
 // Jalur Non-API (Cek Health Server)
 app.get('/', (req, res) => {
