@@ -4,7 +4,8 @@ export const getWalletHistory = async (req, res) => {
   try {
     const query = `
       SELECT 
-        id, amount, 
+        id, 
+        gross_amount AS amount, -- Donatur & Streamer melihat nominal kotor di riwayat
         donatur_name::TEXT AS description, 
         'IN'::TEXT AS type, 
         created_date AS created_at, 
@@ -29,13 +30,14 @@ export const getWalletHistory = async (req, res) => {
   }
 };
 
-// --- 2. HITUNG SALDO LIVE ---
+// --- 2. HITUNG SALDO LIVE (SaaS Potongan Fix) ---
 export const getStreamerBalance = async (req, res) => {
   const { id } = req.params;
   try {
+    // 💰 Saldo dikalkulasi dari net_amount (Saldo setelah dipotong komisi 5%)
     const query = `
       SELECT 
-        (SELECT COALESCE(SUM(amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
+        (SELECT COALESCE(SUM(net_amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
         (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE streamer_id = $1 AND UPPER(status) != 'REJECTED') 
       AS total_saldo
     `;
@@ -52,9 +54,10 @@ export const withdrawBalance = async (req, res) => {
   const { userId, amount, bank } = req.body; 
   const targetId = userId || req.params.id;
   try {
+    // Validasi saldo juga harus mengecek net_amount
     const balanceRes = await req.db.query(`
       SELECT 
-        (SELECT COALESCE(SUM(amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
+        (SELECT COALESCE(SUM(net_amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
         (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE streamer_id = $1 AND UPPER(status) != 'REJECTED') 
       AS current_balance`, [targetId]);
     
@@ -70,27 +73,42 @@ export const withdrawBalance = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 4. CREATE NEW DONATION (DENGAN LOGIC TIERING) ---
+// --- 4. CREATE NEW DONATION (DENGAN SAAS FEE & LOGIC TIERING) ---
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   
-  // 🔥 LOGIC TIERING SULTAN
+  // 💰 SaaS Logic: Hitung Potongan 5% secara otomatis
+  const gross = Number(amount);
+  const fee = gross * 0.05; 
+  const net = gross - fee;  
+
+  // 🔥 LOGIC TIERING SULTAN (Berdasarkan nominal yang dikirim donatur)
   let tier = 'STANDARD';
-  if (amount >= 1000000) tier = 'MYTHIC';
-  else if (amount >= 500000) tier = 'GOLD';
-  else if (amount >= 100000) tier = 'SILVER';
+  if (gross >= 1000000) tier = 'MYTHIC';
+  else if (gross >= 500000) tier = 'GOLD';
+  else if (gross >= 100000) tier = 'SILVER';
 
   try {
-    const result = await req.db.query(
-      `INSERT INTO donations (streamer_id, donatur_name, donatur_email, message, amount, payment_method, status, tier, created_date) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, NOW()) RETURNING *`,
-      [streamer_id, donatur_name, donatur_email, message, amount, payment_method, tier]
-    );
+    const query = `
+      INSERT INTO donations (
+        streamer_id, donatur_name, donatur_email, message, amount, 
+        gross_amount, fee_amount, net_amount, 
+        payment_method, status, tier, created_date
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING', $10, NOW()) 
+      RETURNING *
+    `;
+    const result = await req.db.query(query, [
+      streamer_id, donatur_name, donatur_email, message, gross,
+      gross, fee, net, 
+      payment_method, tier
+    ]);
+    
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 };
 
-// --- 5. UPDATE DONATION STATUS (SIMULASI FAKE QR SUCCESS) ---
+// --- 5. UPDATE DONATION STATUS (SIMULASI FAKE QR SUCCESS & MELEDAK CLOUD) ---
 export const updateDonationStatus = async (req, res) => {
   const { id } = req.params; 
   const { status } = req.body; // 'SUCCESS' atau 'REJECTED'
@@ -103,13 +121,13 @@ export const updateDonationStatus = async (req, res) => {
     const donation = result.rows[0];
 
     if (status.toUpperCase() === 'SUCCESS' && donation) {
-        // 🔥 TRIGGER SOCKET DENGAN DATA TIER UNTUK ANIMASI FE
+        // 🔥 TRIGGER SOCKET ROOM SULTAN DENGAN DATA TIER UNTUK ANIMASI FE
         if (req.io) {
             req.io.emit(`new-donation-${donation.streamer_id}`, {
                 donatur_name: donation.donatur_name,
-                amount: donation.amount,
+                amount: donation.gross_amount, // Menampilkan angka gross biar kelihatan besar di alert screen
                 message: donation.message,
-                tier: donation.tier || 'STANDARD', // Kirim Tier-nya
+                tier: donation.tier || 'STANDARD', 
                 trigger_effect: true
             });
         }
@@ -123,7 +141,7 @@ export const getPublicHistory = async (req, res) => {
   const { id } = req.params;
   try {
     const result = await req.db.query(
-      "SELECT donatur_name, amount, message, created_date FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 5",
+      "SELECT donatur_name, gross_amount AS amount, message, created_date FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 5",
       [id]
     );
     res.json({ success: true, data: result.rows });

@@ -14,6 +14,7 @@ import {
 } from '../controllers/streamerController.js';
 import * as widgetController from '../controllers/widgetController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { adminProtect } from '../middleware/adminMiddleware.js'; // Import Shield Admin
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +42,6 @@ const upload = multer({
 
 /**
  * ✅ WALLET HISTORY NODE
- * FIX: Ganti user_id menjadi streamer_id agar sinkron dengan Database Railway lo.
  */
 router.get('/wallet/history/:id', protect, async (req, res) => {
     try {
@@ -61,8 +61,8 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
 });
 
 /**
- * ✅ DASHBOARD SYNC
- * Mengambil data profil lengkap termasuk info Bank & Saldo
+ * ✅ DASHBOARD SYNC (SaaS Pro Upgrade)
+ * Menarik data role dan category_id untuk identitas SaaS
  */
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
@@ -71,6 +71,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
                    s.full_name, s.display_name, s.profile_picture, s.theme_color, s.bio, 
                    s.instagram, s.tiktok, s.youtube, s.phone_number,
                    s.bank_name, s.bank_account_number, s.bank_account_name,
+                   s.category_id,
                    COALESCE(b.total_saldo, 0) as total_saldo
             FROM users u
             JOIN streamers s ON u.id = s.user_id
@@ -120,9 +121,37 @@ router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSetti
 router.post('/widgets/update', protect, widgetController.updateSettings);
 
 /**
- * ✅ PUBLIC ROUTES
+ * ✅ PUBLIC ROUTES (Discovery SaaS)
  */
+// Menampilkan semua kategori agar user bisa milih di Dashboard Settings
+router.get('/categories', async (req, res) => {
+    try {
+        const result = await req.db.query('SELECT * FROM categories ORDER BY name ASC');
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
 router.get('/public/:username', getStreamerByUsername);
 router.get('/list', getAllStreamers);
+
+/**
+ * ✅ ADMIN COMMAND CENTER (Strict Protocol)
+ */
+router.get('/admin/platform-stats', protect, adminProtect, async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                (SELECT COUNT(*) FROM users) as total_users,
+                (SELECT SUM(fee_amount) FROM donations WHERE status = 'SUCCESS') as total_revenue,
+                (SELECT COUNT(*) FROM withdrawals WHERE status = 'PENDING') as pending_withdrawals
+        `;
+        const result = await req.db.query(query);
+        res.json({ success: true, stats: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
 
 export default router;

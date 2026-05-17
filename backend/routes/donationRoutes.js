@@ -40,11 +40,15 @@ router.get('/profile/:username', async (req, res) => {
     }
 });
 
-// --- 2. SULTAN PRIVACY ROUTES (Auth Required) ---
-// Rute eksklusif yang hanya bisa diakses via Token Sultan (Login)
+// --- 2. PUBLIC FINANSER & HISTORY NODES (No Auth Needed) ---
+// Dilepas dari protect agar halaman publik FE (DonationPage) bisa render data tanpa perlu login
+router.get('/balance/:id', getStreamerBalance); // ✅ FIX: Sekarang donatur bisa liat total "Power Collected"
+router.get('/public-history/:id', getPublicHistory); 
+
+// --- 3. SULTAN PRIVACY ROUTES (Auth Required) ---
+// Rute eksklusif yang benar-benar sensitif wajib pakai Token Sultan (Login)
 router.post('/withdraw', protect, withdrawBalance); 
 router.get('/history/:id', protect, getWalletHistory); 
-router.get('/balance/:id', protect, getStreamerBalance);
 router.get('/list/:id', protect, getDonationsByStreamer); 
 
 // ✅ REFINED ACTIVITY FEED: Tarik data Tier untuk efek real-time di Dashboard
@@ -61,15 +65,12 @@ router.get('/activity-feed', protect, async (req, res) => {
     }
 });
 
-// --- 3. PUBLIC HISTORY (Untuk daftar donatur di halaman profil publik) ---
-router.get('/public-history/:id', getPublicHistory); 
-
 // --- 4. DONATION ENGINE (Transaksi Meledak Protocol) ---
 // Rute untuk user kirim donasi (Trigger Tiering Logic di Controller)
 router.post('/create', validateDonation, createDonation); 
 
 // Rute untuk simulasi/konfirmasi pembayaran (Fake QR Success Trigger)
-// Jalur ini yang akan lo tembak dari PaymentModal.jsx
+// Jalur ini yang lo tembak dari PaymentModal.jsx
 router.put('/status/:id', updateDonationStatus); 
 
 export default router;
