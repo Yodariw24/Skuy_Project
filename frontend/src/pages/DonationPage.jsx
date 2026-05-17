@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/axios' 
+import PaymentModal from '../components/donation/PaymentModal' // ✅ SINKRON: Import Modal Sultan Lo
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
   History, Skull, Heart, Info, Mail, User, Clock, ShieldCheck 
@@ -25,6 +26,10 @@ function DonationPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
+  // 🛡️ STATE SIMULASI QRIS MOCK
+  const [showQR, setShowQR] = useState(false)
+  const [currentDonation, setCurrentDonation] = useState(null)
+  
   const [formData, setFormData] = useState({
     donatur_name: '', donatur_email: '', amount: '', message: ''
   })
@@ -36,16 +41,15 @@ function DonationPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // ✅ SINKRON: Panggil endpoint public profile
       const res = await api.get(`/donations/profile/${username}`);
       
       if (res.data.success) {
         const data = res.data.data;
         setStreamer(data);
 
-        // ✅ FETCH SALDO & HISTORY SECARA PARALEL
+        // ✅ FIXED ENDPOINT: Menyesuaikan rute /donations/balance/:id di backend lo
         const [resBalance, resHistory] = await Promise.all([
-          api.get(`/donations/${data.id}/balance`),
+          api.get(`/donations/balance/${data.id}`),
           api.get(`/donations/public-history/${data.id}`)
         ]);
 
@@ -67,17 +71,18 @@ function DonationPage() {
     
     setSubmitting(true);
     try {
-      // ✅ SINKRON: Kirim donasi ke backend
+      // ✅ SINKRON: Kirim data donasi ke backend, status default 'PENDING'
       const res = await api.post('/donations/create', {
         ...formData,
         streamer_id: streamer.id,
-        payment_method: 'QRIS' // Default protocol
+        payment_method: 'QRIS_MOCK'
       });
 
       if (res.data.success) {
-        // Arahkan ke halaman status atau checkout (sesuai flow lo)
-        alert("Instruksi Pembayaran Meluncur! Cek email lo, Ri!");
-        // window.location.href = res.data.payment_url;
+        // ✅ INJECT DATA: Masukkan data donasi dari BE ke state untuk dikirim ke Modal
+        setCurrentDonation(res.data.data);
+        // ✅ POP UP MODAL: Buka tampilan QR Code Simulator lo
+        setShowQR(true);
       }
     } catch (err) { 
       alert("Energi transmission failed! Cek koneksi lo."); 
@@ -110,14 +115,25 @@ function DonationPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-24 selection:bg-violet-100">
+    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-24 selection:bg-violet-100 relative">
+      
+      {/* 📸 MODAL QR SIMULATOR PROTOCOL */}
+      <PaymentModal 
+        isOpen={showQR} 
+        onClose={() => {
+          setShowQR(false);
+          fetchData(); // ✅ AUTO-REFRESH: Tarik ulang data live saldo & riwayat setelah modal ditutup (simulasi sukses)
+        }} 
+        donationData={currentDonation} 
+      />
+
       {/* Dynamic Glow Background */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className={`absolute top-[-10%] left-[-5%] w-[60%] h-[60%] ${theme.bgLight} opacity-50 blur-[150px] rounded-full`} />
         <div className={`absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] ${theme.bgLight} opacity-40 blur-[150px] rounded-full`} />
       </div>
 
-      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/60 border-b-4 border-slate-950/5 p-5">
+      <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/60 border-b-4 border-slate-950/5 p-5">
         <div className="max-w-6xl mx-auto flex justify-between items-center px-4">
           <Link to="/" className="flex items-center gap-3 text-slate-400 hover:text-slate-950 transition-all font-black text-[10px] uppercase tracking-[0.3em]">
             <ArrowLeft size={20} strokeWidth={4} /> Explore
