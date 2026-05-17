@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage'; 
 import PaymentPage from './pages/PaymentPage';
 import WidgetClient from './pages/WidgetClient';
+import Explore from './pages/Explore'; // 🚀 IMPORT HALAMAN EXPLORE BARU
 import api from './api/axios';
 
 import 'animate.css';
@@ -72,12 +73,14 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
           <Route path="/payment/:donationId" element={<PaymentPage />} />
+          
+          {/* ✅ JALUR UTAMA EXPLORE CREATORS HUB (Diletakkan di atas dynamic parameter) */}
+          <Route path="/explore" element={<Explore />} />
 
           {/* --- 2. SULTAN OVERLAY PROTOCOL (OBS) --- */}
           <Route path="/widget/:streamKey/:type" element={<WidgetClient />} />
 
           {/* --- 3. DASHBOARD ENGINE (SUB-ROUTING ENABLED) --- */}
-          {/* Jalur Utama Dashboard */}
           <Route 
             path="/dashboard" 
             element={
@@ -87,8 +90,6 @@ function App() {
             } 
           />
           
-          {/* ✅ FIX POINT 1: Jalur Sub-Tab (Tip Alert, Milestone, dll) */}
-          {/* Parameter :tab akan dikirim ke DashboardPage */}
           <Route 
             path="/dashboard/:tab" 
             element={

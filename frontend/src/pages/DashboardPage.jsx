@@ -9,12 +9,13 @@ import AppearanceView from '../components/dashboard/AppearanceView'
 import ActivityFeed from '../components/dashboard/ActivityFeed' 
 import EditBankModal from '../components/dashboard/EditBankModal' 
 
-// ✅ IMPORT ALERT & VIEWS
+// ✅ IMPORT ALERT, VIEWS & EXPLORE COMPONENT
 import DonationAlert from '../components/dashboard/DonationAlert'
 import TipAlertView from '../components/dashboard/views/TipAlertView'
 import MediaShareView from '../components/dashboard/views/MediaShareView'
 import MilestoneView from '../components/dashboard/views/MilestoneView'
 import LeaderboardView from '../components/dashboard/views/LeaderboardView'
+import Explore from './Explore' // Injeksi jalur Explore Hub jika diakses via sub-tab
 
 import Swal from 'sweetalert2'
 
@@ -184,7 +185,6 @@ function DashboardPage() {
                         />
                     )}
                     
-                    {/* ✅ MELEMPAR PROPS USER YANG SUDAH TERKUNCI AMAN */}
                     {tab === 'activity' && <ActivityFeed user={user} />}
                     {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
                     {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
@@ -198,6 +198,9 @@ function DashboardPage() {
                             loading={loading2FA}
                         />
                     )}
+
+                    {/* ✅ DYNAMIC EXPLORE VIEW ROUTER SINKRON */}
+                    {tab === 'explore' && <Explore />}
 
                     {/* --- SETUP VIEWS --- */}
                     {tab === 'tip' && <TipAlertView user={user} />}

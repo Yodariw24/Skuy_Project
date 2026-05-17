@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import api from '../../api/axios' 
 import * as Icon from 'lucide-react' 
-import EditBankModal from './EditBankModal' // Pastikan path ini benar sesuai struktur folder lo
+import EditBankModal from './EditBankModal' 
 
 const FormInput = ({ label, iconName, helpText, textArea, ...props }) => {
   const IconComp = Icon[iconName] || Icon.HelpCircle;
@@ -28,10 +28,11 @@ const FormInput = ({ label, iconName, helpText, textArea, ...props }) => {
 export default function ProfileSettings({ user, setUser }) {
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
-    username: '', display_name: '', bio: '', instagram: '', tiktok: '', youtube: '', profile_picture: '', phone_number: ''
+    username: '', display_name: '', bio: '', instagram: '', tiktok: '', youtube: '', profile_picture: '', phone_number: '', category_id: ''
   })
   
-  // ✅ STATE UNTUK BANK SULTAN
+  // ✅ STATE UTK DAFTAR KATEGORI & MODAL BANK
+  const [categories, setCategories] = useState([]);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [bankFormData, setBankFormData] = useState({
     bank_name: '',
@@ -43,6 +44,21 @@ export default function ProfileSettings({ user, setUser }) {
   const [status, setStatus] = useState({ type: '', message: '' })
   const currentUrl = window.location.origin;
 
+  // 📡 FETCH DAFTAR KATEGORI AKTIF DARI BACKEND RAILWAY
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await api.get('/user/categories');
+        if (res.data.success) {
+          setCategories(res.data.data);
+        }
+      } catch (err) {
+        console.warn("⚠️ Gagal sinkronisasi opsi kategori:", err.message);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -53,9 +69,10 @@ export default function ProfileSettings({ user, setUser }) {
         tiktok: user.tiktok || '',
         youtube: user.youtube || '', 
         profile_picture: user.profile_picture || '',
-        phone_number: user.phone_number || '' 
+        phone_number: user.phone_number || '',
+        category_id: user.category_id || '' // Injeksi awal data kategori tersimpan
       });
-      // Sinkronkan data bank ke state modal
+
       setBankFormData({
         bank_name: user.bank_name || '',
         bank_account_number: user.bank_account_number || '',
@@ -98,14 +115,12 @@ export default function ProfileSettings({ user, setUser }) {
     } finally { setLoading(false); setTimeout(() => setStatus({ type: '', message: '' }), 3000); }
   }
 
-  // ✅ HANDLER SAVE BANK KE DATABASE RAILWAY
   const handleUpdateBank = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await api.put(`/user/bank/${user.id}`, bankFormData);
       if (res.data.success) {
-        // Sinkronkan ke Global State biar di Wallet muncul
         const updatedUser = { ...user, ...res.data.data };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -167,6 +182,34 @@ export default function ProfileSettings({ user, setUser }) {
             </div>
             <FormInput label="Display Nickname" iconName="Tag" placeholder="Ari Wirayuda" value={formData.display_name} onChange={(e) => setFormData({...formData, display_name: e.target.value})} />
             <FormInput label="WhatsApp Number" iconName="Phone" helpText="REQUIRED FOR 2FA" placeholder="0812xxxxxxxx" value={formData.phone_number} onChange={handlePhoneChange} />
+            
+            {/* 🎮 NEW ELEMENT: DROPDOWN SELEKSI KATEGORI SULTAN */}
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-2 px-1 text-left">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] block">Kategori Konten Streaming 🎮</label>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors z-10 pointer-events-none">
+                  <Icon.Compass size={16} strokeWidth={2.5} />
+                </div>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  className="w-full pl-12 pr-10 py-4 bg-slate-50 rounded-[1.5rem] border border-slate-100 outline-none font-bold text-slate-700 focus:border-violet-200 focus:ring-4 focus:ring-violet-50/50 focus:bg-white transition-all text-sm cursor-pointer appearance-none italic"
+                >
+                  <option value="">-- PILIH GENRE KONTEN STREAMER --</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                  <Icon.ChevronDown size={16} strokeWidth={3} />
+                </div>
+              </div>
+            </div>
+
             <FormInput label="Bio Description" iconName="FileText" textArea placeholder="Tell your donors about yourself..." value={formData.bio} onChange={(e) => setFormData({...formData, bio: e.target.value})} />
           </div>
 
@@ -211,7 +254,7 @@ export default function ProfileSettings({ user, setUser }) {
         </div>
       </form>
 
-      {/* ✅ MODAL BANK SULTAN */}
+      {/* MODAL BANK SULTAN */}
       <EditBankModal 
         isOpen={isBankModalOpen}
         onClose={() => setIsBankModalOpen(false)}
