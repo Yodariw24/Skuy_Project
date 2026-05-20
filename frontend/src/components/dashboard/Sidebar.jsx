@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Wallet, LogIn, Activity, Tv, LogOut, User, Zap, 
+  Wallet, Activity, Tv, LogOut, User, Zap, 
   ChevronRight, ShieldCheck, Bell, Target, Video, 
-  Trophy, Palette, MessageSquare 
+  Trophy, Palette, MessageSquare,
+  BarChart3 // ✅ SUNTIKAN INTEGRASI IKON ANALISIS PERFORMA
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
@@ -29,27 +30,6 @@ function Sidebar({ user }) {
       setIsOverlayOpen(true);
     }
   }, [activeId]);
-
-  const handleShowTips = () => {
-    const tipsData = [
-      "🛡️ <b>Dual-OTP:</b> Pastikan nomor WA lo aktif biar kode login lancar jaya.",
-      "💰 <b>Strategi Cuan:</b> Pasang link donasi di deskripsi stream lo, Ri!",
-      "🎨 <b>Appearance:</b> Ganti tema ke Violet-Pink biar dashboard makin Sultan.",
-      "🏦 <b>Pencairan:</b> Saldo donasi sekarang bisa cair lebih cepet via E-Wallet."
-    ];
-    const randomTip = tipsData[Math.floor(Math.random() * tipsData.length)];
-    
-    Swal.fire({
-      title: 'SKUY TIPS 💡',
-      html: `<div class="text-left font-bold italic text-slate-600 leading-relaxed">${randomTip}</div>`,
-      icon: 'info',
-      buttonsStyling: false,
-      customClass: {
-        popup: 'rounded-[2rem] border-4 border-slate-950 bg-white shadow-[8px_8px_0px_0px_#000]',
-        confirmButton: 'bg-violet-600 text-white px-8 py-3 rounded-xl font-black uppercase italic border-2 border-slate-950'
-      }
-    });
-  };
 
   const logout = async () => {
     const result = await Swal.fire({
@@ -98,7 +78,7 @@ function Sidebar({ user }) {
           <div className={`p-1 rounded-lg ${isActive ? 'text-violet-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
             <Icon size={isSub ? 16 : 19} strokeWidth={isActive ? 3 : 2.5} />
           </div>
-          <span className={`${isSub ? 'text-[11px]' : 'text-[12.5px]'} font-black uppercase tracking-tight ${isActive ? 'italic' : ''}`}>
+          <span className={`text-[12.5px] ${isSub ? 'text-[11px]' : ''} font-black uppercase tracking-tight ${isActive ? 'italic' : ''}`}>
             {label}
           </span>
         </div>
@@ -136,7 +116,8 @@ function Sidebar({ user }) {
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
-            <NavButton id="tips" icon={LogIn} label="Tips Sultan" onClickCustom={handleShowTips} />
+            {/* ✅ RESTORASI IDENTITAS: Mengubah Tips Sultan menjadi Analisis Performa */}
+            <NavButton id="analytics" icon={BarChart3} label="Analisis Performa" disabled={!isCreator} />
           </nav>
         </div>
 

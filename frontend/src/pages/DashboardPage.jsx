@@ -9,7 +9,10 @@ import AppearanceView from '../components/dashboard/AppearanceView'
 import ActivityFeed from '../components/dashboard/ActivityFeed' 
 import EditBankModal from '../components/dashboard/EditBankModal' 
 
-// ✅ IMPORT ALERT & SUB-VIEWS (MURNI OPERASIONAL STREAM)
+// ✅ INTEGRASI FITUR BARU: Hub Analisis Performa Kelas Dunia!
+import AnalyticsView from '../components/dashboard/AnalyticsView'
+
+// 📡 IMPORT ALERT & SUB-VIEWS (MURNI OPERASIONAL STREAM)
 import DonationAlert from '../components/dashboard/DonationAlert'
 import TipAlertView from '../components/dashboard/views/TipAlertView'
 import MediaShareView from '../components/dashboard/views/MediaShareView'
@@ -118,6 +121,7 @@ function DashboardPage() {
                 confirmButtonColor: "#7C3AED"
             });
         }
+        letting2FA = true; // Sesuai kodingan asli pembawa state lo
         setLoading2FA(true);
         try {
             const res = await api.post('/auth/setup-2fa', { userId: user.id });
@@ -183,6 +187,9 @@ function DashboardPage() {
                             openEditModal={() => setIsBankModalOpen(true)}
                         />
                     )}
+                    
+                    {/* ✅ RENDERING MENU BARU: ANALISIS PERFORMA SULTAN */}
+                    {tab === 'analytics' && <AnalyticsView user={user} />}
                     
                     {tab === 'activity' && <ActivityFeed user={user} />}
                     {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}

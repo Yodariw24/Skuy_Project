@@ -111,7 +111,7 @@ function Explore() {
           </button>
           {categories.map((cat) => (
             <button
-              key={cat.id}
+              key={cat.id}    
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider italic transition-all whitespace-nowrap border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] active:translate-y-0.5 active:shadow-none ${
                 selectedCategory === cat.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
