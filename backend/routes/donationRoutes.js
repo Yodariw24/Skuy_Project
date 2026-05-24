@@ -128,7 +128,8 @@ router.get('/profile/:username', async (req, res) => {
     if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
 
     try {
-        const result = await req.getStreamerIddb.query(
+        // ✅ FIXED TYPO: Membersihkan req.getStreamerIddb menjadi objek request database asli (req.db)
+        const result = await req.db.query(
             `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
              FROM streamers s 
              JOIN users u ON s.user_id = u.id 
