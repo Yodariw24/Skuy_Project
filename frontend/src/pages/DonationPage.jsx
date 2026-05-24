@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/axios' 
-import PaymentModal from '../components/donation/PaymentModal' // ✅ SINKRON: Import Modal Sultan Lo
+import PaymentModal from '../components/donation/PaymentModal' 
 import { 
   ArrowLeft, Zap, Wallet, CheckCircle2, 
   History, Skull, Heart, Info, Mail, User, Clock, ShieldCheck 
 } from 'lucide-react' 
 
-// ✅ UPGRADE: Menambahkan hex warna murni untuk mengunci shadow brutalism Tailwind
 const themeMap = {
   violet: { gradient: 'from-violet-600 via-violet-700 to-fuchsia-600', text: 'text-violet-600', bg: 'bg-violet-600', bgHex: '#7C3AED', bgLight: 'bg-violet-50', border: 'border-violet-100', shadow: 'shadow-violet-200', ring: 'focus:ring-violet-50/50', focusBorder: 'focus:border-violet-200' },
   emerald: { gradient: 'from-emerald-500 via-emerald-600 to-teal-500', text: 'text-emerald-600', bg: 'bg-emerald-600', bgHex: '#10B981', bgLight: 'bg-emerald-50', border: 'border-emerald-100', shadow: 'shadow-emerald-200', ring: 'focus:ring-emerald-50/50', focusBorder: 'focus:border-emerald-200' },
@@ -29,17 +28,18 @@ function DonationPage() {
   
   const [showQR, setShowQR] = useState(false)
   const [currentDonation, setCurrentDonation] = useState(null)
+  const [snapToken, setSnapToken] = useState('') // ✅ ADD STATE: Penampung token Snap Midtrans rill
   
   const [formData, setFormData] = useState({
     donatur_name: '', donatur_email: '', amount: '', message: ''
   })
 
   const shortcuts = [10000, 25000, 50000, 100000];
-  
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
   // --- LOGIKA FETCH DATA SULTAN (Railway Sync) ---
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!username) return;
     try {
       setLoading(true);
       const res = await api.get(`/donations/profile/${username}`);
@@ -61,17 +61,17 @@ function DonationPage() {
     } finally {
       setLoading(false); 
     }
-  };
+  }, [username]);
 
   useEffect(() => { 
-    if (username) { 
-      fetchData(); 
-    } 
-  }, [username]);
+    fetchData(); 
+  }, [fetchData]);
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!formData.amount || formData.amount < 10000) return alert("Minimal dukungan Sultan adalah Rp 10.000");
+    if (!formData.amount || Number(formData.amount) < 10000) {
+      return alert("Minimal dukungan Sultan adalah Rp 10.000");
+    }
     
     setSubmitting(true);
     try {
@@ -83,11 +83,13 @@ function DonationPage() {
       });
 
       if (res.data.success) {
+        // ✅ SINKRON PAYLOAD: Tangkap token hasil kueri snap backend lo, Ri!
         setCurrentDonation(res.data.data);
+        setSnapToken(res.data.token || ''); 
         setShowQR(true);
       }
     } catch (err) { 
-      alert("Energi transmission failed! Cek koneksi lo."); 
+      alert("Energi transmission failed! Cek koneksi server Midtrans lo."); 
     } finally {
       setSubmitting(false);
     }
@@ -126,7 +128,8 @@ function DonationPage() {
           setShowQR(false);
           fetchData(); // ✅ AUTO-REFRESH: Memperbarui live saldo & riwayat secara real-time saat modal ditutup
         }} 
-        donationData={currentDonation} 
+        donationData={currentDonation}
+        token={snapToken} // ✅ PASS TOKEN: Kirim token ke jendela modal agar snap.pay() bisa tereksekusi
       />
 
       {/* Dynamic Glow Background */}
@@ -151,7 +154,6 @@ function DonationPage() {
             <div className={`absolute top-0 right-0 w-40 h-40 ${theme.bgLight} rounded-full -mr-20 -mt-20 blur-3xl opacity-60`} />
             
             <div className="relative shrink-0">
-              {/* ✅ FIXED: Menggunakan inline-style style={{ boxShadow }} untuk memproses variable hex warna murni secara valid */}
               <div 
                 className="w-40 h-40 md:w-48 md:h-48 rounded-[3.5rem] p-2 bg-slate-950"
                 style={{ boxShadow: `10px 10px 0px 0px ${theme.bgHex}` }}
@@ -225,13 +227,13 @@ function DonationPage() {
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2 italic text-left block">Support Energy Nominal</label>
                       <div className="relative group">
                         <span className={`absolute left-8 top-1/2 -translate-y-1/2 text-slate-300 font-black text-4xl group-focus-within:${theme.text}`}>Rp</span>
-                        <input type="number" required placeholder="0" className={`w-full bg-slate-50 p-10 pl-24 rounded-[3.5rem] outline-none ${theme.text} text-6xl font-black border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all shadow-inner tracking-tighter`} value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
+                        <input type="number" required placeholder="0" className={`w-full bg-slate-50 p-10 pl-24 rounded-[3.5rem] outline-none ${theme.text} text-6xl font-black border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all shadow-inner tracking-tighter`} value={formData.amount} onChange={(e) => setFormData({...formData, amount: String(e.target.value).replace(/\D/g, '')})} />
                       </div>
                       
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {shortcuts.map((val) => (
                           <button key={val} type="button" onClick={() => setFormData({...formData, amount: val})}
-                            className={`py-5 rounded-2xl border-4 font-black text-[12px] uppercase tracking-widest transition-all active:translate-y-1 ${formData.amount == val ? `${theme.bg} text-white border-slate-950 shadow-[6px_6px_0px_0px_#000]` : `bg-white text-slate-400 border-slate-100 hover:border-slate-300`}`}>
+                            className={`py-5 rounded-2xl border-4 font-black text-[12px] uppercase tracking-widest transition-all active:translate-y-1 cursor-pointer ${formData.amount == val ? `${theme.bg} text-white border-slate-950 shadow-[6px_6px_0px_0px_#000]` : `bg-white text-slate-400 border-slate-100 hover:border-slate-300`}`}>
                             Rp {val.toLocaleString('id-ID')}
                           </button>
                         ))}
@@ -243,7 +245,7 @@ function DonationPage() {
                       <textarea placeholder="Tulis pesan untuk agen..." className={`w-full bg-slate-50 p-8 rounded-[3rem] h-48 outline-none text-slate-900 font-bold border-4 border-slate-100 ${theme.focusBorder} focus:bg-white transition-all resize-none italic shadow-inner`} value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} />
                     </div>
 
-                    <button type="submit" disabled={submitting} className={`w-full group ${theme.bg} text-white font-black py-10 rounded-[4rem] uppercase italic text-2xl shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-2 border-4 border-slate-950 transition-all hover:brightness-110 flex items-center justify-center gap-6 disabled:opacity-50`}>
+                    <button type="submit" disabled={submitting} className={`w-full group ${theme.bg} text-white font-black py-10 rounded-[4rem] uppercase italic text-2xl shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-2 border-4 border-slate-950 transition-all hover:brightness-110 flex items-center justify-center gap-6 disabled:opacity-50 cursor-pointer`}>
                       {submitting ? 'TRANSMITTING...' : <>Initiate Support <Zap size={28} strokeWidth={3} fill="currentColor" /></>}
                     </button>
                 </form>

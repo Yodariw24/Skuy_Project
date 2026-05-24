@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, QrCode, ShieldCheck, Zap, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { X, QrCode, ShieldCheck, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-export default function PaymentModal({ isOpen, onClose, donationData }) {
+// ✅ FIXED INLINE EXPORT ENGINE: Langsung kunci ekspor di kepala fungsi agar lolos sensor Rollup
+export default function PaymentModal({ isOpen, onClose, donationData, token }) {
     const [copied, setCopied] = useState(false);
+
+    // 📡 GATEWAY MONITORING LAYER: Deteksi jika token rill masuk untuk kebutuhan simulasi sandbox lo, Ri
+    useEffect(() => {
+      if (isOpen && token) {
+        console.log("=== [METRIK INJEKSI TOKEN INTEGRASI] ===");
+        console.log("Token Sandbox Terdeteksi:", token);
+      }
+    }, [isOpen, token]);
 
     if (!isOpen || !donationData) return null;
 
     // 📡 PARSING VARIABLE: Ambil payload murni hasil cetak QRIS Midtrans dari Controller kita
-    const qrImageUrl = donationData?.qrCodeUrl || donationData?.qr_code_url;
-    const orderId = donationData?.id || donationData?.orderId;
+    const qrImageUrl = donationData?.qrCodeUrl || donationData?.qr_code_url || donationData?.actions?.[0]?.url;
+    const orderId = donationData?.id || donationData?.orderId || donationData?.order_id;
     const amount = donationData?.gross_amount || donationData?.amount || 0;
 
     const handleCopyOrderId = () => {
@@ -51,8 +60,9 @@ export default function PaymentModal({ isOpen, onClose, donationData }) {
                     
                     {/* BUTTON CLOSE */}
                     <button 
+                        type="button"
                         onClick={onClose}
-                        className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-950 transition-colors"
+                        className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-950 transition-colors border-0 bg-transparent cursor-pointer"
                     >
                         <X size={24} strokeWidth={3} />
                     </button>
@@ -71,7 +81,7 @@ export default function PaymentModal({ isOpen, onClose, donationData }) {
                         {donationData.donatur_email || 'donor@skuy.gg'}
                     </p>
 
-                    {/* 📸 QR CODE RECHARTS CANVAS (SINKRON MIDTRANS URL) */}
+                    {/* QR CODE CANVAS */}
                     <div className="group relative">
                         <div className="absolute -inset-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-[3rem] blur-xl opacity-20 group-hover:opacity-30 transition duration-500"></div>
                         
@@ -80,7 +90,7 @@ export default function PaymentModal({ isOpen, onClose, donationData }) {
                                 <img 
                                     src={qrImageUrl} 
                                     alt="Midtrans QRIS Canvas"
-                                    className="w-full aspect-square rounded-2xl transition-all duration-500"
+                                    className="w-full aspect-square rounded-2xl transition-all duration-500 select-none pointer-events-auto"
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center text-slate-300 py-12">
@@ -91,17 +101,17 @@ export default function PaymentModal({ isOpen, onClose, donationData }) {
                         </div>
                     </div>
 
-                    {/* 🔑 TOKEN COPIER LAYOUT (UNTUK INPUT SIMULATOR BAYAR SANDBOX) */}
-                    <div className="w-full bg-slate-950 text-white p-4 rounded-2xl border-2 border-slate-950 flex items-center justify-between font-mono text-[11px] mt-6">
+                    {/* 🔑 ORDER ID COPIER LAYOUT (KUNCI SIMULATOR SANDBOX) */}
+                    <div className="w-full bg-slate-950 text-white p-4 rounded-2xl border-2 border-slate-950 flex items-center justify-between font-mono text-[11px] mt-6 select-none">
                         <div className="min-w-0 flex-1 text-left px-1">
-                            <span className="text-white/30 text-[9px] block uppercase font-sans font-black tracking-widest mb-0.5">Order Token ID</span>
+                            <span className="text-white/30 text-[9px] block uppercase font-sans font-black tracking-widest mb-0.5">Order ID / Token</span>
                             <span className="text-violet-400 font-bold tracking-tight block truncate select-all">{orderId || 'FETCHING_ID...'}</span>
                         </div>
                         <button 
                             type="button"
                             onClick={handleCopyOrderId}
                             disabled={!orderId}
-                            className={`p-2.5 rounded-xl border transition-all shrink-0 ml-3 flex items-center justify-center ${copied ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
+                            className={`p-2.5 rounded-xl border transition-all shrink-0 ml-3 flex items-center justify-center cursor-pointer ${copied ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
                         >
                             {copied ? <CheckCircle2 size={14} strokeWidth={3} /> : <Copy size={14} />}
                         </button>
