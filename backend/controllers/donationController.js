@@ -1,6 +1,6 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
- * SYSTEM ENGINE BY: ARI (RE-CALIBRATED SECURE EDITION)
+ * SYSTEM ENGINE BY: ARI (CLEAN IMPLEMENTATION)
  */
 
 import midtransClient from 'midtrans-client';
@@ -17,7 +17,6 @@ const coreApi = new midtransClient.CoreApi({
  */
 export const getWalletHistory = async (req, res) => {
   const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
-  // ✅ FIXED CASTING LAYER: Konversi ke integer murni untuk menepis eror integer = character varying
   const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
@@ -65,7 +64,6 @@ export const getWalletHistory = async (req, res) => {
  */
 export const getStreamerBalance = async (req, res) => {
   const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
-  // ✅ FIXED CASTING LAYER: Paksa string parameter mutasi dari params rute menjadi tipe Integer murni
   const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
@@ -77,7 +75,7 @@ export const getStreamerBalance = async (req, res) => {
       SELECT 
         COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS total_saldo
       FROM (
-        SELECT $1::INT as streamer_id -- ✅ FIXED: Ubah VARCHAR menjadi INT agar simetris dengan relasi tabel balance
+        SELECT $1::INT as streamer_id
       ) s
       LEFT JOIN balance b ON b.streamer_id = s.streamer_id
       LEFT JOIN (
@@ -104,7 +102,6 @@ export const getStreamerBalance = async (req, res) => {
 export const withdrawBalance = async (req, res) => {
   const { userId, amount, bank } = req.body; 
   const rawId = req.user?.streamer_id || userId || req.params.id;
-  // ✅ FIXED CASTING LAYER: Amankan parameter ID penarikan murni bertipe data Integer
   const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
@@ -112,11 +109,10 @@ export const withdrawBalance = async (req, res) => {
   }
 
   try {
-    // Ambil saldo bersih terbaru yang tersedia menggunakan kalkulator on-the-fly
     const balanceRes = await req.db.query(`
       SELECT 
         COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS available_balance
-      FROM (SELECT $1::INT as streamer_id) s -- ✅ FIXED: Ubah VARCHAR menjadi INT murni
+      FROM (SELECT $1::INT as streamer_id) s
       LEFT JOIN balance b ON b.streamer_id = s.streamer_id
       LEFT JOIN (
         SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
@@ -151,7 +147,6 @@ export const withdrawBalance = async (req, res) => {
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   
-  // ✅ FIXED: Amankan konversi streamer_id ke tipe Integer konstan sebelum masuk ke kueri Postgres
   const targetStreamerId = parseInt(streamer_id, 10);
   const gross = Number(amount);
   const fee = gross * 0.05; 
@@ -168,7 +163,7 @@ export const createDonation = async (req, res) => {
         "payment_type": "qris", 
         "transaction_details": {
             "order_id": orderId,
-            "gross_amount": gross // ✅ SECURE: Berupa nilai angka bulat murni sesuai regulasi API Midtrans
+            "gross_amount": gross
         },
         "item_details": [{
             "id": "DONATE-SKUY",
@@ -200,7 +195,7 @@ export const createDonation = async (req, res) => {
 
     const result = await req.db.query(query, [
       orderId,
-      targetStreamerId, // Menggunakan ID yang sudah dikonversi ke Integer
+      targetStreamerId,
       donatur_name,
       donatur_email,
       message,
@@ -256,14 +251,14 @@ export const updateDonationStatus = async (req, res) => {
     const donation = result.rows[0];
 
     if (upperStatus === 'SUCCESS' && donation) {
-        // Parsing paksa ID streamer ke format angka bulat demi meredam letupan tipe data
         const streamerIdCast = parseInt(donation.streamer_id, 10);
 
+        // ✅ CLEAN OPTIMIZATION: Mengamankan mutasi saldo dari potensi nilai NULL dengan COALESCE
         await req.db.query(`
           INSERT INTO balance (streamer_id, total_saldo) 
           VALUES ($1, $2)
           ON CONFLICT (streamer_id) 
-          DO UPDATE SET total_saldo = balance.total_saldo + $2
+          DO UPDATE SET total_saldo = COALESCE(balance.total_saldo, 0) + $2
         `, [streamerIdCast, donation.net_amount]);
 
         if (req.io) {
