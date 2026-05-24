@@ -77,9 +77,13 @@ function DashboardPage() {
     }, [navigate]);
 
     // 💰 2. ENGINE KHUSUS RE-FETCH SALDO LIVE
+    // ✅ OPTIMIZATION: Kunci dependensi murni ke streamer_id spesifik agar kebal dari re-trigger komponen visual lain
+    const streamerIdKey = user?.streamer_id;
+    const userIdFallback = user?.id;
+
     const fetchLiveBalance = useCallback(async () => {
         const savedUser = JSON.parse(localStorage.getItem('user'));
-        const targetId = user?.streamer_id || savedUser?.streamer_id || user?.id || savedUser?.id;
+        const targetId = streamerIdKey || savedUser?.streamer_id || userIdFallback || savedUser?.id;
         
         if (!targetId) return;
 
@@ -91,9 +95,9 @@ function DashboardPage() {
         } catch (err) {
             console.warn("⚠️ Gagal pancing saldo murni database:", err.message);
         }
-    }, [user]);
+    }, [streamerIdKey, userIdFallback]);
 
-    // 🔄 RE-ACTIVE CALLER: Jalankan sinkronisasi profil saat pertama kali masuk
+    // 🔄 RE-ACTIVE CALLER: Jalankan sinkronisasi profil saat pertama kali masuk pangkalan
     useEffect(() => {
         const token = localStorage.getItem('user_token');
         if (!token) {
@@ -103,12 +107,12 @@ function DashboardPage() {
         }
     }, [fetchDashboardData, navigate]);
 
-    // 🔄 TAB MONITOR TRIGGER: Paksa ambil saldo terbaru setiap kali user berada/pindah ke tab 'wallet'
+    // 🔄 TAB MONITOR TRIGGER: Batasi eksekusi kueri saldo murni HANYA ketika user sedang membuka tab wallet
     useEffect(() => {
-        if (user?.id) {
+        if (userIdFallback && tab === 'wallet') {
             fetchLiveBalance();
         }
-    }, [tab, user?.id, fetchLiveBalance]);
+    }, [tab, userIdFallback, fetchLiveBalance]);
 
 
     // --- LOGIKA DUAL-OTP ---
@@ -121,12 +125,11 @@ function DashboardPage() {
                 confirmButtonColor: "#7C3AED"
             });
         }
-        // ✅ FIXED: Menghapus baris typo letget2FA yang bikin crash screen
         setLoading2FA(true);
         try {
             const res = await api.post('/auth/setup-2fa', { userId: user.id });
             if (res.data.success) {
-                Swal.fire("KODE MELUNCUR", "Cek WhatsApp lo & Email!", "info");
+                Swal.fire("KODE MELUNCUR", "Cek WhatsApp lo & Email markas sultan!", "info");
             }
         } catch (err) {
             Swal.fire("ERROR", "Gagal kontak server keamanan.", "error");

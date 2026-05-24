@@ -9,7 +9,7 @@ function MilestoneView({ user }) {
   
   const [goalName, setGoalName] = useState("UPGRADE ENGINE SULTAN");
   const [targetAmount, setTargetAmount] = useState(5000000);
-  const [currentAmount, setCurrentAmount] = useState(0); // Default awal biarkan 0 sebelum disuntik data DB
+  const [currentAmount, setCurrentAmount] = useState(0); 
   const [barColor, setBarColor] = useState('#7C3AED');
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
@@ -59,7 +59,7 @@ function MilestoneView({ user }) {
     const target = Number(targetAmount) || 1000000;
     const current = Number(currentAmount) || 0;
     const pct = Math.round((current / target) * 100);
-    return Math.min(pct, 100); // Kunci di batas maksimal 100% biar bar visualnya gak luber keluar kontainer
+    return Math.min(pct, 100); 
   }, [currentAmount, targetAmount]);
 
   // 🚀 TRIGGER DEPLOY PROTOCOL: Simpan pembaharuan target dan kabarkan ke OBS Browser Source via WebSockets
@@ -174,7 +174,8 @@ function MilestoneView({ user }) {
                         type="number" 
                         disabled={deploying}
                         value={targetAmount}
-                        onChange={(e) => setTargetAmount(e.target.value.replace(/\D/g, ''))}
+                        // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar aman dieksekusi bundler Rollup produksi
+                        onChange={(e) => setTargetAmount(String(e.target.value).replace(/\D/g, ''))}
                         className="w-full bg-slate-50 border-4 border-slate-100 p-5 pl-14 rounded-2xl font-black text-lg outline-none focus:bg-white focus:border-slate-950"
                       />
                     </div>
