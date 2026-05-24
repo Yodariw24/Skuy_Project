@@ -1,6 +1,11 @@
+/**
+ * SKUYGG WIDGET & OBS INTERACTIVE ENGINE CONTROLLER
+ * SYSTEM ENGINE BY: ARI
+ */
+
 // --- 1. UPDATE SETTINGS (Deploy Protocol dari Dashboard) ---
 export const updateSettings = async (req, res) => {
-    // Destructuring dengan default value agar aman Ri
+    // Destructuring dengan default value agar aman dari data undefined, Ri
     const { userId, widgetType, colors = {}, config = {} } = req.body;
 
     if (!userId || !widgetType) {
@@ -40,19 +45,30 @@ export const updateSettings = async (req, res) => {
         ];
         
         const result = await req.db.query(query, values);
+        const rowData = result.rows[0];
 
-        // 🚀 REAL-TIME SYNC: Kirim sinyal update ke OBS via Socket.io
+        // ✅ FIXED SINKRONISASI REAL-TIME SOCKET:
+        // Bungkus payload socket agar format key-nya cocok 100% dengan state WidgetClient.jsx di OBS lo!
         if (req.io) {
             req.io.emit(`widget-update-${userId}`, {
                 type: widgetType,
-                settings: result.rows[0]
+                settings: {
+                    primary_color: rowData.primary_color,
+                    accent_color: rowData.accent_color,
+                    text_color: rowData.text_color,
+                    glow_color: rowData.glow_color,
+                    duration: rowData.duration,
+                    min_tip: rowData.min_tip,
+                    goal_title: rowData.goal_title,
+                    goal_target: rowData.goal_target
+                }
             });
         }
 
         res.status(200).json({ 
             success: true, 
             message: "Visual Protocol Deployed! 🚀",
-            data: result.rows[0] 
+            data: rowData 
         });
     } catch (err) {
         console.error("🔥 Widget Sync Error:", err.message);
@@ -60,9 +76,9 @@ export const updateSettings = async (req, res) => {
     }
 };
 
-// --- 2. GET SETTINGS (Dipanggil oleh Browser Source OBS) ---
+// --- 2. GET SETTINGS (Dipanggil oleh Browser Source OBS Client) ---
 export const getSettings = async (req, res) => {
-    const { streamKey, widgetType } = req.params; // streamKey biasanya username
+    const { streamKey, widgetType } = req.params; // streamKey biasanya username dari parameter URL
     
     try {
         const query = `
@@ -74,7 +90,7 @@ export const getSettings = async (req, res) => {
         
         const result = await req.db.query(query, [streamKey, widgetType]);
         
-        // DATA FALLBACK: Biar OBS nggak item pas dipasang pertama kali
+        // DATA FALLBACK: Biar OBS nggak item pas penonton masang link pertama kali
         if (result.rows.length === 0) {
             return res.status(200).json({ 
                 success: true, 
@@ -96,5 +112,5 @@ export const getSettings = async (req, res) => {
     } catch (err) {
         console.error("🔥 OBS Fetch Error:", err.message);
         res.status(500).json({ success: false, message: "Error fetching Skuy Engine settings" });
-      }
+    }
 };

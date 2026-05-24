@@ -3,12 +3,19 @@
  * SYSTEM ENGINE BY: ARI
  */
 
+import midtransClient from 'midtrans-client';
+
+// Inisialisasi Core API Midtrans Sandbox
+const coreApi = new midtransClient.CoreApi({
+    isProduction: false,
+    serverKey: process.env.MIDTRANS_SERVER_KEY,
+    clientKey: process.env.MIDTRANS_CLIENT_KEY
+});
+
 /**
  * 1. GET WALLET HISTORY (PRIVAT / INTERN DASHBOARD)
- * Menggabungkan mutasi donasi masuk (IN) dan penarikan saldo (OUT) secara real-time.
  */
 export const getWalletHistory = async (req, res) => {
-  // 🛡️ KUNCI PARAMETER: Prioritaskan ID kasta Streamer dari token login, fallback ke params URL
   const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
 
   if (!targetStreamerId) {
@@ -51,11 +58,10 @@ export const getWalletHistory = async (req, res) => {
 };
 
 /**
- * 2. GET STREAMER BALANCE (PRIVAT & PUBLIK FILTERED)
- * Menghitung saldo bersih streamer (Total Donasi Sukses 95% - Total Penarikan yang disetujui/pending).
+ * 2. GET STREAMER BALANCE (FIXED & SYNCHRONIZED VERSION) ✅
+ * Menghitung saldo yang 'tersedia' untuk ditarik (Saldo Utama - Antrean WD yang masih PENDING).
  */
 export const getStreamerBalance = async (req, res) => {
-  // 🛡️ KUNCI PARAMETER: Ambil Streamer ID bawaan token session login user
   const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
 
   if (!targetStreamerId) {
@@ -65,14 +71,23 @@ export const getStreamerBalance = async (req, res) => {
   try {
     const query = `
       SELECT 
-        (SELECT COALESCE(SUM(net_amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
-        (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE streamer_id = $1 AND UPPER(status) != 'REJECTED') 
-      AS total_saldo
+        COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS total_saldo
+      FROM (
+        SELECT $1::VARCHAR as streamer_id
+      ) s
+      LEFT JOIN balance b ON b.streamer_id = s.streamer_id
+      LEFT JOIN (
+        SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
+        FROM withdrawals 
+        WHERE UPPER(status) = 'PENDING' 
+        GROUP BY streamer_id
+      ) w ON w.streamer_id = s.streamer_id
     `;
-    const result = await req.db.query(query, [targetStreamerId]);
-    const balance = parseInt(result.rows[0].total_saldo) || 0;
     
-    return res.json({ success: true, total_saldo: balance });
+    const result = await req.db.query(query, [targetStreamerId]);
+    const balance = result.rows.length > 0 ? parseInt(result.rows[0].total_saldo) : 0;
+    
+    return res.json({ success: true, total_saldo: balance < 0 ? 0 : balance });
   } catch (err) {
     console.error("🔥 Error getStreamerBalance Node:", err.message);
     return res.status(500).json({ success: false, total_saldo: 0 });
@@ -80,8 +95,7 @@ export const getStreamerBalance = async (req, res) => {
 };
 
 /**
- * 3. WITHDRAW BALANCE (PROSEDUR PENARIKAN SALDO SULTAN)
- * Mengecek kecukupan saldo sebelum melakukan pendaftaran antrean penarikan dana baru.
+ * 3. WITHDRAW BALANCE (SECURED TRANSACTION GATEWAY) 🛡️
  */
 export const withdrawBalance = async (req, res) => {
   const { userId, amount, bank } = req.body; 
@@ -92,18 +106,28 @@ export const withdrawBalance = async (req, res) => {
   }
 
   try {
-    // Jalankan kalkulasi saldo pengaman live sebelum eksekusi INSERT
+    // Ambil saldo bersih yang tersedia (menggunakan kalkulasi query point 2 secara on-the-fly)
     const balanceRes = await req.db.query(`
       SELECT 
-        (SELECT COALESCE(SUM(net_amount), 0) FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS') - 
-        (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE streamer_id = $1 AND UPPER(status) != 'REJECTED') 
-      AS current_balance`, [targetStreamerId]);
+        COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS available_balance
+      FROM (SELECT $1::VARCHAR as streamer_id) s
+      LEFT JOIN balance b ON b.streamer_id = s.streamer_id
+      LEFT JOIN (
+        SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
+        FROM withdrawals 
+        WHERE UPPER(status) = 'PENDING' 
+        GROUP BY streamer_id
+      ) w ON w.streamer_id = s.streamer_id
+    `, [targetStreamerId]);
     
-    const currentBalance = parseInt(balanceRes.rows[0].current_balance) || 0;
-    if (amount > currentBalance) {
-      return res.status(400).json({ success: false, message: "Saldo tidak cukup buat ditarik segitu!" });
+    const availableBalance = balanceRes.rows.length > 0 ? parseInt(balanceRes.rows[0].available_balance) : 0;
+    
+    if (parseInt(amount) > availableBalance) {
+      return res.status(400).json({ success: false, message: "Saldo available lo nggak cukup buat ditarik segitu, Ri!" });
     }
 
+    // ✅ FIXED ARCHITECTURE: Jangan potong tabel balance dulu saat statusnya masih 'PENDING'
+    // Biarkan kueri getStreamerBalance yang mengunci nominal antrean secara virtual di UI.
     const formattedBank = typeof bank === 'object' ? JSON.stringify(bank) : String(bank);
     const result = await req.db.query(
       "INSERT INTO withdrawals (streamer_id, amount, bank_info, status, created_at) VALUES ($1, $2, $3, 'PENDING', NOW()) RETURNING *",
@@ -118,34 +142,55 @@ export const withdrawBalance = async (req, res) => {
 };
 
 /**
- * 4. CREATE DONATION (GATEWAY INISIALISASI TRANSAKSI)
- * Mendaftarkan transaksi donasi masuk baru di database, otomatis menghitung komisi platform 5% & kasta tiering.
+ * 4. CREATE DONATION (MIDTRANS QRIS CHARGE INITIALIZER) 🏎️
  */
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   
   const gross = Number(amount);
-  const fee = gross * 0.05; // Potongan komisi platform 5%
+  const fee = gross * 0.05; 
   const net = gross - fee;  
+  const orderId = `SKUY-${Date.now()}`;
 
-  // 🎖️ AUTOMATED TIER RESOLVER SHIELD
   let tier = 'STANDARD';
   if (gross >= 1000000) tier = 'MYTHIC';
   else if (gross >= 500000) tier = 'GOLD';
   else if (gross >= 100000) tier = 'SILVER';
 
   try {
+    let parameter = {
+        "payment_type": "gopay", 
+        "transaction_details": {
+            "order_id": orderId,
+            "gross_amount": gross
+        },
+        "item_details": [{
+            "id": "DONATE-SKUY",
+            "price": gross,
+            "quantity": 1,
+            "name": `Donasi SkuyGG to Streamer: ${streamer_id}`
+        }],
+        "customer_details": {
+            "first_name": donatur_name,
+            "email": donatur_email || "donor@skuy.gg"
+        }
+    };
+
+    const chargeResponse = await coreApi.charge(parameter);
+    const qrCodeUrl = chargeResponse.actions && chargeResponse.actions[0] ? chargeResponse.actions[0].url : null;
+
     const query = `
       INSERT INTO donations (
-        streamer_id, donatur_name, donatur_email, message, amount, 
+        id, streamer_id, donatur_name, donatur_email, message, amount, 
         gross_amount, fee_amount, net_amount, 
         payment_method, tier, status, created_date
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'PENDING', NOW()) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PENDING', NOW()) 
       RETURNING *
     `;
 
     const result = await req.db.query(query, [
+      orderId,
       streamer_id,
       donatur_name,
       donatur_email,
@@ -154,20 +199,24 @@ export const createDonation = async (req, res) => {
       gross,
       fee,
       net, 
-      payment_method || 'QRIS_MOCK',
+      payment_method || 'QRIS',
       tier
     ]);
     
-    return res.status(201).json({ success: true, data: result.rows[0] });
+    return res.status(201).json({ 
+        success: true, 
+        data: result.rows[0],
+        qrCodeUrl: qrCodeUrl,
+        orderId: orderId
+    });
   } catch (err) { 
-    console.error("🔥 Error Create Donation Node:", err.message);
+    console.error("❌ Error Create Donation Node:", err.message);
     return res.status(500).json({ success: false, error: err.message }); 
   }
 };
 
 /**
  * 5. UPDATE DONATION STATUS (WEBHOOK VERIFIER & REAL-TIME SOCKET EMITTER)
- * Mengubah status donasi PENDING -> SUCCESS, auto-update dompet, dan menembakkan efek trigger Socket.io.
  */
 export const updateDonationStatus = async (req, res) => {
   const { id } = req.params; 
@@ -193,12 +242,13 @@ export const updateDonationStatus = async (req, res) => {
 
     const donation = result.rows[0];
 
-    // 🚀 TRANSMISI SOCKET.IO DAN INJEKSI SALDO AKTIF BERSIH
     if (status.toUpperCase() === 'SUCCESS' && donation) {
-        await req.db.query(
-          `UPDATE balance SET total_saldo = total_saldo + $1 WHERE streamer_id = $2`,
-          [donation.net_amount, donation.streamer_id]
-        );
+        await req.db.query(`
+          INSERT INTO balance (streamer_id, total_saldo) 
+          VALUES ($1, $2)
+          ON CONFLICT (streamer_id) 
+          DO UPDATE SET total_saldo = balance.total_saldo + $2
+        `, [donation.streamer_id, donation.net_amount]);
 
         if (req.io) {
             req.io.emit(`new-donation-${donation.streamer_id}`, {
@@ -220,7 +270,6 @@ export const updateDonationStatus = async (req, res) => {
 
 /**
  * 6. GET PUBLIC HISTORY (HALAMAN PROFIL EXTERNAL)
- * Menampilkan 5 riwayat donasi sukses terakhir untuk dilihat publik di luar dashboard (Tanpa data privat).
  */
 export const getPublicHistory = async (req, res) => {
   const { id } = req.params;
@@ -238,7 +287,6 @@ export const getPublicHistory = async (req, res) => {
 
 /**
  * 7. GET DONATIONS BY STREAMER (MONITOR DATA MENTAH)
- * Mengambil seluruh list donasi terlepas dari status (PENDING/FAILED/SUCCESS) untuk kebutuhan log internal admin.
  */
 export const getDonationsByStreamer = async (req, res) => {
   const { id } = req.params;

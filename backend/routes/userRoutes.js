@@ -14,12 +14,12 @@ import {
 } from '../controllers/streamerController.js';
 import * as widgetController from '../controllers/widgetController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { adminProtect } from '../middleware/adminMiddleware.js'; // Import Shield Admin
+import { adminProtect } from '../middleware/adminMiddleware.js'; // Shield Perlindungan Admin Panel
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- 1. MULTER CONFIG (Avatar Upload) ---
+// --- 1. MULTER CONFIG (Avatar Upload System) ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadPath = path.join(__dirname, '../uploads/');
@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
     storage: storage, 
-    limits: { fileSize: 2 * 1024 * 1024 } 
+    limits: { fileSize: 2 * 1024 * 1024 } // Batas aman unggahan gambar 2MB
 });
 
 // --- 2. ENDPOINTS ---
@@ -103,7 +103,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
 });
 
 /**
- * ✅ PROFILE & BANK ACTIONS
+ * ✅ PROFILE & BANK ACTIONS (Terproteksi Token Token Session)
  */
 router.post('/upload-avatar', protect, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: "Mana fotonya Ri?" });
@@ -116,10 +116,12 @@ router.post('/upload-avatar', protect, upload.single('image'), async (req, res) 
 });
 
 router.put('/update-profile', protect, updateProfileInfo);
+
+// ✅ FIXED COMPATIBILITY: Menyelaraskan endpoint rute bank internal agar konsisten dibaca oleh central axios instance
 router.put('/bank/:id', protect, updateBankInfo);
 
 /**
- * ✅ THEME & WIDGETS
+ * ✅ THEME & OBS WIDGET CONFIG CONTROL
  */
 router.put('/update-theme', protect, async (req, res) => {
     const { theme_color } = req.body;
@@ -129,11 +131,13 @@ router.put('/update-theme', protect, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// Jalur pipa sinkronisasi visual OBS Browser Source lo, Ri 
 router.get('/widgets/settings/:streamKey/:widgetType', widgetController.getSettings);
 router.post('/widgets/update', protect, widgetController.updateSettings);
 
 /**
- * ✅ PUBLIC ROUTES (Discovery SaaS)
+ * ✅ PUBLIC DISCOVERY ROUTES (Akses Terbuka Tanpa Token Auth)
+ * Dipakai oleh landing page utama untuk render penjelajahan ekosistem kreator
  */
 router.get('/categories', async (req, res) => {
     try {
@@ -148,7 +152,7 @@ router.get('/public/:username', getStreamerByUsername);
 router.get('/list', getAllStreamers);
 
 /**
- * ✅ ADMIN COMMAND CENTER (Strict Protocol)
+ * ✅ ADMIN COMMAND CENTER (Strict Admin Protocol Perlindungan Ganda)
  */
 router.get('/admin/platform-stats', protect, adminProtect, async (req, res) => {
     try {

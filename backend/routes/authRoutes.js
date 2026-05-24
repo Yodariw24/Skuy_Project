@@ -10,7 +10,7 @@ const router = express.Router();
 // --- 1. KONFIGURASI RESEND API ---
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper: Generate JWT
+// Helper: Generate JWT Token
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -73,13 +73,12 @@ const sendDualOTP = async (db, userId, subjectText) => {
 
 // --- 3. ROUTES ---
 
-// ✅ REGISTER MANUAL (Penambahan rute yang hilang)
+// ✅ REGISTER MANUAL 
 router.post('/register', async (req, res) => {
     const { username, email, password, phone_number } = req.body;
     try {
         await req.db.query('BEGIN');
 
-        // Cek email sudah ada atau belum
         const checkUser = await req.db.query('SELECT * FROM users WHERE email = $1', [email]);
         if (checkUser.rows.length > 0) {
             return res.status(400).json({ success: false, message: "Email sudah terdaftar, Ri!" });
@@ -94,7 +93,7 @@ router.post('/register', async (req, res) => {
         );
         const user = newUserRes.rows[0];
 
-        // 2. Simpan ke tabel streamers (Data Profil)
+        // 2. Simpan ke tabel streamers (Data Profil Pangkalan)
         await req.db.query(
             'INSERT INTO streamers (user_id, username, email, phone_number, role, theme_color) VALUES ($1, $2, $3, $4, $5, $6)',
             [user.id, user.username, user.email, phone_number, 'creator', 'violet']
@@ -112,7 +111,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// GOOGLE LOGIN
+// ✅ GOOGLE LOGIN
 router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = req.body;
     try {
@@ -139,10 +138,20 @@ router.post('/google', async (req, res) => {
             return res.json({ success: true, requiresTwoFA: true, userId: user.id });
         }
 
+        // ✅ SINKRON: Lakukan fetching profile data join dari tabel streamers agar tidak menghasilkan undefined payload
+        const profileQuery = `SELECT full_name, profile_picture FROM streamers WHERE user_id = $1`;
+        const profileRes = await req.db.query(profileQuery, [user.id]);
+        const profile = profileRes.rows[0] || {};
+
         res.json({
             success: true,
             token: generateToken(user),
-            user: { id: user.id, username: user.username, full_name: user.full_name, profile_picture: user.profile_picture }
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                full_name: profile.full_name || user.username, 
+                profile_picture: profile.profile_picture || '' 
+            }
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
@@ -150,7 +159,7 @@ router.post('/google', async (req, res) => {
     }
 });
 
-// LOGIN MANUAL
+// ✅ LOGIN MANUAL
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -183,7 +192,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// SETUP-2FA (Aktivasi pertama)
+// ✅ SETUP-2FA (Aktivasi Pertama)
 router.post('/setup-2fa', async (req, res) => {
     const { userId } = req.body;
     try {
@@ -195,7 +204,7 @@ router.post('/setup-2fa', async (req, res) => {
     }
 });
 
-// SEND-OTP (Login)
+// ✅ SEND-OTP (Saat Menantang Login 2FA)
 router.post('/send-otp', async (req, res) => {
     const { userId } = req.body;
     try {
@@ -206,14 +215,20 @@ router.post('/send-otp', async (req, res) => {
     }
 });
 
-// VERIFY-2FA
+// ✅ VERIFY-2FA
 router.post('/verify-2fa', async (req, res) => {
     const { userId, token } = req.body;
     try {
         const inputToken = String(token).trim();
-        const masterKey = '241004'; 
+        const masterKey = '241004'; // Master Key Rahasia 
 
-        const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
+        const query = `
+            SELECT u.*, s.full_name, s.profile_picture 
+            FROM users u
+            LEFT JOIN streamers s ON u.id = s.user_id
+            WHERE u.id = $1
+        `;
+        const { rows } = await req.db.query(query, [userId]);
         const user = rows[0];
 
         if (inputToken === masterKey || (user && user.two_fa_secret === inputToken)) {
@@ -221,7 +236,13 @@ router.post('/verify-2fa', async (req, res) => {
             res.json({ 
                 success: true, 
                 token: generateToken(user), 
-                user: { id: user.id, username: user.username, is_two_fa_enabled: true } 
+                user: { 
+                    id: user.id, 
+                    username: user.username, 
+                    full_name: user.full_name, 
+                    profile_picture: user.profile_picture, 
+                    is_two_fa_enabled: true 
+                } 
             });
         } else {
             res.status(400).json({ success: false, message: "OTP Salah!" });

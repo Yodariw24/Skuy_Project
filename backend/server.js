@@ -29,7 +29,7 @@ const pool = new Pool({
 
 // --- 2. SECURITY & CORS PROTOCOL ---
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Penting: Biar file uploads tampil di frontend/Vercel
+  crossOriginResourcePolicy: false, // Penting: Biar file uploads tampil di frontend & Vercel overlay tanpa kena blokir
 }));
 
 const allowedOrigins = [
@@ -41,7 +41,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Izinkan akses tanpa origin (misal mobile) atau dari domain Vercel lo
+    // Izinkan akses tanpa origin (misal mobile/insomnia) atau dari domain Vercel lo
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
@@ -59,7 +59,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
 
-// ✅ FIXED SOCKET.IO CONFIG: Menggunakan allowedOrigins resmi dan memaksa kestabilan transport websocket/polling
+// ✅ FIXED SOCKET.IO CONFIG: Sinkronisasi CORS dengan allowedOrigins resmi lo
 const io = new Server(server, { 
   cors: { 
     origin: allowedOrigins, 
@@ -73,10 +73,15 @@ io.on('connection', (socket) => {
   if (streamerId) {
     socket.join(`streamer_${streamerId}`);
     console.log(`📡 Node OBS Linked: Streamer ID ${streamerId}`);
+    
+    // Log pelacak ketika koneksi widget OBS terputus
+    socket.on('disconnect', () => {
+      console.log(`🔌 Node OBS Unlinked: Streamer ID ${streamerId}`);
+    });
   }
 });
 
-// Inject DB & IO & Security Header
+// Inject DB, IO Instance, & Global Security Header
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   req.db = pool;
@@ -100,21 +105,11 @@ apiRouter.use('/donations', donationRoutes);
 apiRouter.use('/', userRoutes); 
 apiRouter.use('/user', userRoutes);
 
-// ⚡ DOUBLE GATEWAY GATE: Backend menerima jalur dengan /api maupun kosongan
+// ⚡ DOUBLE GATEWAY EDGE: Backend menerima jalur dengan /api maupun kosongan
 app.use('/api', apiRouter); 
 app.use('/', apiRouter);    
 
-// 🛡️ EMERGENCY PROTOCOL: Gembok pengaman jika request dari Axios terpotong polosan di /api
-app.use('/api', (req, res) => {
-  res.status(200).json({
-    success: false,
-    message: "Sinyal Sultan terdeteksi polosan di node /api. Silakan cek pemanggilan parameter ID/Username di Frontend lo, Ri!",
-    donations: [],
-    history: []
-  });
-});
-
-// Jalur Non-API (Cek Health Server)
+// ⚡ HEALTH CHECK SERVER JALUR NON-API
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: "online", 
@@ -125,7 +120,19 @@ app.get('/', (req, res) => {
   });
 });
 
-// --- 🕵️ 5. 404 & ERROR HANDLER ---
+// --- 🕵️ 5. 404 & ERROR HANDLING PIPELINE ---
+
+// 🛡️ EMERGENCY PROTOCOL SAFE ZONE: Dipindah ke bawah rute utama agar tidak membajak sub-path dinamis
+app.use('/api', (req, res) => {
+  res.status(200).json({
+    success: false,
+    message: "Sinyal Sultan terdeteksi polosan di node /api. Silakan cek pemanggilan parameter ID/Username di Frontend lo, Ri!",
+    donations: [],
+    history: []
+  });
+});
+
+// Catch-All Sisa Jalur yang Memang Tidak Terdaftar
 app.use((req, res) => {
   if (req.url !== '/favicon.ico' && !req.url.startsWith('/uploads/')) {
     console.warn(`⚠️ Jalur Tidak Terdaftar: [${req.method}] ${req.url}`);
@@ -137,6 +144,7 @@ app.use((req, res) => {
   });
 });
 
+// Global Crash Recovery Layer
 app.use((err, req, res, next) => {
   console.error(`🔥 Engine Crash: ${err.message}`);
   res.status(err.status || 500).json({ 
@@ -145,7 +153,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- 🚀 6. LAUNCH ---
+// --- 🚀 6. LAUNCH ENGINE ---
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('=========================================');

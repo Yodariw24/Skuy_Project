@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 
 /**
- * 1. PROTECT: Satpam Utama (Cek Token & Inject User Data)
- * Memastikan setiap request ke route sensitif memiliki token valid.
+ * 1. PROTECT: Satpam Utama (Cek Token & Inject User Data Termutakhir)
+ * Memastikan setiap request ke route sensitif memiliki token valid bawaan session.
  */
 export const protect = async (req, res, next) => {
     let token;
@@ -10,18 +10,19 @@ export const protect = async (req, res, next) => {
     // 🛡️ 1. Cek apakah ada token di Header Authorization
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // Ambil tokennya
+            // Ambil tokennya murni setelah string 'Bearer '
             token = req.headers.authorization.split(' ')[1];
 
-            // 🛡️ 2. Verifikasi Token (Gunakan secret yang sama dengan authRoutes)
+            // 🛡️ 2. Verifikasi Token (Menggunakan secret pangkalan yang sama dengan authRoutes)
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'RAHASIA_SULTAN_SKUYGG');
 
             /**
-             * 🛡️ 3. Sync Database: Ambil data user paling seger!
-             * Kita ambil juga phone_number buat validasi 2FA di middleware jika butuh.
+             * 🛡️ 3. Sync Database: Ambil data user paling seger dari PostgreSQL Railway!
+             * ✅ FIXED MAPPING: Seleksi s.profile_picture sebagai pangkalan utama avatar streamer lo, Ri
              */
             const query = `
-                SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, u.profile_picture, s.phone_number 
+                SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, 
+                       s.profile_picture, s.phone_number, s.id AS streamer_id
                 FROM users u
                 LEFT JOIN streamers s ON u.id = s.user_id
                 WHERE u.id = $1
@@ -36,9 +37,9 @@ export const protect = async (req, res, next) => {
                 });
             }
 
-            // 🛡️ 4. Injeksi data ke req.user
+            // 🛡️ 4. Injeksi data komplit ke dalam object request session
             req.user = rows[0];
-            next();
+            return next(); // Langsung return next agar eksekusi berhenti di sini dan lanjut ke router/controller
         } catch (err) {
             console.error("🔥 SHIELD_BREAK_ERROR:", err.message);
             return res.status(401).json({ 
@@ -48,6 +49,7 @@ export const protect = async (req, res, next) => {
         }
     }
 
+    // 🛡️ 5. FALLBACK ACCESS DENIED: Jika token kosong atau format header hancur
     if (!token) {
         return res.status(401).json({ 
             success: false, 
@@ -57,15 +59,15 @@ export const protect = async (req, res, next) => {
 };
 
 /**
- * 2. AUTHORIZE: Cek Role (Admin, Creator, dsb)
+ * 2. AUTHORIZE: Cek Tingkatan Role (Admin, Creator, dsb)
  */
 export const authorize = (...roles) => {
     return (req, res, next) => {
-        // Pastikan role user masuk dalam daftar izin
+        // Pastikan level kekuasaan user masuk dalam daftar whitelist izin rute
         if (!req.user || !roles.includes(req.user.role)) {
             return res.status(403).json({ 
                 success: false, 
-                message: `Level lo [${req.user?.role || 'Guest'}] belum cukup buat akses ini!` 
+                message: `Level lo [${req.user?.role || 'Guest'}] belum cukup buat akses gerbang ini!` 
             });
         }
         next();

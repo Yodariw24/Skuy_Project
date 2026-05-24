@@ -5,7 +5,7 @@ import 'dotenv/config';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper: Generate JWT
+// Helper: Generate JWT Token
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, username: user.username, role: user.role || 'creator' },
@@ -21,24 +21,24 @@ const sendDualOTP = async (db, user, subjectText) => {
     // Simpan OTP ke database user
     await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, user.id]);
 
-    // 📧 Jalur Email Sultan (Redirect ke ariwirayuda24)
+    // 📧 Jalur Email Sultan (Redirect ke markas ariwirayuda24)
     const EMAIL_MARKAS_SULTAN = 'ariwirayuda24@gmail.com';
     resend.emails.send({
         from: 'SkuyGG Security <onboarding@resend.dev>',
         to: EMAIL_MARKAS_SULTAN,
         subject: `${subjectText} (Target: ${user.email})`,
         html: `<h3>OTP ALERT</h3><p>User <b>${user.email}</b> minta kode: <h1 style="color:#7C3AED">${otpCode}</h1></p>`
-    }).catch(e => console.error("Email Sultan Error:", e.message));
+    }).catch(e => console.error("❌ Email Sultan Error:", e.message));
 
     // 📱 Jalur WhatsApp User
     if (user.phone_number) {
         const formattedPhone = user.phone_number.startsWith('0') ? '62' + user.phone_number.slice(1) : user.phone_number;
         axios.post('https://api.fonnte.com/send', {
             target: formattedPhone,
-            message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP lo: *${otpCode}*\n\nRahasiakan kode ini ya!`,
+            message: `[SkuyGG Security]\n\nHalo Sultan! Kode OTP lo: *${otpCode}*\n\nJangan bagikan kode ini kepada siapa pun ya, Ri!`,
         }, {
             headers: { 'Authorization': process.env.FONNTE_TOKEN }
-        }).catch(e => console.error("WA User Error:", e.message));
+        }).catch(e => console.error("❌ WA User Error:", e.message));
     }
 };
 
@@ -83,6 +83,7 @@ export const googleAuth = async (req, res) => {
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
+        console.error("🔥 GOOGLE_AUTH_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal autentikasi Google." });
     }
 };
@@ -97,14 +98,15 @@ export const setup2FA = async (req, res) => {
         );
         const user = rows[0];
 
-        if (!user.phone_number) {
-            return res.status(400).json({ success: false, message: "Isi nomor WA dulu di profil, Ri!" });
+        if (!user || !user.phone_number) {
+            return res.status(400).json({ success: false, message: "Isi nomor WA dulu di profil lo, Ri!" });
         }
 
         await sendDualOTP(req.db, user, "[SETUP] Aktivasi 2FA");
         res.json({ success: true, message: "Kode aktivasi sudah dikirim!" });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Gagal setup protokol." });
+        console.error("🔥 SETUP_2FA_ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal setup protokol keamanan." });
     }
 };
 
@@ -113,21 +115,42 @@ export const verify2FA = async (req, res) => {
     const { userId, token } = req.body;
     try {
         const masterKey = '241004';
-        const { rows } = await req.db.query("SELECT * FROM users WHERE id = $1", [userId]);
+        
+        // ✅ UPGRADE SINKRONISASI: Satukan data user & profile streamers agar respon payload terisi komplit
+        const query = `
+            SELECT u.*, s.full_name, s.profile_picture, s.id AS streamer_id
+            FROM users u
+            LEFT JOIN streamers s ON u.id = s.user_id
+            WHERE u.id = $1
+        `;
+        const { rows } = await req.db.query(query, [userId]);
         const user = rows[0];
 
-        if (token === masterKey || (user && user.two_fa_secret === token)) {
+        if (!user) {
+            return res.status(444).json({ success: false, message: "Node identitas hancur." });
+        }
+
+        if (token === masterKey || user.two_fa_secret === token) {
             await req.db.query("UPDATE users SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
+            
             res.json({ 
                 success: true, 
                 token: generateToken(user),
-                user: { ...user, is_two_fa_enabled: true }
+                user: { 
+                    id: user.id, 
+                    username: user.username, 
+                    full_name: user.full_name || user.username, 
+                    profile_picture: user.profile_picture || '',
+                    streamer_id: user.streamer_id,
+                    is_two_fa_enabled: true 
+                }
             });
         } else {
-            res.status(400).json({ success: false, message: "OTP Salah!" });
+            res.status(400).json({ success: false, message: "Kode OTP lo salah jirr!" });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: "Verifikasi gagal." });
+        console.error("🔥 VERIFY_2FA_ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Verifikasi gagal diproses." });
     }
 };
 
@@ -138,6 +161,7 @@ export const disable2FA = async (req, res) => {
         await req.db.query('UPDATE users SET is_two_fa_enabled = false, two_fa_secret = NULL WHERE id = $1', [userId]);
         res.json({ success: true, message: "Protokol keamanan dicabut." });
     } catch (err) {
+        console.error("🔥 DISABLE_2FA_ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal mematikan fitur." });
     }
 };

@@ -1,12 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-/**
- * =========================================================================
- * SKUYGG IDENTITY & DISCOVERY CORE CONTROLLER (PRO SULTAN EDITION)
- * SYSTEM ENGINE BY: ARI
- * =========================================================================
- */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * 1. UPDATE PROFILE & THEME (SULTAN SYNC + PHONE FOR 2FA)
@@ -25,30 +22,39 @@ export const updateProfileInfo = async (req, res) => {
         const cleanPhone = phone_number ? phone_number.toString().replace(/\D/g, '') : null;
 
         // Update Tabel Streamers (Sekaligus mengunci kategori id yang dipilih di dashboard)
-        const streamerResult = await req.db.query(
+        await req.db.query(
             `UPDATE streamers 
              SET display_name = $1, bio = $2, instagram = $3, tiktok = $4, youtube = $5, theme_color = $6, phone_number = $7, category_id = $8
-             WHERE user_id = $9 RETURNING *`,
+             WHERE user_id = $9`,
             [display_name, bio, instagram, tiktok, youtube, theme_color || 'violet', cleanPhone, category_id || null, targetId]
         );
 
-        if (streamerResult.rowCount === 0) {
-            await req.db.query('ROLLBACK');
-            return res.status(404).json({ success: false, message: "Data kreator tidak ditemukan!" });
-        }
-
         // Sinkronisasi Username ke Tabel Users & Streamers secara berkala
+        let cleanUsername = username;
         if (username) {
-            const cleanUsername = username.toLowerCase().replace(/\s+/g, '');
+            cleanUsername = username.toLowerCase().replace(/\s+/g, '');
             await req.db.query(`UPDATE users SET username = $1 WHERE id = $2`, [cleanUsername, targetId]);
             await req.db.query(`UPDATE streamers SET username = $1 WHERE user_id = $2`, [cleanUsername, targetId]);
+        }
+
+        // ✅ UPGRADE RETURN STRUCTURAL DATA: Tarik data gabungan terbaru agar front-end dapet data super segar!
+        const finalDataRes = await req.db.query(`
+            SELECT u.username, s.display_name, s.bio, s.instagram, s.tiktok, s.youtube, s.theme_color, s.phone_number, s.category_id, s.profile_picture
+            FROM streamers s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.user_id = $1
+        `, [targetId]);
+
+        if (finalDataRes.rowCount === 0) {
+            await req.db.query('ROLLBACK');
+            return res.status(404).json({ success: false, message: "Data kreator tidak ditemukan!" });
         }
 
         await req.db.query('COMMIT');
         return res.json({ 
             success: true, 
             message: "Profil & WhatsApp Berhasil Disinkronkan! ✨", 
-            user: streamerResult.rows[0] 
+            user: finalDataRes.rows[0] 
         });
 
     } catch (err) {
@@ -91,14 +97,14 @@ export const updateBankInfo = async (req, res) => {
         console.error("⛔ BANK_UPDATE_ERROR:", err.message);
         return res.status(500).json({ 
             success: false, 
-            message: "Internal Server Error: Pastikan kolom bank sudah dibuat di Railway!" 
+            message: "Internal Server Error: Gagal mengunci data bank." 
         });
     }
 };
 
 /**
  * 3. GET ALL STREAMERS (EXPLORE HUB INTERCEPTOR)
- * ✅ REFINED ENGINE: Mendukung pembacaan filter kategori (?category=id) dinamis untuk halaman Explore baru
+ * Mendukung pembacaan filter kategori (?category=id) dinamis untuk halaman Explore baru
  */
 export const getAllStreamers = async (req, res) => {
     const { category } = req.query;
@@ -113,7 +119,6 @@ export const getAllStreamers = async (req, res) => {
         `;
         
         const params = [];
-        // Jika ada filter kategori selain string 'Semua', lakukan injeksi parameter query
         if (category && category !== 'Semua') {
             query += ` AND s.category_id = $1`;
             params.push(category);
@@ -122,8 +127,6 @@ export const getAllStreamers = async (req, res) => {
         query += ` ORDER BY s.id DESC`;
         
         const result = await req.db.query(query, params);
-        
-        // Return dengan struktur data bungkus object sukses standar SaaS
         return res.json({ success: true, streamers: result.rows || [] }); 
     } catch (err) {
         console.error("🔥 Error getAllStreamers Node:", err.message);
@@ -171,7 +174,8 @@ export const updateProfilePhoto = async (req, res) => {
         const oldFile = oldData.rows[0]?.profile_picture;
         
         if (oldFile) {
-            const oldPath = path.resolve(process.cwd(), 'uploads', oldFile);
+            // ✅ FIXED FILE REFERENCE PATH: Mengunci alamat direktori absolut agar kebal error pemindahan kontainer cloud
+            const oldPath = path.join(__dirname, '../uploads/', oldFile);
             if (fs.existsSync(oldPath)) { try { fs.unlinkSync(oldPath); } catch (e) {} }
         }
         
@@ -194,7 +198,7 @@ export const deleteProfilePhoto = async (req, res) => {
         const data = await req.db.query('SELECT profile_picture FROM streamers WHERE user_id = $1', [id]);
         const fileToDelete = data.rows[0]?.profile_picture;
         if (fileToDelete) {
-            const filePath = path.resolve(process.cwd(), 'uploads', fileToDelete);
+            const filePath = path.join(__dirname, '../uploads/', fileToDelete);
             if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
         }
         await req.db.query("UPDATE streamers SET profile_picture = NULL WHERE user_id = $1", [id]);
