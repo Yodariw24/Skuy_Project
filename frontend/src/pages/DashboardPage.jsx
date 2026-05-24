@@ -88,7 +88,8 @@ function DashboardPage() {
         if (!targetId) return;
 
         try {
-            const balanceRes = await api.get(`/api/donations/balance/${targetId}`);
+            // Bersihkan URL dari double prefix api jika instansiasi axios lo sudah mengunci base /api
+            const balanceRes = await api.get(`/donations/balance/${parseInt(targetId, 10)}`);
             if (balanceRes.data && balanceRes.data.success) {
                 setBalance(balanceRes.data.total_saldo);
             }
@@ -107,12 +108,13 @@ function DashboardPage() {
         }
     }, [fetchDashboardData, navigate]);
 
-    // 🔄 TAB MONITOR TRIGGER: Batasi eksekusi kueri saldo murni HANYA ketika user sedang membuka tab wallet
+    // 🔄 SINKRON TOTAL LAYER: Pemicu saldo live ditiupkan secara konstan tanpa terblokir batasan tab menu, Ri!
     useEffect(() => {
-        if (userIdFallback && tab === 'wallet') {
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        if (userIdFallback || savedUser?.id) {
             fetchLiveBalance();
         }
-    }, [tab, userIdFallback, fetchLiveBalance]);
+    }, [userIdFallback, tab, fetchLiveBalance]); // Ikut memantau perubahan tab untuk me-refresh saldo live secara on-the-fly
 
     // --- LOGIKA DUAL-OTP ---
     const handleRequestOTP = async () => {
@@ -175,7 +177,7 @@ function DashboardPage() {
             {/* 🔥 REAL-TIME ALERT PROTOCOL */}
             <DonationAlert streamerId={user?.streamer_id || user?.id} />
             
-            {/* ✅ FIXED TRANSMISSION: Oper props balance live ke Sidebar agar nominal sinkron */}
+            {/* ✅ FIXED TRANSMISSION: Oper props balance live ke Sidebar agar nominal selalu sinkron lintas menu */}
             <Sidebar user={user} balance={balance} />
             
             <main className="flex-1 p-6 md:p-12 overflow-y-auto">

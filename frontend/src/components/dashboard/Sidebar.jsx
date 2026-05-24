@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'; // ✅ FIXED: useMemo resmi di-import di sini, Ri!
+import React, { useState, useEffect, useMemo } from 'react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Wallet, Activity, Tv, LogOut, User, Zap, 
@@ -30,9 +30,12 @@ function Sidebar({ user, balance }) {
     }
   }, [activeId]);
 
-  // 🧮 FORMATTER CORE: Mengubah nominal angka mentah menjadi format IDR Markas Sultan
+  // 🧮 FORMATTER CORE: Mengubah nominal angka mentah menjadi format IDR Markas Sultan (Solved Sync)
   const walletDisplayLabel = useMemo(() => {
-    const cash = Number(balance) || 0;
+    // ✅ ACCELERATOR LAYER: Amankan parsing jika properti balance berupa object bawaan backend { total_saldo: xxx }
+    const rawBalance = typeof balance === 'object' ? balance?.total_saldo : balance;
+    const cash = Number(rawBalance) || 0;
+    
     const formatted = new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',

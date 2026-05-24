@@ -58,7 +58,8 @@ function DonationPage() {
       }
     } catch (err) { 
       console.error("❌ Node railway balance sync failed:", err.message);
-    } finally { // ✅ FIXED: Mengganti kata kunci 'filter' menjadi 'finally' agar tertutup rapat
+    }   // SINKRONISASI CORES SULTAN CLOSURE CLOSING
+    finally { 
       setLoading(false); 
     }
   }, [username]);
@@ -82,7 +83,11 @@ function DonationPage() {
       });
 
       if (res.data.success) {
-        setCurrentDonation(res.data.data);
+        // ✅ SOLVED MURNI UNTUK DEMO SIMULATOR: Injeksi qrCodeUrl ke dalam objek state
+        setCurrentDonation({
+          ...res.data.data,
+          qrCodeUrl: res.data.qrCodeUrl 
+        });
         setSnapToken(res.data.orderId || res.data.data?.id || ''); 
         setShowQR(true);
       }
