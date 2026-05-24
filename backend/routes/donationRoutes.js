@@ -1,3 +1,8 @@
+/**
+ * SKUYGG FINANCIAL & DONATION CORE ROUTER (PRO GRADE EDITION)
+ * SYSTEM ENGINE BY: ARI (RE-CALIBRATED SECURE INTERCEPTOR)
+ */
+
 import express from 'express';
 const router = express.Router();
 
@@ -28,15 +33,15 @@ const injectStreamerId = async (req, res, next) => {
         // Pancing ID streamer asli dari database berdasarkan User ID yang sedang aktif login
         const streamerCheck = await req.db.query(
             "SELECT id FROM streamers WHERE user_id = $1", 
-            [req.user.id]
+            [parseInt(req.user.id, 10)] // ✅ FIXED: Amankan kueri pencarian user_id bertipe Integer
         );
         
         if (streamerCheck.rows.length > 0) {
-            // Kunci streamer_id asli ke dalam object request session
-            req.user.streamer_id = streamerCheck.rows[0].id;
+            // Kunci streamer_id asli ke dalam object request session (Integer)
+            req.user.streamer_id = parseInt(streamerCheck.rows[0].id, 10);
         } else {
-            // Fallback darurat jika user ternyata belum terdaftar sebagai streamer
-            req.user.streamer_id = req.user.id;
+            // ✅ FIXED FALLBACK: Paksa konversi ke integer murni agar tidak merusak kueri controller
+            req.user.streamer_id = parseInt(req.user.id, 10);
         }
         next();
     } catch (err) {
@@ -65,10 +70,11 @@ router.get('/list-internal', protect, injectStreamerId, getDonationsByStreamer);
 router.get('/activity-feed', protect, injectStreamerId, async (req, res) => {
     try {
         const targetStreamerId = req.user.streamer_id || req.user.id;
+        const castId = parseInt(targetStreamerId, 10); // ✅ SAFETY FIRST
 
         const result = await req.db.query(
             "SELECT * FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 15",
-            [targetStreamerId]
+            [castId]
         );
         res.json({ success: true, donations: result.rows });
     } catch (err) {
@@ -103,7 +109,7 @@ router.get('/list', async (req, res) => {
         const params = [];
         if (category && category !== 'Semua') {
             query += " WHERE s.category_id = $1";
-            params.push(category);
+            params.push(parseInt(category, 10)); // ✅ SAFETY: Cast kueri filter kategori ke integer
         }
         query += " ORDER BY s.id DESC";
         const result = await req.db.query(query, params);
@@ -122,7 +128,7 @@ router.get('/profile/:username', async (req, res) => {
     if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
 
     try {
-        const result = await req.db.query(
+        const result = await req.getStreamerIddb.query(
             `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
              FROM streamers s 
              JOIN users u ON s.user_id = u.id 

@@ -1,13 +1,13 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
- * SYSTEM ENGINE BY: ARI
+ * SYSTEM ENGINE BY: ARI (RE-CALIBRATED SECURE EDITION)
  */
 
 import midtransClient from 'midtrans-client';
 
 // Inisialisasi Core API Midtrans Sandbox (Gunakan credentials dari environment variables Railway)
 const coreApi = new midtransClient.CoreApi({
-    isProduction: false,
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true', // ✅ BOOTSTRAP: Konversi string env menjadi boolean murni
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
@@ -16,7 +16,9 @@ const coreApi = new midtransClient.CoreApi({
  * 1. GET WALLET HISTORY (PRIVAT / INTERN DASHBOARD LOG MUTASI)
  */
 export const getWalletHistory = async (req, res) => {
-  const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
+  const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
+  // ✅ FIXED CASTING LAYER: Konversi ke integer murni untuk menepis eror integer = character varying
+  const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
     return res.status(400).json({ success: false, history: [], message: "ID Node tidak terdeteksi!" });
@@ -62,7 +64,9 @@ export const getWalletHistory = async (req, res) => {
  * Menghitung saldo bersih yang tersedia (Saldo Utama - Antrean WD PENDING).
  */
 export const getStreamerBalance = async (req, res) => {
-  const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
+  const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
+  // ✅ FIXED CASTING LAYER: Paksa string parameter mutasi dari params rute menjadi tipe Integer murni
+  const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
     return res.status(400).json({ success: false, total_saldo: 0, message: "ID Node tidak terdeteksi!" });
@@ -73,7 +77,7 @@ export const getStreamerBalance = async (req, res) => {
       SELECT 
         COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS total_saldo
       FROM (
-        SELECT $1::VARCHAR as streamer_id
+        SELECT $1::INT as streamer_id -- ✅ FIXED: Ubah VARCHAR menjadi INT agar simetris dengan relasi tabel balance
       ) s
       LEFT JOIN balance b ON b.streamer_id = s.streamer_id
       LEFT JOIN (
@@ -85,7 +89,7 @@ export const getStreamerBalance = async (req, res) => {
     `;
     
     const result = await req.db.query(query, [targetStreamerId]);
-    const balance = result.rows.length > 0 ? parseInt(result.rows[0].total_saldo) : 0;
+    const balance = result.rows.length > 0 ? parseInt(result.rows[0].total_saldo, 10) : 0;
     
     return res.json({ success: true, total_saldo: balance < 0 ? 0 : balance });
   } catch (err) {
@@ -99,7 +103,9 @@ export const getStreamerBalance = async (req, res) => {
  */
 export const withdrawBalance = async (req, res) => {
   const { userId, amount, bank } = req.body; 
-  const targetStreamerId = req.user?.streamer_id || userId || req.params.id;
+  const rawId = req.user?.streamer_id || userId || req.params.id;
+  // ✅ FIXED CASTING LAYER: Amankan parameter ID penarikan murni bertipe data Integer
+  const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
     return res.status(400).json({ success: false, message: "Akses penarikan ditolak, ID tidak valid!" });
@@ -110,7 +116,7 @@ export const withdrawBalance = async (req, res) => {
     const balanceRes = await req.db.query(`
       SELECT 
         COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS available_balance
-      FROM (SELECT $1::VARCHAR as streamer_id) s
+      FROM (SELECT $1::INT as streamer_id) s -- ✅ FIXED: Ubah VARCHAR menjadi INT murni
       LEFT JOIN balance b ON b.streamer_id = s.streamer_id
       LEFT JOIN (
         SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
@@ -120,16 +126,16 @@ export const withdrawBalance = async (req, res) => {
       ) w ON w.streamer_id = s.streamer_id
     `, [targetStreamerId]);
     
-    const availableBalance = balanceRes.rows.length > 0 ? parseInt(balanceRes.rows[0].available_balance) : 0;
+    const availableBalance = balanceRes.rows.length > 0 ? parseInt(balanceRes.rows[0].available_balance, 10) : 0;
     
-    if (parseInt(amount) > availableBalance) {
+    if (parseInt(amount, 10) > availableBalance) {
       return res.status(400).json({ success: false, message: "Saldo available lo nggak cukup buat ditarik segitu, Ri!" });
     }
 
     const formattedBank = typeof bank === 'object' ? JSON.stringify(bank) : String(bank);
     const result = await req.db.query(
       "INSERT INTO withdrawals (streamer_id, amount, bank_info, status, created_at) VALUES ($1, $2, $3, 'PENDING', NOW()) RETURNING *",
-      [targetStreamerId, amount, formattedBank]
+      [targetStreamerId, parseInt(amount, 10), formattedBank]
     );
     
     return res.json({ success: true, message: "Prosedur WD Berhasil Diinisialisasi!", data: result.rows[0] });
@@ -145,6 +151,8 @@ export const withdrawBalance = async (req, res) => {
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   
+  // ✅ FIXED: Amankan konversi streamer_id ke tipe Integer konstan sebelum masuk ke kueri Postgres
+  const targetStreamerId = parseInt(streamer_id, 10);
   const gross = Number(amount);
   const fee = gross * 0.05; 
   const net = gross - fee;  
@@ -160,13 +168,13 @@ export const createDonation = async (req, res) => {
         "payment_type": "qris", 
         "transaction_details": {
             "order_id": orderId,
-            "gross_amount": gross
+            "gross_amount": gross // ✅ SECURE: Berupa nilai angka bulat murni sesuai regulasi API Midtrans
         },
         "item_details": [{
             "id": "DONATE-SKUY",
             "price": gross,
             "quantity": 1,
-            "name": `Donasi SkuyGG to Streamer: ${streamer_id}`
+            "name": `Donasi SkuyGG to Streamer ID: ${targetStreamerId}`
         }],
         "customer_details": {
             "first_name": donatur_name,
@@ -192,7 +200,7 @@ export const createDonation = async (req, res) => {
 
     const result = await req.db.query(query, [
       orderId,
-      streamer_id,
+      targetStreamerId, // Menggunakan ID yang sudah dikonversi ke Integer
       donatur_name,
       donatur_email,
       message,
@@ -248,15 +256,18 @@ export const updateDonationStatus = async (req, res) => {
     const donation = result.rows[0];
 
     if (upperStatus === 'SUCCESS' && donation) {
+        // Parsing paksa ID streamer ke format angka bulat demi meredam letupan tipe data
+        const streamerIdCast = parseInt(donation.streamer_id, 10);
+
         await req.db.query(`
           INSERT INTO balance (streamer_id, total_saldo) 
           VALUES ($1, $2)
           ON CONFLICT (streamer_id) 
           DO UPDATE SET total_saldo = balance.total_saldo + $2
-        `, [donation.streamer_id, donation.net_amount]);
+        `, [streamerIdCast, donation.net_amount]);
 
         if (req.io) {
-            req.io.emit(`new-donation-${donation.streamer_id}`, {
+            req.io.emit(`new-donation-${streamerIdCast}`, {
                 donatur_name: donation.donatur_name,
                 amount: donation.gross_amount, 
                 message: donation.message,
@@ -280,10 +291,11 @@ export const updateDonationStatus = async (req, res) => {
  */
 export const getPublicHistory = async (req, res) => {
   const { id } = req.params;
+  const streamerId = id ? parseInt(id, 10) : null;
   try {
     const result = await req.db.query(
       "SELECT donatur_name, gross_amount AS amount, message, created_date FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 5",
-      [id]
+      [streamerId]
     );
     return res.json({ success: true, data: result.rows });
   } catch (err) { 
@@ -297,7 +309,8 @@ export const getPublicHistory = async (req, res) => {
  */
 export const getDonationsByStreamer = async (req, res) => {
   const { id } = req.params;
-  const targetId = id || req.user?.streamer_id || req.user?.id;
+  const rawId = id || req.user?.streamer_id || req.user?.id;
+  const targetId = rawId ? parseInt(rawId, 10) : null;
   try {
     const result = await req.db.query(`SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`, [targetId]);
     return res.json({ success: true, data: result.rows });
@@ -309,10 +322,10 @@ export const getDonationsByStreamer = async (req, res) => {
 
 /**
  * 8. GET STREAMER ANALYTICS (OMSET DONASI LIVE AGGREGATION SYSTEM) ✅
- * Menyediakan data statistik performa keuangan streamer secara riil untuk Recharts frontend
  */
 export const getStreamerAnalytics = async (req, res) => {
-  const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
+  const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
+  const targetStreamerId = rawId ? parseInt(rawId, 10) : null;
 
   if (!targetStreamerId) {
     return res.status(400).json({ 
