@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect,专心, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/axios' 
@@ -58,7 +58,7 @@ function DonationPage() {
       }
     } catch (err) { 
       console.error("❌ Node railway balance sync failed:", err.message);
-    }   // SINKRONISASI CORES SULTAN CLOSURE CLOSING
+    } 
     finally { 
       setLoading(false); 
     }
@@ -68,6 +68,7 @@ function DonationPage() {
     fetchData(); 
   }, [fetchData]);
 
+  // --- ENGINE MODAL SNAP EMITTER & RESOLVER ---
   const handleSend = async (e) => {
     e.preventDefault();
     if (!formData.amount || Number(formData.amount) < 10000) {
@@ -79,17 +80,37 @@ function DonationPage() {
       const res = await api.post('/donations/create', {
         ...formData,
         streamer_id: parseInt(streamer.id, 10),
-        payment_method: 'QRIS'
+        payment_method: 'MIDTRANS_SNAP' // Diubah ke mode multi-payment snap gateway
       });
 
-      if (res.data.success) {
-        // ✅ SOLVED MURNI UNTUK DEMO SIMULATOR: Injeksi qrCodeUrl ke dalam objek state
-        setCurrentDonation({
-          ...res.data.data,
-          qrCodeUrl: res.data.qrCodeUrl 
-        });
-        setSnapToken(res.data.orderId || res.data.data?.id || ''); 
-        setShowQR(true);
+      if (res.data.success && res.data.snapToken) {
+        const token = res.data.snapToken;
+        setSnapToken(token);
+        setCurrentDonation(res.data.data);
+
+        // ✅ PERBAIKAN UTAMA Frontend: Memanggil Widget Pop-up Snap Midtrans secara langsung
+        if (window.snap) {
+          window.snap.pay(token, {
+            onSuccess: function (result) {
+              alert("Energi donasi berhasil ditransmisikan, Sultan!");
+              fetchData(); // Refresh info saldo & feed riwayat
+              setFormData({ donatur_name: '', donatur_email: '', amount: '', message: '' });
+            },
+            onPending: function (result) {
+              alert("Menunggu penyelesaian transmisi pembayaran...");
+            },
+            onError: function (result) {
+              alert("Transmisi pembayaran terputus/gagal!");
+            },
+            onClose: function () {
+              console.log('Sultan menutup modul pembayaran sebelum selesai.');
+              fetchData();
+            }
+          });
+        } else {
+          // Fallback redirect jika script snap.js gagal di-load di index.html
+          window.open(res.data.redirectUrl, '_blank');
+        }
       }
     } catch (err) { 
       alert("Transmisi energi putus! Cek status engine server Railway lo, Ri."); 
@@ -124,17 +145,6 @@ function DonationPage() {
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans pb-24 selection:bg-violet-100 relative">
       
-      {/* 📸 MODAL QR SIMULATOR PROTOCOL */}
-      <PaymentModal 
-        isOpen={showQR} 
-        onClose={() => {
-          setShowQR(false);
-          fetchData(); 
-        }} 
-        donationData={currentDonation}
-        token={snapToken} 
-      />
-
       {/* Dynamic Glow Background */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className={`absolute top-[-10%] left-[-5%] w-[60%] h-[60%] ${theme.bgLight} opacity-50 blur-[150px] rounded-full`} />
