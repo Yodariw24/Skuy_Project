@@ -9,11 +9,13 @@ import AppearanceView from '../components/dashboard/AppearanceView'
 import ActivityFeed from '../components/dashboard/ActivityFeed' 
 import EditBankModal from '../components/dashboard/EditBankModal' 
 
-// ✅ INTEGRASI FITUR BARU: Hub Analisis Performa Kelas Dunia!
-import AnalyticsView from '../components/dashboard/AnalyticsView'
-
-// 📡 IMPORT ALERT & SUB-VIEWS (MURNI OPERASIONAL STREAM)
+// 📡 IMPORT ALERT UTAMA (MURNI OPERASIONAL)
 import DonationAlert from '../components/dashboard/DonationAlert'
+
+// ==========================================
+// ✅ INTEGRASI AKTIF: RE-CONNECT ALL CLEAN SUB-VIEWS MODULES
+// ==========================================
+import AnalyticsView from '../components/dashboard/AnalyticsView'
 import TipAlertView from '../components/dashboard/views/TipAlertView'
 import MediaShareView from '../components/dashboard/views/MediaShareView'
 import MilestoneView from '../components/dashboard/views/MilestoneView'
@@ -47,7 +49,6 @@ function DashboardPage() {
             const res = await api.get('/user/dashboard-sync');
             
             if (res.data.success) {
-                // 🛡️ LOCK MERGE SYSTEM: Amankan streamer_id dari ancaman data kosong
                 const userData = {
                     ...savedUser,
                     ...res.data.user,
@@ -77,7 +78,6 @@ function DashboardPage() {
     }, [navigate]);
 
     // 💰 2. ENGINE KHUSUS RE-FETCH SALDO LIVE
-    // ✅ OPTIMIZATION: Kunci dependensi murni ke streamer_id spesifik agar kebal dari re-trigger komponen visual lain
     const streamerIdKey = user?.streamer_id;
     const userIdFallback = user?.id;
 
@@ -113,7 +113,6 @@ function DashboardPage() {
             fetchLiveBalance();
         }
     }, [tab, userIdFallback, fetchLiveBalance]);
-
 
     // --- LOGIKA DUAL-OTP ---
     const handleRequestOTP = async () => {
@@ -191,9 +190,6 @@ function DashboardPage() {
                         />
                     )}
                     
-                    {/* ✅ RENDERING MENU BARU: ANALISIS PERFORMA SULTAN */}
-                    {tab === 'analytics' && <AnalyticsView user={user} />}
-                    
                     {tab === 'activity' && <ActivityFeed user={user} />}
                     {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
                     {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
@@ -208,7 +204,10 @@ function DashboardPage() {
                         />
                     )}
 
-                    {/* --- SETUP VIEWS --- */}
+                    {/* ========================================== */}
+                    {/* ✅ RENDERING DYNAMIC ENGINE WIDGETS HUB */}
+                    {/* ========================================== */}
+                    {tab === 'analytics' && <AnalyticsView user={user} />}
                     {tab === 'tip' && <TipAlertView user={user} />}
                     {tab === 'mediashare' && <MediaShareView user={user} />}
                     {tab === 'milestone' && <MilestoneView user={user} />}

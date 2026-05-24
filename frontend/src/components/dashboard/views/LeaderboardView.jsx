@@ -14,9 +14,13 @@ function LeaderboardView({ user }) {
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
 
+  // ✅ OPTIMIZATION LAYER: Ekstrak ID dan username ke variabel primitif (string) agar referensi memori konstan & kebal dari circular trigger
+  const userIdKey = user?.id;
+  const usernameKey = user?.username;
+
   // 📡 PROTOKOL PIPELINE: Sedot data donatur tertinggi langsung dari PostgreSQL Railway
   const fetchLiveLeaderboard = useCallback(async () => {
-    if (!user) return;
+    if (!userIdKey) return;
     try {
       setLoading(true);
       const res = await api.get(`/api/donations/leaderboard-rank?period=${period}&limit=${maxDisplay}`);
@@ -33,7 +37,7 @@ function LeaderboardView({ user }) {
     } finally {
       setLoading(false);
     }
-  }, [period, maxDisplay, user]);
+  }, [period, maxDisplay, userIdKey]); // ✅ FIXED: Gunakan string userIdKey, bukan objek mentah 'user'
 
   // Pemicu re-fetch otomatis setiap kali filter dropdown or tombol periode diklik
   useEffect(() => {
@@ -57,11 +61,11 @@ function LeaderboardView({ user }) {
 
   // 🚀 TRIGGER DEPLOY PROTOCOL: Sinkronisasi dan kirim sinyal update ke OBS Source via WebSockets
   const handleSyncLeaderboard = async () => {
+    if (!userIdKey) return;
     setDeploying(true);
     try {
-      // Kirim payload modifikasi filter ke tabel widget_settings lo biar OBS-nya ikut berubah real-time
       const res = await api.post('/user/widgets/update', {
-        userId: user.id,
+        userId: userIdKey,
         widgetType: 'leaderboard',
         config: { period, limit: maxDisplay }
       });

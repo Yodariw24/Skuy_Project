@@ -4,7 +4,8 @@ import { Bell, Copy, Eye, Save, Sparkles, Zap, Globe, Loader2 } from 'lucide-rea
 import Swal from 'sweetalert2';
 import api from '../../../api/axios'; 
 
-function TipAlertView({ user }) {
+// ✅ FIXED INLINE EXPORT ENGINE: Langsung tancap ekspor di kepala fungsi agar terbaca absolut oleh Rollup
+export default function TipAlertView({ user }) {
   // ✅ Widget URL Protocol (Safe Guard dengan parameter username riil session)
   const overlayUrl = `https://skuy-gg.vercel.app/widget/${user?.username || 'username'}/tip`;
   
@@ -14,23 +15,27 @@ function TipAlertView({ user }) {
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
 
+  // ✅ OPTIMIZATION LAYER: Ekstrak properti primitif (string) agar referensi memori konstan saat kompilasi
+  const usernameKey = user?.username;
+  const userIdKey = user?.id;
+
   // 📡 PROTOKOL PIPELINE: Sedot data konfigurasi Tip Alert ter-update dari PostgreSQL Railway
   const fetchCurrentAlertSettings = useCallback(async () => {
-    if (!user?.username) return;
+    if (!usernameKey) return;
     try {
       setLoading(true);
-      const res = await api.get(`/api/donations/widgets/settings/${user.username}/tip`);
+      const res = await api.get(`/api/donations/widgets/settings/${usernameKey}/tip`);
       if (res.data.success && res.data.data) {
         const cloudData = res.data.data;
-        setMinDonation(cloudData.min_tip || 10000);
-        setDuration(cloudData.duration || 10);
+        setMinDonation(Number(cloudData.min_tip) || 10000);
+        setDuration(Number(cloudData.duration) || 10);
       }
     } catch (err) {
       console.warn("⚠️ Mode Sandbox: Mengaktifkan parameter pangkalan lokal untuk rendering sandbox.");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [usernameKey]); // ✅ FIXED: Gunakan string usernameKey statis
 
   useEffect(() => {
     fetchCurrentAlertSettings();
@@ -66,7 +71,7 @@ function TipAlertView({ user }) {
     setDeploying(true);
     try {
       const res = await api.post('/api/donations/widgets/update', {
-        userId: user.id,
+        userId: userIdKey,
         widgetType: 'tip',
         colors: { primary: '#7C3AED', accent: '#FF1493', text: '#ffffff', glow: '#7C3AED' }, 
         config: {
@@ -87,10 +92,11 @@ function TipAlertView({ user }) {
 
   // 🔊 TEST TRIGGER PACKET: Tembak simulasi alert instan ke OBS Browser Source tanpa transaksi asli
   const handleTriggerTestAlert = async () => {
+    if (!userIdKey) return;
     try {
       showSultanToast('<b>TEST TRIGGERED</b> <span>Memancarkan sinyal ke OBS...</span>', 'info');
       await api.post(`/api/user/widgets/test-trigger`, {
-        userId: user.id,
+        userId: userIdKey,
         widgetType: 'tip',
         mockData: {
           donatur_name: 'Sultan_Donatur',
@@ -105,15 +111,12 @@ function TipAlertView({ user }) {
   };
 
   // SAFE GUARD: Jika data user belum ter-inject, tampilkan animasi spin rotasi pangkalan
-  if (!user || loading) {
+  if (!userIdKey || loading) {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <motion.div 
-          animate={{ rotate: 360 }} 
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-        >
+        <div className="animate-spin duration-1000">
           <Zap size={40} className="text-violet-600" />
-        </motion.div>
+        </div>
         <p className="font-black italic uppercase text-slate-400 animate-pulse text-[10px] tracking-widest">Sinkronisasi Parameter Alert Node...</p>
       </div>
     );
@@ -146,10 +149,7 @@ function TipAlertView({ user }) {
         <div className="lg:col-span-7 space-y-8">
           
           {/* URL CARD */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]"
-          >
+          <div className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black italic uppercase text-xs flex items-center gap-2">
                 <Globe size={18} className="text-[#7C3AED]" /> OBS Browser Source
@@ -182,13 +182,10 @@ function TipAlertView({ user }) {
                   Set ukuran ke <span className="text-violet-600">1920x1080</span> untuk hasil maksimal!
                </p>
             </div>
-          </motion.div>
+          </div>
 
           {/* PARAMS CARD */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]"
-          >
+          <div className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]">
             <h3 className="font-black italic uppercase text-xs mb-8 pb-4 border-b-4 border-slate-50 flex items-center gap-2">
                <Sparkles size={18} className="text-[#7C3AED]" /> Logic & Timing
             </h3>
@@ -202,7 +199,8 @@ function TipAlertView({ user }) {
                     type="number" 
                     disabled={deploying}
                     value={minDonation}
-                    onChange={(e) => setMinDonation(e.target.value.replace(/\D/g, ''))}
+                    // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar aman dieksekusi bundler Rollup produksi
+                    onChange={(e) => setMinDonation(String(e.target.value).replace(/\D/g, ''))}
                     className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black text-lg text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all relative z-0"
                   />
                 </div>
@@ -215,14 +213,15 @@ function TipAlertView({ user }) {
                     type="number" 
                     disabled={deploying}
                     value={duration}
-                    onChange={(e) => setDuration(e.target.value.replace(/\D/g, ''))}
+                    // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar aman dieksekusi bundler Rollup produksi
+                    onChange={(e) => setDuration(String(e.target.value).replace(/\D/g, ''))}
                     className="w-full bg-slate-50 border-4 border-slate-50 p-5 rounded-2xl font-black text-lg text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all relative z-0"
                   />
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-[10px] italic z-10">Sec</span>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* --- RIGHT: LIVE MOCKUP PREVIEW --- */}
@@ -242,7 +241,7 @@ function TipAlertView({ user }) {
                   <div className="bg-white p-6 border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000] -rotate-3 transition-transform group-hover:rotate-0 duration-500">
                     <p className="font-black italic uppercase text-[10px] text-slate-400 mb-1 text-left">New Support!</p>
                     <p className="text-2xl font-black italic text-slate-950 tracking-tighter leading-none mb-2 font-mono">
-                        Rp {Number(minDonation || 0).toLocaleString('id-ID')}
+                       Rp {Number(minDonation || 0).toLocaleString('id-ID')}
                     </p>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-950/5">
                         <motion.div 
@@ -270,7 +269,7 @@ function TipAlertView({ user }) {
       </div>
 
       {/* --- FLOATING SAVE BAR --- */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[100]">
+      <div className="fixed bottom-10 right-10 z-[100]">
           <button 
             type="button"
             onClick={handleSaveConfig}
@@ -284,5 +283,3 @@ function TipAlertView({ user }) {
     </motion.div>
   );
 }
-
-export default TipAlertView;

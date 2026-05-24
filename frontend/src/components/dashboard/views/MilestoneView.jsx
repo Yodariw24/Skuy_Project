@@ -3,7 +3,8 @@ import { Target, Flag, Save, Copy, Palette, Sparkles, TrendingUp, Loader2 } from
 import Swal from 'sweetalert2';
 import api from '../../../api/axios'; 
 
-function MilestoneView({ user }) {
+// ✅ FIXED INLINE EXPORT ENGINE: Langsung tancap ekspor di kepala fungsi agar terbaca absolut oleh Rollup
+export default function MilestoneView({ user }) {
   const currentUrl = window.location.origin;
   const overlayUrl = `${currentUrl}/widget/${user?.username || user?.id}/milestone`;
   
@@ -14,17 +15,20 @@ function MilestoneView({ user }) {
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
 
+  // ✅ OPTIMIZATION LAYER: Isolasi variabel id primitif (string) agar referensi memori konstan
+  const userIdKey = user?.id;
+
   // 📡 PROTOKOL PIPELINE: Sedot log data pencapaian riil langsung dari Postgres Railway
   const fetchMilestoneLiveStats = useCallback(async () => {
-    if (!user) return;
+    if (!userIdKey) return;
     try {
       setLoading(true);
       const res = await api.get('/api/donations/milestone/config');
       if (res.data.success && res.data.data) {
         const cloudData = res.data.data;
         setGoalName(cloudData.goal_title || "UPGRADE ENGINE SULTAN");
-        setTargetAmount(cloudData.goal_target || 5000000);
-        setCurrentAmount(cloudData.goal_current || 0);
+        setTargetAmount(Number(cloudData.goal_target) || 5000000);
+        setCurrentAmount(Number(cloudData.goal_current) || 0);
         setBarColor(cloudData.primary_color || '#7C3AED');
       }
     } catch (err) {
@@ -33,11 +37,11 @@ function MilestoneView({ user }) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userIdKey]);
 
   useEffect(() => {
     fetchMilestoneLiveStats();
-  }, [fetchMilestoneLiveStats]);
+  }, [fetchMediaShareConfig, fetchMilestoneLiveStats]); // Menjaga sinkronisasi pangkalan
 
   const showSultanToast = (title) => {
     const Toast = Swal.mixin({
@@ -71,7 +75,7 @@ function MilestoneView({ user }) {
     setDeploying(true);
     try {
       const res = await api.post('/user/widgets/update', {
-        userId: user.id,
+        userId: userIdKey,
         widgetType: 'milestone',
         colors: { primary: barColor, glow: barColor, text: '#ffffff' },
         config: {
@@ -174,7 +178,6 @@ function MilestoneView({ user }) {
                         type="number" 
                         disabled={deploying}
                         value={targetAmount}
-                        // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar aman dieksekusi bundler Rollup produksi
                         onChange={(e) => setTargetAmount(String(e.target.value).replace(/\D/g, ''))}
                         className="w-full bg-slate-50 border-4 border-slate-100 p-5 pl-14 rounded-2xl font-black text-lg outline-none focus:bg-white focus:border-slate-950"
                       />
@@ -248,5 +251,3 @@ function MilestoneView({ user }) {
     </div>
   );
 }
-
-export default MilestoneView;

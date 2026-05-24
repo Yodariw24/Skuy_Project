@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Youtube, Settings, ShieldAlert, Copy, Play, Save, Trash2, Clock, Loader2, ChevronRight } from 'lucide-react';
+import { Youtube, Settings, ShieldAlert, Copy, Play, Save, Trash2, Clock, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../../api/axios'; 
 
@@ -13,23 +13,26 @@ function MediaShareView({ user }) {
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
 
+  // ✅ OPTIMIZATION LAYER: Isolasi variabel id murni agar referensi memori konstan saat kompilasi
+  const userIdKey = user?.id;
+
   // 📡 PROTOKOL PIPELINE: Ambil konfigurasi Media Share ter-update dari PostgreSQL Railway
   const fetchMediaShareConfig = useCallback(async () => {
-    if (!user) return;
+    if (!userIdKey) return;
     try {
       setLoading(true);
       const res = await api.get('/api/donations/mediashare/config');
       if (res.data.success && res.data.data) {
-        setMinDonation(res.data.data.min_donation);
-        setPricePerSec(res.data.data.price_per_second);
-        setIsModerationActive(res.data.data.is_moderation_active);
+        setMinDonation(Number(res.data.data.min_donation) || 5000);
+        setPricePerSec(Number(res.data.data.price_per_second) || 100);
+        setIsModerationActive(!!res.data.data.is_moderation_active);
       }
     } catch (err) {
       console.warn("⚠️ Mode Sandbox: Gagal sinkronisasi cloud, mengaktifkan pangkalan lokal.");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userIdKey]);
 
   useEffect(() => {
     fetchMediaShareConfig();
@@ -59,8 +62,8 @@ function MediaShareView({ user }) {
     setDeploying(true);
     try {
       const res = await api.put('/api/donations/mediashare/config', {
-        min_donation: minDonation,
-        price_per_second: pricePerSec,
+        min_donation: Number(minDonation),
+        price_per_second: Number(pricePerSec),
         is_moderation_active: isModerationActive
       });
 
@@ -112,6 +115,11 @@ function MediaShareView({ user }) {
       </div>
     );
   }
+
+  // Kalkulasi durasi dasar yang aman dari jebakan NaN / Infinity string kosong
+  const parsedMin = Number(minDonation) || 0;
+  const parsedPrice = Number(pricePerSec) || 0;
+  const estDuration = parsedPrice > 0 ? Math.round(parsedMin / parsedPrice) : 0;
 
   return (
     <div className="space-y-10 text-left pb-32 selection:bg-red-100 selection:text-red-600 font-sans">
@@ -174,7 +182,8 @@ function MediaShareView({ user }) {
                       type="number" 
                       disabled={deploying}
                       value={minDonation}
-                      onChange={(e) => setMinDonation(e.target.value.replace(/\D/g, ''))}
+                      // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar kebal dari eror kompilasi Rollup
+                      onChange={(e) => setMinDonation(String(e.target.value).replace(/\D/g, ''))}
                       className="w-full bg-slate-50 border-4 border-slate-100 p-5 pl-14 rounded-2xl font-black text-lg focus:bg-white focus:border-slate-950 outline-none transition-all"
                     />
                   </div>
@@ -187,7 +196,8 @@ function MediaShareView({ user }) {
                       type="number" 
                       disabled={deploying}
                       value={pricePerSec}
-                      onChange={(e) => setPricePerSec(e.target.value.replace(/\D/g, ''))}
+                      // ✅ FIXED SANITIZATION LAYER: Paksa string casting agar kebal dari eror kompilasi Rollup
+                      onChange={(e) => setPricePerSec(String(e.target.value).replace(/\D/g, ''))}
                       className="w-full bg-slate-50 border-4 border-slate-100 p-5 pl-14 rounded-2xl font-black text-lg focus:bg-white focus:border-slate-950 outline-none transition-all"
                     />
                   </div>
@@ -230,7 +240,7 @@ function MediaShareView({ user }) {
               <div className="flex justify-between p-4 bg-white/5 rounded-2xl border-2 border-white/5 items-center">
                  <span className="text-[9px] font-black text-slate-500 uppercase">Est. Base Duration</span>
                  <span className="text-xs font-black text-white italic font-mono">
-                   {Number(pricePerSec) > 0 ? (minDonation / pricePerSec).toFixed(0) : 0} Detik
+                    {estDuration} Detik
                  </span>
               </div>
             </div>
@@ -261,3 +271,6 @@ function MediaShareView({ user }) {
     </div>
   );
 }
+
+// ✅ FIXED EXPORT GATEWAY
+export default MediaShareView;

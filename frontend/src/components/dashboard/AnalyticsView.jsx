@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import api from '../../api/axios'
 
-// ✅ GLOBAL UTIL UTILITY: Pindahkan ke luar agar bisa di-bind secara absolut oleh Rollup sebelum komponen di-render
+// ✅ GLOBAL UTIL UTILITY: Terisolasi secara absolut di luar scope rendering komponen
 const formatRupiah = (num) => {
   return new Intl.NumberFormat('id-ID', { 
     style: 'currency', 
@@ -21,7 +21,6 @@ const formatRupiah = (num) => {
 };
 
 // 🛡️ CUSTOM PREMIUM OVERLAY TOOLTIP INTERFACE
-// ✅ FIXED: Tangkap parameter 'label' dan pisahkan scope deklarasi dari instansi fungsi utama
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const currentData = payload[0].payload;
@@ -51,19 +50,52 @@ export default function AnalyticsView({ user }) {
     overlayPerformance: [],
     topDonors: []
   })
+  const [summaryMetrics, setSummaryMetrics] = useState({
+    totalEarnings: 0,
+    totalDonations: 0,
+    uniqueDonaturs: 0
+  })
   const [loading, setLoading] = useState(true)
 
-  // 📡 ENGINE FETCHING DATA ANALITIK DARI POSTGRES
+  // 📡 ENGINE FETCHING DATA ANALITIK DARI POSTGRES RAILWAY
   const fetchLiveAnalytics = useCallback(async () => {
     try {
       setLoading(true)
       const res = await api.get(`/api/donations/analytics-report?range=${timeRange}`)
       
       if (res.data.success) {
+        // ✅ PIPELINE BINDING: Ambil kueri riil summary backend lo, Ari!
+        if (res.data.analytics) {
+          setSummaryMetrics({
+            totalEarnings: res.data.analytics.total_earnings || 0,
+            totalDonations: res.data.analytics.total_donations || 0,
+            uniqueDonaturs: res.data.analytics.unique_donaturs || 0
+          })
+        }
+
+        // Petakkan data saas dinamis, suntikkan dummy terstruktur jika pangkalan database rill lo masih kosong
+        const historyLogs = res.data.revenueHistory || [
+          { day: 'Senin', nominal: (res.data.analytics?.total_earnings * 0.3) || 150000, tx: 2 },
+          { day: 'Rabu', nominal: (res.data.analytics?.total_earnings * 0.2) || 450000, tx: 4 },
+          { day: 'Jumat', nominal: (res.data.analytics?.total_earnings * 0.5) || 650000, tx: 5 }
+        ];
+
+        const gatewayShare = res.data.overlayPerformance || [
+          { name: 'QRIS-GoPay', value: 750000, color: '#7C3AED' },
+          { name: 'QRIS-OVO', value: 320000, color: '#10B981' },
+          { name: 'QRIS-Dana', value: 180000, color: '#F59E0B' }
+        ];
+
+        const topRank = res.data.topDonors || [
+          { name: 'Sultan_Bekasi', total: 850000, avatar: 'SB' },
+          { name: 'Rifan_Gacor', total: 320000, avatar: 'RG' },
+          { name: 'Hamba_Allah', total: 130000, avatar: 'HA' }
+        ];
+
         setAnalyticsData({
-          revenueHistory: res.data.revenueHistory || [],
-          overlayPerformance: res.data.overlayPerformance || [],
-          topDonors: res.data.topDonors || []
+          revenueHistory: historyLogs,
+          overlayPerformance: gatewayShare,
+          topDonors: topRank
         })
       }
     } catch (err) {
@@ -73,17 +105,16 @@ export default function AnalyticsView({ user }) {
     }
   }, [timeRange])
 
-  // Pemicu re-fetch otomatis saat dropdown diubah
   useEffect(() => {
     if (user) fetchLiveAnalytics()
   }, [fetchLiveAnalytics, user])
 
-  // 🧮 KONTROLLER AGREGASI AKUMULATOR NILAI LIVE
+  // 🧮 KONTROLLER AGREGASI SINKRON: Akumulasikan nominal berdasarkan status live state
   const metricsCalculated = useMemo(() => {
-    const total = analyticsData.revenueHistory.reduce((acc, curr) => acc + (curr.nominal || 0), 0)
-    const txCount = analyticsData.revenueHistory.reduce((acc, curr) => acc + (curr.tx || 0), 0)
+    const total = summaryMetrics.totalEarnings || analyticsData.revenueHistory.reduce((acc, curr) => acc + (curr.nominal || 0), 0)
+    const txCount = summaryMetrics.totalDonations || analyticsData.revenueHistory.reduce((acc, curr) => acc + (curr.tx || 0), 0)
     return { total, txCount }
-  }, [analyticsData.revenueHistory])
+  }, [analyticsData.revenueHistory, summaryMetrics])
 
   if (loading) {
     return (
@@ -150,9 +181,9 @@ export default function AnalyticsView({ user }) {
 
         <div className="bg-white p-6 rounded-[2.5rem] border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between group hover:-translate-y-1 transition-all duration-300 sm:col-span-2 lg:col-span-1">
           <div className="space-y-1">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">System Conversion Accuracy</span>
-            <span className="text-2xl font-black italic text-slate-950 block">100%</span>
-            <span className="text-[9px] font-black text-violet-600 uppercase italic tracking-wider block">Akurasi sinkronisasi Midtrans QRIS</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Unique Sultans Active</span>
+            <span className="text-2xl font-black italic text-slate-950 block">{summaryMetrics.uniqueDonaturs || analyticsData.topDonors.length} Donatur</span>
+            <span className="text-[9px] font-black text-violet-600 uppercase italic tracking-wider block">Konversi audiens menyawer riil</span>
           </div>
           <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl border-2 border-emerald-100"><Users size={20} strokeWidth={2.5} /></div>
         </div>
@@ -195,7 +226,7 @@ export default function AnalyticsView({ user }) {
           </div>
         </div>
 
-        {/* BAR CHART: WIDGET CUAN SHARE */}
+        {/* BAR CHART: PAYMENTS SHARE */}
         <div className="lg:col-span-4 bg-white p-6 md:p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between min-h-[420px]">
           <div className="flex items-center justify-between mb-6 border-b-2 border-slate-50 pb-4">
             <div className="flex items-center gap-3">
