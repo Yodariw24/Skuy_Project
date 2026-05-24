@@ -11,6 +11,39 @@ import {
 } from 'lucide-react'
 import api from '../../api/axios'
 
+// ✅ GLOBAL UTIL UTILITY: Pindahkan ke luar agar bisa di-bind secara absolut oleh Rollup sebelum komponen di-render
+const formatRupiah = (num) => {
+  return new Intl.NumberFormat('id-ID', { 
+    style: 'currency', 
+    currency: 'IDR', 
+    minimumFractionDigits: 0 
+  }).format(Number(num) || 0);
+};
+
+// 🛡️ CUSTOM PREMIUM OVERLAY TOOLTIP INTERFACE
+// ✅ FIXED: Tangkap parameter 'label' dan pisahkan scope deklarasi dari instansi fungsi utama
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const currentData = payload[0].payload;
+    return (
+      <div className="bg-[#0F172A] text-white p-4 rounded-2xl border-4 border-slate-950 font-sans shadow-2xl text-left">
+        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">
+          {label || currentData.day || currentData.name || 'Sinyal Sultan'}
+        </p>
+        <p className="text-base font-black text-[#7C3AED] italic tracking-tight leading-none">
+          {formatRupiah(payload[0].value)}
+        </p>
+        {currentData.tx && (
+          <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase tracking-wider">
+            Sinyal Node: {currentData.tx} Transaksi
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function AnalyticsView({ user }) {
   const [timeRange, setTimeRange] = useState('30_DAYS')
   const [analyticsData, setAnalyticsData] = useState({
@@ -51,22 +84,6 @@ export default function AnalyticsView({ user }) {
     const txCount = analyticsData.revenueHistory.reduce((acc, curr) => acc + (curr.tx || 0), 0)
     return { total, txCount }
   }, [analyticsData.revenueHistory])
-
-  const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-
-  // 🛡️ CUSTOM PREMIUM OVERLAY TOOLTIP INTERFACE
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#0F172A] text-white p-4 rounded-2xl border-4 border-slate-950 font-sans shadow-2xl text-left">
-          <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">{payload[0].payload.day || payload[0].payload.name}</p>
-          <p className="text-base font-black text-[#7C3AED] italic tracking-tight leading-none">{formatRupiah(payload[0].value)}</p>
-          {payload[0].payload.tx && <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase tracking-wider">Sinyal Node: {payload[0].payload.tx} Transaksi</p>}
-        </div>
-      );
-    }
-    return null;
-  };
 
   if (loading) {
     return (
@@ -245,7 +262,7 @@ export default function AnalyticsView({ user }) {
       {/* --- BOTTOM INFORMATION ROW --- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-7 bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-2.5 mb-8">
             <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100"><Target size={18} strokeWidth={3} /></div>
             <h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Active Milestone Goal</h2>
           </div>
