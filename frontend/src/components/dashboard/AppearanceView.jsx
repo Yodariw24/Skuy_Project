@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api/axios' 
-import { Palette, Check, Layout, CheckCircle2, Zap } from 'lucide-react'
+import { Palette, Check, Layout, CheckCircle2, Zap, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const THEMES = [
@@ -28,22 +28,25 @@ export default function AppearanceView({ user, setUser }) {
 
     setLoading(true)
     try {
-      // ✅ SINKRONISASI RAILWAY
-      const res = await api.put('/api/user/update-theme', {
+      // ✅ FIXED ENDPOINT: Sinkronisasi rute privat terproteksi token tanpa redundansi prefix /api
+      const res = await api.put('/user/update-theme', {
         theme_color: themeId
       });
 
       if (res.data && res.data.success) {
         setSelectedTheme(themeId)
         const updatedUser = { ...user, theme_color: themeId }
-        setUser(updatedUser)
+        
+        if (typeof setUser === 'function') {
+          setUser(updatedUser)
+        }
         localStorage.setItem('user', JSON.stringify(updatedUser))
         
         setShowToast(true)
         setTimeout(() => setShowToast(false), 3000)
       }
     } catch (err) {
-      console.error("Gagal update tema:", err.message)
+      console.error("❌ Gagal menyuntikkan tema baru ke database:", err.message)
     } finally {
       setLoading(false)
     }
@@ -52,7 +55,7 @@ export default function AppearanceView({ user, setUser }) {
   const currentThemeData = THEMES.find(t => t.id === selectedTheme) || THEMES[0];
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20 text-left px-2">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20 text-left px-4 selection:bg-violet-600 selection:text-white">
       
       {/* --- TOAST NOTIFICATION --- */}
       <AnimatePresence>
@@ -61,7 +64,7 @@ export default function AppearanceView({ user, setUser }) {
             initial={{ opacity: 0, y: 20, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[100] bg-slate-950 text-white px-8 py-5 rounded-[2rem] border-4 border-emerald-500 shadow-[8px_8px_0px_0px_rgba(16,185,129,1)] flex items-center gap-4"
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[100] bg-slate-950 text-white px-8 py-5 rounded-[2rem] border-4 border-emerald-500 shadow-[8px_8px_0px_0px_rgba(16,185,129,1)] flex items-center gap-4 pointer-events-none"
           >
             <CheckCircle2 className="text-emerald-400" size={24} strokeWidth={3} />
             <p className="text-[11px] font-black uppercase italic tracking-[0.2em]">Visual Core Synchronized! ✨</p>
@@ -98,9 +101,10 @@ export default function AppearanceView({ user, setUser }) {
             {THEMES.map((theme) => (
               <button
                 key={theme.id}
+                type="button"
                 onClick={() => handleSaveTheme(theme.id)}
                 disabled={loading}
-                className={`relative p-6 rounded-[2.5rem] border-4 transition-all flex flex-col items-center gap-4 group ${
+                className={`relative p-6 rounded-[2.5rem] border-4 transition-all flex flex-col items-center gap-4 group cursor-pointer ${
                   selectedTheme === theme.id 
                   ? 'border-slate-950 bg-slate-50 shadow-[6px_6px_0px_0px_#7C3AED] scale-105' 
                   : 'border-slate-100 bg-white hover:border-slate-200 active:scale-95'
@@ -123,63 +127,63 @@ export default function AppearanceView({ user, setUser }) {
 
         {/* RIGHT: LIVE PREVIEW MOCKUP */}
         <div className="lg:col-span-5 space-y-8">
-            <div className="bg-[#0F0F1A] p-12 rounded-[4rem] text-white relative overflow-hidden flex flex-col items-center justify-center min-h-[500px] shadow-[12px_12px_0px_0px_#E2E8F0] border-4 border-slate-950">
-              {/* Animated Glow Background */}
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  opacity: [0.3, 0.5, 0.3] 
-                }}
-                transition={{ duration: 4, repeat: Infinity }}
-                className={`absolute top-0 right-0 w-64 h-64 blur-[100px] rounded-full ${currentThemeData.class} opacity-30`} 
-              />
-              
-              <div className="text-center mb-10 relative z-10">
-                 <Layout className="text-white/10 mx-auto mb-4" size={48} />
-                 <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-2">Cloud Preview</h3>
-                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">Identity Node Protocol</p>
-              </div>
-              
-              {/* Mini Website Mockup - SULTAN STYLE */}
-              <motion.div 
-                layout
-                className="w-full max-w-[240px] bg-white rounded-[3rem] p-6 shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)] relative z-10 border-4 border-slate-950"
-              >
-                <div className="w-16 h-16 rounded-[1.8rem] bg-slate-100 mx-auto mb-6 border-4 border-slate-950 overflow-hidden shadow-[4px_4px_0px_0px_#ddd]">
-                   <img 
-                    src={user?.profile_picture ? (user.profile_picture.startsWith('http') ? user.profile_picture : `${import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app'}/uploads/${user.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} 
-                    alt="Avatar" 
-                    className="w-full h-full object-cover" 
-                    onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
-                   />
-                </div>
-                <div className="h-3 w-24 bg-slate-950 rounded-full mx-auto mb-3" />
-                <div className="h-2 w-16 bg-slate-200 rounded-full mx-auto mb-8" />
-                
-                <div className="space-y-3">
-                    <motion.div 
-                      animate={{ backgroundColor: currentThemeData.id === 'slate' ? '#0f172a' : '' }}
-                      className={`h-12 w-full rounded-2xl border-4 border-slate-950 transition-all duration-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${currentThemeData.class}`} 
-                    />
-                    <div className="h-8 w-full rounded-xl bg-slate-50 border-2 border-slate-200" />
-                </div>
-              </motion.div>
+          <div className="bg-[#0F0F1A] p-12 rounded-[4rem] text-white relative overflow-hidden flex flex-col items-center justify-center min-h-[500px] shadow-[12px_12px_0px_0px_#E2E8F0] border-4 border-slate-950">
+            {/* Animated Glow Background */}
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.2, 1],
+                opacity: [0.3, 0.5, 0.3] 
+              }}
+              transition={{ duration: 4, repeat: Infinity }}
+              className={`absolute top-0 right-0 w-64 h-64 blur-[100px] rounded-full ${currentThemeData.class} opacity-30 pointer-events-none`} 
+            />
+            
+            <div className="text-center mb-10 relative z-10 pointer-events-none">
+               <Layout className="text-white/10 mx-auto mb-4" size={48} />
+               <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-2">Cloud Preview</h3>
+               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">Identity Node Protocol</p>
             </div>
+            
+            {/* Mini Website Mockup */}
+            <motion.div 
+              layout
+              className="w-full max-w-[240px] bg-white rounded-[3rem] p-6 shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)] relative z-10 border-4 border-slate-950"
+            >
+              <div className="w-16 h-16 rounded-[1.8rem] bg-slate-100 mx-auto mb-6 border-4 border-slate-950 overflow-hidden shadow-[4px_4px_0px_0px_#ddd]">
+                 <img 
+                  src={user?.profile_picture ? (user.profile_picture.startsWith('http') ? user.profile_picture : `${import.meta.env.VITE_API_URL || 'https://skuyproject-production.up.railway.app'}/uploads/${user.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}` }}
+                 />
+              </div>
+              <div className="h-3 w-24 bg-slate-950 rounded-full mx-auto mb-3" />
+              <div className="h-2 w-16 bg-slate-200 rounded-full mx-auto mb-8" />
+              
+              <div className="space-y-3">
+                  <motion.div 
+                    animate={{ backgroundColor: currentThemeData.id === 'slate' ? '#0f172a' : '' }}
+                    className={`h-12 w-full rounded-2xl border-4 border-slate-950 transition-all duration-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${currentThemeData.class}`} 
+                  />
+                  <div className="h-8 w-full rounded-xl bg-slate-50 border-2 border-slate-200" />
+              </div>
+            </motion.div>
+          </div>
 
-            {/* SYNC STATUS */}
-            <AnimatePresence>
-                {loading && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className="flex items-center justify-center gap-4 bg-slate-950 py-5 rounded-[2rem] border-4 border-slate-950 shadow-[6px_6px_0px_0px_#7C3AED]"
-                    >
-                        <div className="w-5 h-5 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-[11px] font-black text-white uppercase italic tracking-widest">
-                            Injecting Style to Railway...
-                        </span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+          {/* SYNC STATUS */}
+          <AnimatePresence>
+              {loading && (
+                  <motion.div 
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className="flex items-center justify-center gap-4 bg-slate-950 py-5 rounded-[2rem] border-4 border-slate-950 shadow-[6px_6px_0px_0px_#7C3AED] pointer-events-none"
+                  >
+                      <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
+                      <span className="text-[11px] font-black text-white uppercase italic tracking-widest">
+                          Injecting Style to Railway...
+                      </span>
+                  </motion.div>
+              )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

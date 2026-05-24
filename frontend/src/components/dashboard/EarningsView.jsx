@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios' 
 import { 
@@ -21,19 +21,16 @@ function EarningsView({ user, bankData, openEditModal }) {
   // 🛡️ LOCK LOKAL STATE: Mengamankan fitur Show/Hide balance biar berfungsi mandiri saat diklik
   const [localShowBalance, setLocalShowBalance] = useState(false)
 
-  // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE
-  const fetchWalletData = async () => {
-    // 💡 SOLUSI MUTLAK ID: Menangkap streamer_id database, jika kosong fallback ke user.id
-    const targetStreamerId = user?.streamer_id || user?.id;
-    
-    if (!targetStreamerId) return;
+  // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE (FIXED URL PATHS)
+  const fetchWalletData = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       
-      // ✅ FIX ENDPOINT PARAMETERS: Mengirimkan Streamer ID asli agar data dari Postgres terpanggil sempurna
+      // ✅ SINKRON: Menembak rute privat yang terproteksi token murni tanpa melempar ID di parameter URL
       const [resHistory, resBalance] = await Promise.all([
-        api.get(`/api/donations/history/${targetStreamerId}`), 
-        api.get(`/api/donations/balance/${targetStreamerId}`)  
+        api.get('/api/donations/history'), 
+        api.get('/api/donations/balance')  
       ]);
       
       if (resHistory.data && Array.isArray(resHistory.data.history)) {
@@ -46,18 +43,18 @@ function EarningsView({ user, bankData, openEditModal }) {
         setBalance(resBalance.data.total_saldo);
       }
     } catch (err) {
-      console.warn("⚠️ Gagal sinkronisasi data dengan Node Railway:", err.message);
+      console.warn("⚠️ Gagal sinkronisasi data dompet dengan Node Railway:", err.message);
       setTransactions([]); 
     } finally {
       setLoading(false);
     }
-  }
+  }, [user]);
 
   useEffect(() => { 
     if (user?.id) {
       fetchWalletData(); 
     }
-  }, [user?.id]);
+  }, [user?.id, fetchWalletData]);
 
   // 📊 FILTER ENGINE LOGS
   const filteredTransactions = (Array.isArray(transactions) ? transactions : []).filter(tx => {
@@ -90,7 +87,7 @@ function EarningsView({ user, bankData, openEditModal }) {
 
     try {
       await api.post('/api/donations/withdraw', { 
-        userId: targetStreamerId, // Mengirimkan ID penarik saldo yang valid
+        userId: targetStreamerId, 
         amount: parseInt(withdrawAmount), 
         bank: bankData 
       });
@@ -105,7 +102,8 @@ function EarningsView({ user, bankData, openEditModal }) {
       setWithdrawAmount('');
       fetchWalletData(); 
     } catch (err) { 
-      Swal.fire('ERROR', 'Engine gagal memproses transfer penarikan.', 'error'); 
+      const errorMsg = err.response?.data?.message || 'Engine gagal memproses transfer penarikan.';
+      Swal.fire('DITOLAK', errorMsg, 'error'); 
     }
   };
 
@@ -122,7 +120,7 @@ function EarningsView({ user, bankData, openEditModal }) {
   };
 
   return (
-    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-24 px-2 font-sans text-left">
+    <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-24 px-2 font-sans text-left selection:bg-violet-100">
       
       {/* --- HEADER --- */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6 px-2">
@@ -134,8 +132,9 @@ function EarningsView({ user, bankData, openEditModal }) {
           <h1 className="text-5xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">My <span className="text-violet-600">Wallet</span></h1>
         </div>
         <button 
+          type="button"
           onClick={() => setIsWithdrawModalOpen(true)} 
-          className="w-full md:w-auto bg-slate-950 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase italic tracking-widest hover:bg-violet-600 shadow-[8px_8px_0px_0px_rgba(124,58,237,0.3)] transition-all flex items-center justify-center gap-3 active:translate-y-1"
+          className="w-full md:w-auto bg-slate-950 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase italic tracking-widest hover:bg-violet-600 shadow-[8px_8px_0px_0px_rgba(124,58,237,0.3)] transition-all flex items-center justify-center gap-3 cursor-pointer"
         >
           Withdraw Funds <ArrowUpRight size={18} strokeWidth={3} />
         </button>
@@ -148,7 +147,7 @@ function EarningsView({ user, bankData, openEditModal }) {
           
           {/* CARD SALDO NEO-BRUTALISM */}
           <div className="bg-violet-600 border-4 border-slate-950 rounded-[3.5rem] p-10 text-white relative overflow-hidden shadow-[12px_12px_0px_0px_#000] group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700">
+            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
                <Wallet size={180} />
             </div>
             
@@ -156,10 +155,10 @@ function EarningsView({ user, bankData, openEditModal }) {
               <div className="flex justify-between items-start">
                 <div className="p-4 bg-slate-950 text-white rounded-2xl border-2 border-white/10 shadow-xl"><Wallet size={32} /></div>
                 
-                {/* 👁️ CONTROL BUTTON USING AUTONOMOUS LOCAL STATE */}
                 <button 
+                  type="button"
                   onClick={() => setLocalShowBalance(!localShowBalance)} 
-                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center"
+                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer flex items-center justify-center"
                 >
                   {localShowBalance ? 'Hide Balance' : 'Show Balance'}
                 </button>
@@ -187,8 +186,9 @@ function EarningsView({ user, bankData, openEditModal }) {
 
               <div className="relative">
                 <button 
+                  type="button"
                   onClick={() => setIsFilterOpen(!isFilterOpen)} 
-                  className="w-full md:w-56 flex items-center justify-between gap-3 bg-white border-4 border-slate-950 px-6 py-4 rounded-2xl text-[11px] font-black text-slate-950 uppercase transition-all hover:bg-slate-50 shadow-[4px_4px_0px_0px_#000]"
+                  className="w-full md:w-56 flex items-center justify-between gap-3 bg-white border-4 border-slate-950 px-6 py-4 rounded-2xl text-[11px] font-black text-slate-950 uppercase transition-all hover:bg-slate-50 shadow-[4px_4px_0px_0px_#000] cursor-pointer"
                 >
                   {filter} <ChevronDown size={18} strokeWidth={3} className={`transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -196,7 +196,7 @@ function EarningsView({ user, bankData, openEditModal }) {
                   {isFilterOpen && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-full bg-white border-4 border-slate-950 rounded-[2rem] shadow-[8px_8px_0px_0px_#000] z-50 p-3">
                       {['Semua', 'Donasi Masuk', 'Penarikan Saldo'].map((item) => (
-                        <motion.button whileHover={{ x: 4 }} key={item} onClick={() => { setFilter(item); setIsFilterOpen(false); }} className={`w-full text-left px-5 py-4 text-[10px] font-black uppercase rounded-xl mb-1 transition-colors ${filter === item ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <motion.button type="button" whileHover={{ x: 4 }} key={item} onClick={() => { setFilter(item); setIsFilterOpen(false); }} className={`w-full text-left px-5 py-4 text-[10px] font-black uppercase rounded-xl mb-1 transition-colors cursor-pointer border-0 ${filter === item ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                           {item}
                         </motion.button>
                       ))}
@@ -257,7 +257,7 @@ function EarningsView({ user, bankData, openEditModal }) {
               skuy.gg/<span className="text-violet-600">{user?.username}</span>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={() => copyToClipboard(`https://skuy-project.vercel.app/${user?.username}`, "Link Donasi Sultan Siap Disebar!")} className="w-full py-5 bg-violet-50 text-violet-600 border-2 border-violet-100 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-violet-100 transition-all">Copy Link</button>
+              <button type="button" onClick={() => copyToClipboard(`https://skuy-project.vercel.app/${user?.username}`, "Link Donasi Sultan Siap Disebar!")} className="w-full py-5 bg-violet-50 text-violet-600 border-2 border-violet-100 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-violet-100 transition-all cursor-pointer">Copy Link</button>
               <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-xl italic tracking-widest hover:translate-y-[-2px] transition-all">Visit Page <ExternalLink size={14}/></a>
             </div>
           </div>
@@ -266,15 +266,16 @@ function EarningsView({ user, bankData, openEditModal }) {
           <div className="bg-white rounded-[3rem] p-10 border-4 border-slate-950 shadow-[12px_12px_0px_0px_#F1F5F9] relative overflow-hidden group">
             <div className="flex justify-between items-start mb-10 relative z-10">
               <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.3em] italic flex items-center gap-3"><Landmark size={18} className="text-violet-600" /> Payout Dest</h4>
-              <button onClick={openEditModal} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-violet-600 hover:bg-violet-50 transition-all border border-transparent hover:border-violet-100 shadow-sm"><Edit3 size={16} /></button>
+              <button type="button" onClick={openEditModal} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-violet-600 hover:bg-violet-50 transition-all border border-transparent hover:border-violet-100 shadow-sm cursor-pointer"><Edit3 size={16} /></button>
             </div>
             
             <div className="p-10 bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] text-center relative z-10 group-hover:bg-white group-hover:border-violet-200 transition-all">
-              {bankData?.bank_name !== 'Belum Diatur' ? (
+              {/* ✅ FIXED VARIABLES: Menyelaraskan mapping struktur data bank object dengan DB */}
+              {bankData?.bank_name && bankData?.bank_name !== 'Belum Diatur' ? (
                 <div className="space-y-4">
                   <div className="bg-violet-600 inline-block px-4 py-1.5 rounded-full"><p className="text-[9px] font-black text-white uppercase italic tracking-widest">{bankData.bank_name}</p></div>
-                  <p className="text-3xl font-black text-slate-950 tracking-tighter">{bankData.account_number}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase italic tracking-widest border-t border-slate-100 pt-4">{bankData.account_name}</p>
+                  <p className="text-3xl font-black text-slate-950 tracking-tighter break-all">{bankData.bank_account_number || bankData.account_number}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest border-t border-slate-100 pt-4 truncate">{bankData.bank_account_name || bankData.account_name}</p>
                 </div>
               ) : (
                 <div className="py-6"><AlertCircle size={40} className="mx-auto text-slate-200 mb-5" /><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bank Details Required</p></div>
@@ -303,8 +304,8 @@ function EarningsView({ user, bankData, openEditModal }) {
               </div>
 
               <div className="space-y-4">
-                <button onClick={handleWithdraw} className="w-full py-6 bg-slate-950 text-white rounded-[2rem] font-black uppercase italic text-xs tracking-[0.2em] shadow-2xl hover:bg-violet-600 transition-all border-4 border-slate-900 active:translate-y-1">Initialize Transfer</button>
-                <button onClick={() => setIsWithdrawModalOpen(false)} className="w-full py-4 font-black uppercase text-[10px] text-slate-400 hover:text-rose-500 transition-colors italic tracking-widest">Abort Protocol</button>
+                <button type="button" onClick={handleWithdraw} className="w-full py-6 bg-slate-950 text-white rounded-[2rem] font-black uppercase italic text-xs tracking-[0.2em] shadow-2xl hover:bg-violet-600 transition-all border-4 border-slate-900 cursor-pointer">Initialize Transfer</button>
+                <button type="button" onClick={() => setIsWithdrawModalOpen(false)} className="w-full py-4 font-black uppercase text-[10px] text-slate-400 hover:text-rose-500 transition-colors italic tracking-widest bg-transparent border-0 cursor-pointer">Abort Protocol</button>
               </div>
             </motion.div>
           </div>
@@ -313,4 +314,5 @@ function EarningsView({ user, bankData, openEditModal }) {
     </div>
   )
 }
+
 export default EarningsView;

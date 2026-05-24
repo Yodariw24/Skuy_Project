@@ -3,8 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Wallet, Activity, Tv, LogOut, User, Zap, 
   ChevronRight, ShieldCheck, Bell, Target, Video, 
-  Trophy, Palette, MessageSquare,
-  BarChart3 // ✅ SUNTIKAN INTEGRASI IKON ANALISIS PERFORMA
+  Trophy, Palette, MessageSquare, BarChart3 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
@@ -54,7 +53,8 @@ function Sidebar({ user }) {
   };
 
   const NavButton = ({ id, icon: Icon, label, badge, disabled, onClickCustom, isSub }) => {
-    const isActive = activeId === id;
+    // ✅ UPGRADE LOGIC: Tombol induk overlay tetep menyala aktif jika sub-menu di dalamnya sedang diakses
+    const isActive = activeId === id || (id === 'overlay' && overlayTabs.includes(activeId));
     const isLocked = disabled; 
     
     return (
@@ -116,7 +116,6 @@ function Sidebar({ user }) {
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
             <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
-            {/* ✅ RESTORASI IDENTITAS: Mengubah Tips Sultan menjadi Analisis Performa */}
             <NavButton id="analytics" icon={BarChart3} label="Analisis Performa" disabled={!isCreator} />
           </nav>
         </div>
@@ -189,7 +188,7 @@ function Sidebar({ user }) {
           </div>
         </div>
         
-        <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-500 font-black text-[9px] uppercase transition-all group py-1.5 tracking-widest">
+        <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-500 font-black text-[9px] uppercase transition-all group py-1.5 tracking-widest bg-transparent border-0 cursor-pointer">
           <LogOut size={12} className="group-hover:-translate-x-1 transition-transform" /> Sign Out Protocol
         </button>
       </div>

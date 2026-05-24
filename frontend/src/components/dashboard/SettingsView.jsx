@@ -1,7 +1,7 @@
-import React from 'react'
-import { Moon, Settings, Sparkles, ShieldCheck, MessageSquare, Zap, Globe, Landmark, CheckCircle2 } from 'lucide-react'
-import ProfileSettings from './ProfileSettings'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect } from 'react';
+import { Settings, ShieldCheck, MessageSquare, Zap, Globe, Landmark, CheckCircle2 } from 'lucide-react';
+import ProfileSettings from './ProfileSettings';
+import { motion } from 'framer-motion';
 
 export default function SettingsView({ user, setUser }) {
   // ✅ PENCEGAHAN BLANK SCREEN (Sultan Guard Security)
@@ -17,14 +17,19 @@ export default function SettingsView({ user, setUser }) {
   }
 
   const isSecured = !!user.is_two_fa_enabled;
-  // Memastikan UI reaktif memantau penuh keberadaan bank terdaftar
-  const hasBankData = !!(user.bank_name && (user.bank_account_number || user.account_number));
+  
+  // ✅ FIXED EVALUATION: Memastikan nomor DAN nama akun pemilik tervalidasi murni demi keamanan payout
+  const hasBankData = !!(
+    user.bank_name && 
+    (user.bank_account_number || user.account_number) &&
+    (user.bank_account_name || user.account_name)
+  );
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-6xl mx-auto pb-24 px-4 font-sans text-left"
+      className="max-w-6xl mx-auto pb-24 px-4 font-sans text-left selection:bg-violet-600 selection:text-white"
     >
       {/* --- HEADER SECTION --- */}
       <div className="mb-12 px-1">
@@ -105,7 +110,7 @@ export default function SettingsView({ user, setUser }) {
 
           {/* Infrastructure Node Info */}
           <div className="p-10 bg-slate-950 rounded-[3.5rem] text-white shadow-[12px_12px_0px_0px_#7C3AED] relative overflow-hidden border-4 border-slate-950 text-left">
-             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-violet-600 blur-[80px] opacity-30 animate-pulse" />
+             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-violet-600 blur-[80px] opacity-30 animate-pulse pointer-events-none" />
              <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-8">
                   <Globe size={16} className="text-violet-400" />
@@ -153,5 +158,5 @@ export default function SettingsView({ user, setUser }) {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }

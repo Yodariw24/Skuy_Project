@@ -42,8 +42,11 @@ function AuthPage() {
     Toast.fire({ icon, title });
   };
 
+  // ✅ FIXED: Eksekusi autocomplete bypass murni tanpa melempar raw state ke parameter event
   useEffect(() => {
-    if (otp.length === 6) handleVerify2FALogin();
+    if (otp.length === 6) {
+      handleVerify2FALogin();
+    }
   }, [otp]);
 
   const triggerSendOTP = async (userId) => {
@@ -67,7 +70,6 @@ function AuthPage() {
       const completeUser = {
         ...fallbackUser,
         id: fallbackUser?.id || decodedToken?.id,
-        // Cari streamer_id dari response data atau token, fallback teraman gunakan ID user asli
         streamer_id: fallbackUser?.streamer_id || decodedToken?.streamer_id || fallbackUser?.id || decodedToken?.id
       };
       
@@ -135,7 +137,7 @@ function AuthPage() {
   };
 
   const handleVerify2FALogin = async (e) => {
-    if (e) e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     setLoading(true);
     try {
       const res = await api.post('/auth/verify-2fa', { userId: tempUserId, token: otp });
@@ -147,6 +149,13 @@ function AuthPage() {
       showSultanToast('OTP SALAH!', 'error');
       setOtp('');
     } finally { setLoading(false); }
+  };
+
+  // Logic reset gate untuk tombol abort 2FA
+  const handleAbort2FA = () => {
+    setShow2FA(false);
+    setOtp('');
+    setTempUserId(null);
   };
 
   return (
@@ -265,7 +274,7 @@ function AuthPage() {
               </motion.div>
             ) : (
               /* --- 2FA STATE --- */
-              <motion.div key="2fa" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-[340px] mx-auto w-full text-center space-y-10">
+              <motion.div key="2fa" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="max-w-[340px] mx-auto w-full text-center space-y-10">
                 <div className="w-20 h-20 bg-violet-50 text-violet-600 rounded-3xl mx-auto flex items-center justify-center border-4 border-slate-950 shadow-[8px_8px_0px_0px_#000] rotate-3">
                   <ShieldCheck size={40} strokeWidth={3} />
                 </div>
@@ -282,7 +291,11 @@ function AuthPage() {
                   <button onClick={handleVerify2FALogin} disabled={loading} className="w-full bg-slate-950 text-white py-6 rounded-2xl font-black uppercase italic shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 border-4 border-slate-950">
                     {loading ? <Loader2 className="animate-spin" /> : 'AUTHORIZE ACCESS'}
                   </button>
-                  <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-violet-600 hover:underline tracking-widest transition-colors italic mx-auto">Resend Security Protocol</button>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <button onClick={() => triggerSendOTP(tempUserId)} className="text-[9px] font-black uppercase text-violet-600 hover:underline tracking-widest transition-colors italic mx-auto">Resend Security Protocol</button>
+                    {/* ✅ UX FIX: Tombol abort biar user gak stuck pas screen OTP */}
+                    <button type="button" onClick={handleAbort2FA} className="text-[9px] font-black uppercase text-slate-400 hover:text-rose-500 tracking-widest transition-colors italic mx-auto underline mt-1">Abort Verification</button>
+                  </div>
                 </div>
               </motion.div>
             )}

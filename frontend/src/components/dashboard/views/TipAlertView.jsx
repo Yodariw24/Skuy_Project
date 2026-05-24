@@ -1,18 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Copy, Eye, Save, Sparkles, Volume2, Image as ImageIcon, Globe, Zap } from 'lucide-react';
+import { Bell, Copy, Eye, Save, Sparkles, Zap, Globe, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../api/axios'; 
 
 function TipAlertView({ user }) {
-  // ✅ Widget URL Protocol (Safe Guard with Optional Chaining)
+  // ✅ Widget URL Protocol (Safe Guard dengan parameter username riil session)
   const overlayUrl = `https://skuy-gg.vercel.app/widget/${user?.username || 'username'}/tip`;
   
   // ✅ State Sultan
   const [minDonation, setMinDonation] = useState(10000);
   const [duration, setDuration] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [deploying, setDeploying] = useState(false);
+
+  // 📡 PROTOKOL PIPELINE: Sedot data konfigurasi Tip Alert ter-update dari PostgreSQL Railway
+  const fetchCurrentAlertSettings = useCallback(async () => {
+    if (!user?.username) return;
+    try {
+      setLoading(true);
+      const res = await api.get(`/api/donations/widgets/settings/${user.username}/tip`);
+      if (res.data.success && res.data.data) {
+        const cloudData = res.data.data;
+        setMinDonation(cloudData.min_tip || 10000);
+        setDuration(cloudData.duration || 10);
+      }
+    } catch (err) {
+      console.warn("⚠️ Mode Sandbox: Mengaktifkan parameter pangkalan lokal untuk rendering sandbox.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchCurrentAlertSettings();
+  }, [fetchCurrentAlertSettings]);
 
   // --- 🛡️ SULTAN SLIM TOAST ---
-  const showSultanToast = (title) => {
+  const showSultanToast = (title, icon = 'success') => {
     const Toast = Swal.mixin({
       toast: true,
       position: 'top-end',
@@ -20,14 +45,11 @@ function TipAlertView({ user }) {
       timer: 3000,
       timerProgressBar: true,
       customClass: {
-        popup: 'skuy-slim-toast',
-        title: 'skuy-toast-content'
+        popup: 'border-4 border-slate-950 bg-white rounded-2xl shadow-[4px_4px_0px_0px_#7C3AED]',
+        title: 'font-sans font-black uppercase text-slate-950 text-[10px] tracking-widest'
       }
     });
-    Toast.fire({
-      icon: 'success',
-      title: title
-    });
+    Toast.fire({ icon, title });
   };
 
   const handleCopy = () => {
@@ -35,21 +57,64 @@ function TipAlertView({ user }) {
     showSultanToast('<b>LINK COPIED</b> <span>Siap tempel di OBS!</span>');
   };
 
-  const handleSave = () => {
-    showSultanToast('<b>SYNC SUCCESS</b> <span>Config tersimpan di Cloud.</span>');
+  // 🚀 TRIGGER DEPLOY PROTOCOL: Simpan pembaharuan parameter ke DB dan tembak update ke OBS via Socket
+  const handleSaveConfig = async () => {
+    if (Number(minDonation) <= 0 || Number(duration) <= 0) {
+      return showSultanToast('<b>INPUT INVALID</b> <span>Ambang batas & durasi tidak boleh 0!</span>', 'error');
+    }
+
+    setDeploying(true);
+    try {
+      const res = await api.post('/api/donations/widgets/update', {
+        userId: user.id,
+        widgetType: 'tip',
+        colors: { primary: '#7C3AED', accent: '#FF1493', text: '#ffffff', glow: '#7C3AED' }, 
+        config: {
+          min_tip: parseInt(minDonation),
+          duration: parseInt(duration)
+        }
+      });
+
+      if (res.data.success) {
+        showSultanToast('<b>SYNC SUCCESS</b> <span>Config tersimpan di Cloud.</span>');
+      }
+    } catch (err) {
+      showSultanToast('<b>DEPLOY FAILED</b> <span>Gagal kontak server Railway.</span>', 'error');
+    } finally {
+      setDeploying(false);
+    }
   };
 
-  // 🛡️ SAFE GUARD: Jika data user belum ada, tampilkan loading daripada White Blank
-  if (!user) {
+  // 🔊 TEST TRIGGER PACKET: Tembak simulasi alert instan ke OBS Browser Source tanpa transaksi asli
+  const handleTriggerTestAlert = async () => {
+    try {
+      showSultanToast('<b>TEST TRIGGERED</b> <span>Memancarkan sinyal ke OBS...</span>', 'info');
+      await api.post(`/api/user/widgets/test-trigger`, {
+        userId: user.id,
+        widgetType: 'tip',
+        mockData: {
+          donatur_name: 'Sultan_Donatur',
+          amount: parseInt(minDonation),
+          message: 'Gokil, nyobain fitur test alert live tanpa delay, Ri!',
+          tier: parseInt(minDonation) >= 1000000 ? 'MYTHIC' : 'STANDARD'
+        }
+      });
+    } catch (err) {
+      console.error("🔥 Gagal memicu test alert:", err.message);
+    }
+  };
+
+  // SAFE GUARD: Jika data user belum ter-inject, tampilkan animasi spin rotasi pangkalan
+  if (!user || loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-4">
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
         <motion.div 
           animate={{ rotate: 360 }} 
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
         >
           <Zap size={40} className="text-violet-600" />
         </motion.div>
-        <p className="font-black italic uppercase text-slate-400 animate-pulse">Syncing Engine Node...</p>
+        <p className="font-black italic uppercase text-slate-400 animate-pulse text-[10px] tracking-widest">Sinkronisasi Parameter Alert Node...</p>
       </div>
     );
   }
@@ -58,10 +123,10 @@ function TipAlertView({ user }) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-10 text-left pb-32"
+      className="space-y-10 text-left pb-32 selection:bg-violet-50 selection:text-violet-600 font-sans px-2"
     >
-      {/* --- SECTION 1: HEADER --- */}
-      <div className="flex items-center gap-4 mb-2">
+      {/* --- HEADER --- */}
+      <div className="flex items-center gap-4 mb-2 px-1">
         <div className="p-3 bg-violet-600 text-white border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] rounded-2xl">
           <Bell size={32} strokeWidth={3} />
         </div>
@@ -76,9 +141,9 @@ function TipAlertView({ user }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         {/* --- LEFT: CONFIGURATION --- */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-7 space-y-8">
           
           {/* URL CARD */}
           <motion.div 
@@ -86,7 +151,7 @@ function TipAlertView({ user }) {
             className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]"
           >
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-black italic uppercase text-sm flex items-center gap-2">
+              <h3 className="font-black italic uppercase text-xs flex items-center gap-2">
                 <Globe size={18} className="text-[#7C3AED]" /> OBS Browser Source
               </h3>
               <Zap size={16} className="text-amber-400 fill-current" />
@@ -96,13 +161,16 @@ function TipAlertView({ user }) {
               <div className="flex-1 relative group">
                 <input 
                   readOnly 
+                  type="text"
                   value={overlayUrl}
-                  className="w-full bg-slate-50 border-4 border-slate-100 p-5 rounded-2xl font-mono text-[11px] font-bold text-slate-500 outline-none transition-all group-hover:border-slate-200"
+                  onClick={(e) => e.target.select()}
+                  className="w-full bg-slate-50 border-4 border-slate-100 p-5 rounded-2xl font-mono text-[11px] font-bold text-slate-500 outline-none truncate italic"
                 />
               </div>
               <button 
+                type="button"
                 onClick={handleCopy}
-                className="p-5 bg-slate-950 text-white rounded-2xl hover:bg-[#7C3AED] transition-all shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none flex items-center justify-center border-2 border-slate-950"
+                className="p-5 bg-slate-950 text-white rounded-2xl hover:bg-[#7C3AED] transition-all shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none border-2 border-slate-950 cursor-pointer"
               >
                 <Copy size={24} />
               </button>
@@ -121,49 +189,51 @@ function TipAlertView({ user }) {
             whileHover={{ y: -5 }}
             className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#000]"
           >
-            <h3 className="font-black italic uppercase text-sm mb-8 pb-4 border-b-4 border-slate-50 flex items-center gap-2">
+            <h3 className="font-black italic uppercase text-xs mb-8 pb-4 border-b-4 border-slate-50 flex items-center gap-2">
                <Sparkles size={18} className="text-[#7C3AED]" /> Logic & Timing
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] block px-1">Minimal Donation</label>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] block px-1">Minimal Donation (IDR)</label>
                 <div className="relative group">
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-slate-300 group-focus-within:text-slate-950 transition-colors">Rp</span>
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-slate-300 focus-within:text-slate-950 transition-colors z-10">Rp</span>
                   <input 
                     type="number" 
+                    disabled={deploying}
                     value={minDonation}
-                    onChange={(e) => setMinDonation(e.target.value)}
-                    className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black text-xl text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all"
+                    onChange={(e) => setMinDonation(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-slate-50 border-4 border-slate-50 p-5 pl-14 rounded-2xl font-black text-lg text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all relative z-0"
                   />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] block px-1">Alert Duration</label>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] block px-1">Alert Duration</label>
                 <div className="relative group">
                   <input 
                     type="number" 
+                    disabled={deploying}
                     value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full bg-slate-50 border-4 border-slate-50 p-5 rounded-2xl font-black text-xl text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all"
+                    onChange={(e) => setDuration(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-slate-50 border-4 border-slate-50 p-5 rounded-2xl font-black text-lg text-slate-950 focus:bg-white focus:border-slate-950 outline-none transition-all relative z-0"
                   />
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-[10px] italic">Sec</span>
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-[10px] italic z-10">Sec</span>
                 </div>
               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* --- RIGHT: LIVE PREVIEW --- */}
-        <div className="sticky top-10">
+        {/* --- RIGHT: LIVE MOCKUP PREVIEW --- */}
+        <div className="lg:col-span-5 lg:sticky lg:top-10">
           <div className="bg-slate-950 p-8 rounded-[3.5rem] border-4 border-[#7C3AED] shadow-[15px_15px_0px_0px_#000] text-center">
             <div className="flex items-center justify-center gap-2 mb-8">
                <div className="w-2 h-2 bg-[#7C3AED] rounded-full animate-pulse" />
-               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">Engine Preview</p>
+               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">OBS Mockup Preview</p>
             </div>
             
-            <div className="aspect-[4/3] bg-[#0c0c14] rounded-[2.5rem] border-2 border-white/5 flex items-center justify-center mb-10 relative group overflow-hidden shadow-inner">
+            <div className="aspect-[4/3] bg-[#0c0c14] rounded-[2.5rem] border-2 border-white/5 flex items-center justify-center mb-10 relative group overflow-hidden shadow-inner pointer-events-none">
                 <motion.div 
                   animate={{ y: [0, -15, 0] }}
                   transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
@@ -171,15 +241,15 @@ function TipAlertView({ user }) {
                 >
                   <div className="bg-white p-6 border-4 border-slate-950 shadow-[6px_6px_0px_0px_#000] -rotate-3 transition-transform group-hover:rotate-0 duration-500">
                     <p className="font-black italic uppercase text-[10px] text-slate-400 mb-1 text-left">New Support!</p>
-                    <p className="text-2xl font-black italic text-slate-950 tracking-tighter leading-none mb-2">
-                        Rp {parseInt(minDonation || 0).toLocaleString('id-ID')}
+                    <p className="text-2xl font-black italic text-slate-950 tracking-tighter leading-none mb-2 font-mono">
+                        Rp {Number(minDonation || 0).toLocaleString('id-ID')}
                     </p>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-950/5">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: '100%' }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                          className="h-full bg-[#7C3AED]" 
+                          transition={{ duration: Number(duration) || 5, repeat: Infinity }}
+                          className="h-full bg-gradient-to-r from-violet-500 to-violet-600" 
                         />
                     </div>
                   </div>
@@ -187,7 +257,12 @@ function TipAlertView({ user }) {
                 <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
             </div>
 
-            <button className="w-full py-5 bg-white text-slate-950 rounded-[1.8rem] font-black uppercase italic tracking-widest text-[11px] shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none hover:bg-violet-50 transition-all flex items-center justify-center gap-3 border-4 border-slate-950">
+            <button 
+              type="button"
+              disabled={deploying}
+              onClick={handleTriggerTestAlert}
+              className="w-full py-5 bg-white text-slate-950 rounded-[1.8rem] font-black uppercase italic tracking-widest text-[11px] shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-2 active:shadow-none hover:bg-violet-50 transition-all flex items-center justify-center gap-3 border-4 border-slate-950 cursor-pointer disabled:bg-slate-100"
+            >
               <Eye size={20} strokeWidth={3} /> Launch Test Alert
             </button>
           </div>
@@ -196,17 +271,15 @@ function TipAlertView({ user }) {
 
       {/* --- FLOATING SAVE BAR --- */}
       <div className="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[100]">
-          <motion.button 
-            initial={{ y: 100 }}
-            animate={{ y: 0 }}
-            onClick={handleSave}
-            whileHover={{ y: -6 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-[#7C3AED] text-white px-12 py-7 rounded-[2.5rem] font-black italic uppercase tracking-[0.2em] text-sm shadow-[12px_12px_0px_0px_#000] border-4 border-slate-950 flex items-center gap-4 transition-all group"
+          <button 
+            type="button"
+            onClick={handleSaveConfig}
+            disabled={deploying}
+            className="bg-[#7C3AED] text-white px-12 py-7 rounded-[2.5rem] font-black italic uppercase tracking-[0.2em] text-sm shadow-[12px_12px_0px_0px_#000] border-4 border-slate-950 flex items-center gap-4 transition-all group cursor-pointer disabled:bg-slate-200 disabled:border-slate-300 disabled:text-slate-400 disabled:shadow-none"
           >
-            <Save size={26} strokeWidth={3} className="group-hover:rotate-12 transition-transform" /> 
+            {deploying ? <Loader2 className="animate-spin" size={26} /> : <Save size={26} strokeWidth={3} />} 
             Save Sync Node
-          </motion.button>
+          </button>
       </div>
     </motion.div>
   );

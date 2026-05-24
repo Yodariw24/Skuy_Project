@@ -1,53 +1,40 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import api from '../api/axios' 
-import { CheckCircle2, QrCode, Loader2, ShieldCheck, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft, QrCode, ShieldCheck, Zap, Copy, CheckCircle2 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
 function PaymentPage() {
   const { donationId } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const location = useLocation();
+  const [copied, setCopied] = useState(false);
 
-  // --- LOGIKA VERIFIKASI SULTAN (Sync Railway) ---
-  const handleConfirm = async () => {
-    setLoading(true);
-    try {
-      // ✅ SINKRON: Update status donasi ke SUCCESS via backend
-      const res = await api.put(`/donations/status/${donationId}`, {
-        status: 'SUCCESS'
-      });
+  // 📡 PARSING MIDTRANS DATA: Mengambil lemparan data state dari penembakan form awal
+  const donationData = location.state?.donationData;
+  const qrImageUrl = donationData?.qrCodeUrl || donationData?.qr_code_url;
+  const amount = donationData?.gross_amount || donationData?.amount || 0;
 
-      if (res.data.success) {
-        Swal.fire({
-          title: 'ENERGY RECEIVED! 🚀',
-          text: 'Energi donasi berhasil disalurkan ke pangkalan data Sultan!',
-          icon: 'success',
-          customClass: {
-            popup: 'rounded-[3rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_#10B981]',
-            confirmButton: 'bg-slate-950 text-white px-10 py-4 rounded-2xl font-black uppercase italic text-xs tracking-widest'
-          },
-          buttonsStyling: false
-        }).then(() => {
-            navigate(-1); 
-        });
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      // Fallback untuk mode development
+  useEffect(() => {
+    // Jalur pengaman: Jika halaman diakses langsung tanpa data transaksi riil, tendang balik
+    if (!donationData) {
       Swal.fire({
-        title: 'NODE SIMULATION',
-        text: 'Backend tidak merespon, menyimulasikan transaksi sukses...',
-        icon: 'info',
+        title: 'PAYLOAD KOSONG',
+        text: 'Data transaksi tidak ditemukan dalam pangkalan, Ri!',
+        icon: 'error',
         confirmButtonColor: '#7C3AED'
       }).then(() => navigate(-1));
-    } finally {
-      setLoading(false);
     }
+  }, [donationData, navigate]);
+
+  const handleCopyOrderId = () => {
+    if (!donationId) return;
+    navigator.clipboard.writeText(donationId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-6 font-sans text-left selection:bg-violet-600 selection:text-white">
       <div className="bg-white p-10 md:p-14 rounded-[4rem] shadow-[20px_20px_0px_0px_#F1F5F9] border-4 border-slate-950 max-w-md w-full text-center relative overflow-hidden">
         
         {/* Sultan Header Decor */}
@@ -66,44 +53,67 @@ function PaymentPage() {
 
         <div className="space-y-2 mb-10">
             <h2 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 leading-none">Gate: <span className="text-violet-600">Secure</span></h2>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] italic">Encrypted QRIS Protocol v2.3</p>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] italic">Midtrans QRIS Engine Connection</p>
         </div>
         
-        {/* QRIS Container Neo-Brutalism */}
-        <div className="bg-white p-6 rounded-[3rem] mb-12 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#F1F5F9] relative group">
-           <img 
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=skuy-donation-${donationId}&bgcolor=ffffff&color=0f172a`} 
-            alt="QRIS Protocol" 
-            className="w-full aspect-square object-contain rounded-2xl group-hover:scale-95 transition-transform duration-500"
-           />
-           <div className="mt-6 flex items-center justify-center gap-2">
-              <Zap size={14} className="text-amber-500 animate-pulse" fill="currentColor" />
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Instant Node Activation</span>
-           </div>
+        {/* REAL QRIS CANVAS FROM MIDTRANS */}
+        <div className="bg-white p-6 rounded-[3rem] mb-6 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#F1F5F9] relative group">
+           {qrImageUrl ? (
+             <img 
+              src={qrImageUrl} 
+              alt="Midtrans Official QRIS" 
+              className="w-full aspect-square object-contain rounded-2xl group-hover:scale-102 transition-transform duration-500"
+             />
+           ) : (
+             <div className="w-full aspect-square bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 font-mono text-[10px] uppercase font-black">Broken Node Payload</div>
+           )}
         </div>
 
-        <div className="space-y-5">
-          <button 
-            onClick={handleConfirm}
-            disabled={loading}
-            className="w-full bg-slate-950 text-white font-black py-6 rounded-[2rem] shadow-[0_8px_0_0_#475569] hover:bg-violet-600 transition-all flex items-center justify-center gap-4 active:translate-y-2 active:shadow-none text-xs uppercase italic tracking-[0.2em] border-2 border-white/10"
+        {/* ORDER TOKEN MONITOR */}
+        <div className="w-full bg-slate-950 text-white p-4 rounded-2xl border-2 border-slate-950 flex items-center justify-between font-mono text-[11px] mb-6">
+            <div className="min-w-0 flex-1 text-left px-1">
+                <span className="text-white/30 text-[9px] block uppercase font-sans font-black tracking-widest mb-0.5">Order Token ID</span>
+                <span className="text-violet-400 font-bold tracking-tight block truncate select-all">{donationId || 'NULL'}</span>
+            </div>
+            <button 
+                type="button"
+                onClick={handleCopyOrderId}
+                className={`p-2.5 rounded-xl border transition-all shrink-0 ml-3 flex items-center justify-center ${copied ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
+            >
+                {copied ? <CheckCircle2 size={14} strokeWidth={3} /> : <Copy size={14} />}
+            </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Total Amount</p>
+              <p className="text-4xl font-black text-slate-950 tracking-tighter italic">
+                  Rp {Number(amount).toLocaleString('id-ID')}
+              </p>
+          </div>
+
+          {/* SIMULATOR SHORTCUT BUTTON */}
+          <a 
+            href="https://dashboard.sandbox.midtrans.com/welcome/simulator" 
+            target="_blank" 
+            rel="noreferrer"
+            className="w-full bg-slate-950 text-white font-black py-5 rounded-[2rem] shadow-[0_8px_0_0_#475569] hover:bg-violet-600 transition-all flex items-center justify-center gap-3 active:translate-y-2 active:shadow-none text-xs uppercase italic tracking-[0.15em] border-2 border-white/10 text-center"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : <>Verify Payload <CheckCircle2 size={20} /></>}
-          </button>
+            Buka Simulator Pembayaran <Zap size={16} fill="currentColor" />
+          </a>
           
           <button 
             onClick={() => navigate(-1)}
-            disabled={loading}
-            className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-rose-500 transition-colors italic"
+            className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-slate-950 transition-colors italic pt-2"
           >
-            Abort Transaction
+            <ArrowLeft size={12} strokeWidth={4} /> Kembali ke Profil
           </button>
         </div>
 
         {/* Security Footer */}
-        <div className="mt-10 pt-8 border-t-2 border-slate-100 flex items-center justify-center gap-3">
+        <div className="mt-10 pt-6 border-t-2 border-slate-100 flex items-center justify-center gap-3">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Secure Socket Layer Active</span>
+            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Single Source Verification Active</span>
         </div>
       </div>
     </div>

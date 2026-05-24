@@ -19,7 +19,7 @@ const SecurityView = ({
   const isEnabled = user?.is_two_fa_enabled;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-10 p-6 font-sans text-left pb-20 relative">
+    <div className="max-w-2xl mx-auto space-y-10 p-6 font-sans text-left pb-20 relative selection:bg-violet-600 selection:text-white">
       
       {/* --- HEADER SECTION --- */}
       <div className="space-y-2 px-2">
@@ -85,9 +85,10 @@ const SecurityView = ({
                   </p>
                 </div>
                 <button 
+                  type="button"
                   onClick={onGenerateQR}
                   disabled={loading} 
-                  className="group bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic tracking-widest text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[8px_8px_0px_0px_#000] active:translate-y-2 active:shadow-none transition-all disabled:opacity-50"
+                  className="group bg-[#7C3AED] text-white px-12 py-6 rounded-3xl font-black uppercase italic tracking-widest text-sm flex items-center gap-4 border-4 border-slate-950 shadow-[8px_8px_0px_0px_#000] hover:bg-slate-950 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? <Loader2 className="animate-spin" size={24}/> : <>Kirim Kode Aktivasi <Send size={20}/></>}
                 </button>
@@ -97,8 +98,9 @@ const SecurityView = ({
               <div className="space-y-8 flex flex-col items-center relative">
                 {/* Back Button Sultan */}
                 <button 
+                  type="button"
                   onClick={onCancel} 
-                  className="absolute -top-4 -right-4 p-2 bg-slate-100 rounded-full hover:bg-rose-100 hover:text-rose-500 transition-colors"
+                  className="absolute -top-4 -right-4 p-2 bg-slate-100 rounded-full hover:bg-rose-100 hover:text-rose-500 transition-colors cursor-pointer border-0"
                 >
                   <X size={20} strokeWidth={3} />
                 </button>
@@ -109,27 +111,29 @@ const SecurityView = ({
                       <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }}><MessageSquare size={24} /></motion.div>
                    </div>
                    <h3 className="text-xl font-black italic uppercase text-slate-950 tracking-tighter">Verify Identity Node</h3>
-                   <p className="text-[10px] font-black text-slate-400 uppercase italic">Input 6-digit kode dari WA/Email ariwirayuda24</p>
+                   <p className="text-[10px] font-black text-slate-400 uppercase italic">Input 6-digit kode dari WA/Email lo</p>
                 </div>
 
                 <div className="max-w-xs mx-auto space-y-6 w-full text-center">
+                    {/* ✅ UX FIXED: Penyelarasan tracking placeholder biar posisi teks simetris sempurna di tengah */}
                     <input 
                       type="text" 
                       maxLength="6" 
                       placeholder="000000" 
                       autoFocus
-                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white focus:shadow-[6px_6px_0px_0px_#7C3AED] transition-all placeholder:text-slate-200"
+                      className="w-full bg-slate-50 border-4 border-slate-950 p-6 rounded-[2rem] text-center text-5xl font-black tracking-[0.4em] outline-none focus:bg-white focus:shadow-[6px_6px_0px_0px_#7C3AED] transition-all placeholder:text-slate-200 placeholder:tracking-normal focus:placeholder:opacity-0"
                       value={otp} 
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     />
                     <button 
+                      type="button"
                       onClick={onVerify}
                       disabled={otp.length < 6 || loading} 
-                      className="w-full bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-[8px_8px_0px_0px_#7C3AED] active:translate-y-2 active:shadow-none transition-all flex justify-center items-center gap-3 border-4 border-slate-950"
+                      className="w-full bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-[8px_8px_0px_0px_#7C3AED] active:translate-y-2 active:shadow-none transition-all flex justify-center items-center gap-3 border-4 border-slate-950 cursor-pointer disabled:bg-slate-200 disabled:shadow-none disabled:border-slate-300 disabled:text-slate-400"
                     >
                       {loading ? <Loader2 className="animate-spin" size={24} /> : <>Verify & Activate <ShieldCheck size={20}/></>}
                     </button>
-                    <button onClick={onGenerateQR} className="text-[10px] font-black uppercase text-[#7C3AED] hover:underline italic tracking-widest">Belum terima? Kirim ulang</button>
+                    <button type="button" onClick={onGenerateQR} className="text-[10px] font-black uppercase text-[#7C3AED] hover:underline italic tracking-widest bg-transparent border-0 cursor-pointer">Belum terima? Kirim ulang</button>
                 </div>
               </div>
             )}
@@ -150,8 +154,9 @@ const SecurityView = ({
                   Dual-Channel Aktif. Akun lo resmi aman di bawah perlindungan Sultan via WhatsApp & Email.
               </p>
               <button 
+                type="button"
                 onClick={onDisable}
-                className="group mt-12 flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 hover:text-rose-500 transition-all mx-auto"
+                className="group mt-12 flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 hover:text-rose-500 transition-all mx-auto bg-transparent border-0 cursor-pointer tracking-wider"
               >
                 <ShieldAlert size={14} /> Copot Protokol Keamanan
               </button>

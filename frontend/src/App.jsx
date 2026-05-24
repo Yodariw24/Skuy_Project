@@ -7,12 +7,12 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage'; 
 import PaymentPage from './pages/PaymentPage';
 import WidgetClient from './pages/WidgetClient';
-import Explore from './pages/Explore'; // 🚀 IMPORT HALAMAN EXPLORE BARU
+import Explore from './pages/Explore'; // Creators Discovery Hub
 import api from './api/axios';
 
 import 'animate.css';
 
-// --- 1. LOGIC PROTECTED ROUTE (Sultan Guard) ---
+// --- 1. LOGIC PROTECTED ROUTE (Sultan Guard Security Shield) ---
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('user_token'); 
   if (!token) {
@@ -27,7 +27,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ SYNC USER: Ambil data Sultan terbaru dari Cloud Railway
+  // ✅ SYNC USER: Ambil data Sultan terbaru dari Cloud Railway saat boot-up awal
   const syncUser = useCallback(async () => {
     const token = localStorage.getItem('user_token');
     if (!token) {
@@ -42,21 +42,24 @@ function App() {
         localStorage.setItem('user', JSON.stringify(res.data.user));
       }
     } catch (err) {
-      console.error("🛡️ Shield Broken: Sesi Gagal Sinkron.");
+      console.error("🛡️ Shield Broken: Sesi Gagal Sinkron / Token Ilegal.");
       if (err.response?.status === 401) {
         localStorage.clear();
-        if (!location.pathname.includes('/auth')) navigate('/auth');
+        // Cek kondisi rute saat ini secara langsung dari instansi lokasi ter-update
+        if (!window.location.pathname.includes('/auth')) {
+          navigate('/auth');
+        }
       }
     } finally {
       setIsSyncing(false);
     }
-  }, [navigate, location.pathname]);
+  }, [navigate]); // ✅ FIXED OPTIMIZATION: Hapus location.pathname dari dependensi agar terbebas dari siklus infinite API loop!
 
   useEffect(() => {
     syncUser();
   }, [syncUser]);
 
-  // Loading Screen pas booting biar gak flicker
+  // Loading Screen pas booting pangkalan biar gak kedap-kedip
   if (isSyncing && localStorage.getItem('user_token')) {
     return (
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
@@ -74,7 +77,7 @@ function App() {
           <Route path="/auth" element={<AuthPage />} /> 
           <Route path="/payment/:donationId" element={<PaymentPage />} />
           
-          {/* ✅ JALUR UTAMA EXPLORE CREATORS HUB (Diletakkan di atas dynamic parameter) */}
+          {/* ✅ JALUR UTAMA EXPLORE CREATORS HUB (Aman dari dynamic hijacking) */}
           <Route path="/explore" element={<Explore />} />
 
           {/* --- 2. SULTAN OVERLAY PROTOCOL (OBS) --- */}
@@ -102,7 +105,7 @@ function App() {
           {/* --- 4. DYNAMIC CREATOR PROFILE (Public) --- */}
           <Route path="/:username" element={<DonationPage />} />
           
-          {/* --- 5. 404 REDIRECT --- */}
+          {/* --- 5. 404 REDIRECT FALLBACK --- */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

@@ -11,7 +11,6 @@ const SecurityPage = () => {
   const [isVerifying, setIsVerifying] = useState(false);
 
   // ✅ SULTAN SLIM TOAST PROTOCOL
-  // Muncul di pojok kanan atas, durasi 3 detik, dan TIDAK nge-blok input OTP.
   const showSultanToast = (title, icon = 'success') => {
     Swal.fire({
       toast: true,
@@ -46,16 +45,14 @@ const SecurityPage = () => {
 
     setLoading(true);
     try {
-      // ✅ Trigger setup-2fa ke backend
       const res = await api.post('/auth/setup-2fa', { userId: user.id });
-      
       if (res.data.success) {
-        setIsVerifying(true); // Membuka form input di SecurityView secara otomatis
+        setIsVerifying(true); 
         showSultanToast('<b>KODE TERKIRIM 🚀</b> <span>Cek WhatsApp lo, Ri!</span>', 'info');
       }
     } catch (err) {
       showSultanToast('<b>ENGINE ERROR</b> <span>Gagal kontak server keamanan.</span>', 'error');
-    } finally { 
+    } finally {
       setLoading(false); 
     }
   };
@@ -85,12 +82,12 @@ const SecurityPage = () => {
     } catch (err) { 
       showSultanToast('<b>KODE SALAH</b> <span>OTP nggak cocok, Ri!</span>', 'error');
       setOtp('');
-    } finally { 
+    } finally {
       setLoading(false); 
     }
   };
 
-  // --- 3. DISABLE 2FA (Master Key Protocol) ---
+  // --- 3. DISABLE 2FA (Master Secure Protocol) ✅ ---
   const handleDisable2FA = async () => {
     Swal.fire({
       title: 'COPOT PROTEKSI?',
@@ -110,8 +107,9 @@ const SecurityPage = () => {
       if (result.isConfirmed) {
         setLoading(true);
         try {
-          // ✅ Gunakan Master Key bypass
-          const res = await api.post('/auth/verify-2fa', { userId: user.id, token: '241004' }); 
+          // ✅ FIXED: Menembak endpoint pencabutan resmi tanpa membocorkan kunci rahasia statis di client-side
+          const res = await api.post('/auth/disable-2fa', { userId: user.id }); 
+          
           if (res.data.success) {
             const updatedUser = { ...user, is_two_fa_enabled: false };
             setUser(updatedUser);
@@ -121,6 +119,7 @@ const SecurityPage = () => {
         } catch (err) {
           showSultanToast('<b>FAILED</b> <span>Gagal mematikan protokol.</span>', 'error');
         } finally {
+          setLoading(true); // Mematikan status loading engine
           setLoading(false);
         }
       }
@@ -139,7 +138,7 @@ const SecurityPage = () => {
           onGenerateQR={handleRequestOTP} 
           onVerify={handleVerifyOTP}
           onDisable={handleDisable2FA}
-          onCancel={() => setIsVerifying(false)} // Tambahkan fungsi cancel
+          onCancel={() => setIsVerifying(false)}
         />
       </div>
     </div>

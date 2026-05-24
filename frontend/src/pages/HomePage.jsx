@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import api from '../api/axios' 
 import { 
   Sun, Moon, ArrowRight, Zap, HelpCircle, ChevronDown, ShieldCheck, 
-  Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight,
-  Target // ✅ FIXED: Ikon Target dikunci di sini agar terbebas dari ReferenceError!
+  Wallet, Monitor, Video, Gamepad2, Compass, ChevronRight, Target 
 } from 'lucide-react'
 
 const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
@@ -83,6 +82,7 @@ function HomePage() {
   useEffect(() => {
     const fetchStreamers = async () => {
       try {
+        // ✅ HIGH SIGNAL: Menggunakan rute terbuka publik untuk merender list di landing page
         const res = await api.get('/user/list');
         const data = res.data.success ? (res.data.streamers || res.data.data) : (Array.isArray(res.data) ? res.data : []);
         setStreamers(data); 
@@ -150,7 +150,7 @@ function HomePage() {
         </Reveal>
       </section>
 
-      {/* --- 💎 THE ELITE SQUAD HUB (CLEAN PREMIUM STATIC GRID) --- */}
+      {/* --- 💎 THE ELITE SQUAD HUB --- */}
       <section className="max-w-7xl mx-auto px-6 py-20 text-center relative z-10">
         <Reveal>
           <div className="flex flex-col items-center mb-20">
@@ -160,7 +160,6 @@ function HomePage() {
           </div>
         </Reveal>
 
-        {/* 🔲 FAANG STYLE STATIC GRID: Kotak Sempurna, Elegan, Gak Bikin Pusing */}
         {streamers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
             {streamers.slice(0, 8).map((s, idx) => {
@@ -174,7 +173,6 @@ function HomePage() {
                     onClick={() => navigate(`/${s.username}`)}
                     className={`w-full aspect-square p-6 rounded-[2.5rem] border-4 border-slate-950 cursor-pointer hover:shadow-[8px_8px_0px_0px_#7C3AED] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between items-center text-center group ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
                   >
-                    {/* Lingkaran Foto Real-time */}
                     <div className="w-20 h-20 rounded-full border-2 border-slate-950 overflow-hidden shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-violet-50 flex-shrink-0 transition-transform group-hover:scale-105 duration-300">
                       <img 
                         src={targetAvatar} 
@@ -184,7 +182,6 @@ function HomePage() {
                       />
                     </div>
                     
-                    {/* Metadata */}
                     <div className="w-full min-w-0 my-2">
                       <h4 className="font-black italic text-base uppercase tracking-tight truncate leading-none mb-1 px-1 group-hover:text-violet-600 transition-colors">
                         {s.display_name || s.full_name || s.username}
@@ -192,7 +189,6 @@ function HomePage() {
                       <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase truncate">@{s.username}</p>
                     </div>
 
-                    {/* Action Hub Indicator */}
                     <div className="text-violet-600 text-[10px] font-black uppercase tracking-widest italic flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                       INSPECT NODE <ChevronRight size={12} strokeWidth={3} />
                     </div>
@@ -205,7 +201,6 @@ function HomePage() {
           <p className="text-slate-400 italic font-bold">Scanning active creator nodes...</p>
         )}
 
-        {/* LINK GATEWAY UTK MELIHAT LEBIH BANYAK (EXPLORE REDIRECT) */}
         <div className="text-center mt-16">
           <Link 
             to="/explore" 
@@ -261,7 +256,7 @@ function HomePage() {
 
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-slate-900 border-red-500/20 shadow-[15px_15px_0px_0px_rgba(239,68,68,0.2)]' : 'bg-white shadow-[15px_15px_0px_0px_#EF4444]'}`}>
              <div className="space-y-6">
-                <Video size={40} className="text-red-500" />
+                <div className="text-red-500"><Video size={40} /></div>
                 <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Media <br /> <span className="text-red-500">Share</span></h3>
              </div>
              <p className="text-slate-500 font-bold italic mt-10">Biarkan fans lo yang jadi DJ. Putar video favorit mereka lewat donasi interaktif secara live.</p>
@@ -269,7 +264,7 @@ function HomePage() {
 
           <motion.div whileHover={{ y: -10 }} className={`md:col-span-6 p-12 rounded-[4rem] border-4 border-slate-950 flex flex-col justify-between transition-all ${darkMode ? 'bg-slate-900 border-emerald-500/20 shadow-[15px_15px_0px_0px_rgba(16,185,129,0.2)]' : 'bg-slate-950 text-white shadow-[15px_15px_0px_0px_#10B981]'}`}>
              <div className="space-y-6">
-                <Target size={40} className="text-emerald-500" />
+                <div className="text-emerald-500"><Target size={40} /></div>
                 <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9]">Goal <br /> <span className="text-emerald-500">Tracker</span></h3>
              </div>
              <p className="text-slate-400 font-bold italic mt-10">Tunjukkan ambisi lo. Pantau target donasi secara real-time dengan bar progres yang gahar.</p>
@@ -326,11 +321,10 @@ function HomePage() {
         </div>
       </footer>
 
-      {/* --- ✅ PREMIUM INJECTIONS: SMOOTH SCROLL ENGINE & CUSTOM SCROLLBAR --- */}
+      {/* --- PREMIUM INJECTIONS: SMOOTH SCROLL ENGINE & CUSTOM SCROLLBAR --- */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
         
-        /* 🚀 PRECISE SMOOTH SCROLL ENGINE ACTIVATED */
         html { 
           scroll-behavior: smooth !important;
         }
@@ -340,7 +334,6 @@ function HomePage() {
           -webkit-font-smoothing: antialiased;
         }
         
-        /* Premium Custom Scrollbar */
         ::-webkit-scrollbar { 
           width: 10px; 
         }

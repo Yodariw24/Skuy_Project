@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Copy, Play, Eye, EyeOff, Save, Zap, Target, Trophy, Crown, 
-  ShieldCheck, Check, Waves, Loader2, Settings2, Paintbrush
+  ShieldCheck, Check, Loader2, Settings2, Paintbrush, Heart
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../api/axios'; 
@@ -12,7 +12,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 1. BRANDING STATE (Sync with widget_settings table)
+  // 1. BRANDING STATE (Sync dengan widget_settings di database lo)
   const [colors, setColors] = useState({
     primary: '#7C3AED',   
     accent: '#FF1493',    
@@ -25,10 +25,47 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
     duration: 8, 
     goal_title: 'SULTAN STREAM SETUP', 
     goal_target: 1000000,
-    goal_current: 0
+    goal_current: 350000 // Set default terisi buat dummy mockup visual
   });
 
+  // 📡 PANCING DATA AWAL: Ambil konfigurasi terakhir dari database biar gak ketimpa nilai default hancur
+  const fetchCurrentWidgetSettings = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get(`/user/widgets/settings/${user.username || user.id}/${activeSubMenu}`);
+      if (res.data.success && res.data.data) {
+        const dbData = res.data.data;
+        if (dbData.primary_color) {
+          setColors({
+            primary: dbData.primary_color || '#7C3AED',
+            accent: dbData.accent_color || '#FF1493',
+            text: dbData.text_color || '#ffffff',
+            glow: dbData.glow_color || '#7C3AED'
+          });
+        }
+        if (dbData.config) {
+          setConfig(prev => ({ ...prev, ...dbData.config }));
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️ Menggunakan visual pangkalan lokal untuk rendering sandbox.");
+    }
+  }, [user, activeSubMenu]);
+
+  // Trigger pancing data otomatis setiap kali user berpindah sub-menu overlay setup
+  useEffect(() => {
+    fetchCurrentWidgetSettings();
+  }, [fetchCurrentWidgetSettings]);
+
   const formatR = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
+
+  // ✅ UTILITY CALCULATION: Hitung persentase bar progres Milestone secara riil harian
+  const milestonePercentage = useMemo(() => {
+    const target = Number(config.goal_target) || 1000000;
+    const current = Number(config.goal_current) || 0;
+    const pct = Math.round((current / target) * 100);
+    return Math.min(pct, 100); // Kunci mentok di 100% biar gak over-width bar visualnya
+  }, [config.goal_target, config.goal_current]);
 
   const featureMeta = {
     tip: { tag: "Engagement System", title: "Interaction", suffix: "Alerts", desc: "Ubah setiap apresiasi menjadi selebrasi visual yang memikat komunitas anda." },
@@ -43,10 +80,9 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const handleDeploy = async () => {
     setLoading(true);
     try {
-      // ✅ SINKRONISASI KE WIDGET CONTROLLER (Langkah 14)
       const res = await api.post('/user/widgets/update', {
         userId: user.id,
-        widgetType: activeSubMenu, // Kirim tipe widget aktif
+        widgetType: activeSubMenu, 
         colors,
         config
       });
@@ -54,7 +90,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
       if (res.data.success) {
         Swal.fire({
           title: 'PROTOCOL DEPLOYED 🚀',
-          text: 'Konfigurasi visual sudah aktif di Skuy Engine & OBS lo!',
+          text: 'Konfigurasi visual sudah aktif di Skuy Engine & OBS lo, Ri!',
           icon: 'success',
           confirmButtonColor: '#7C3AED',
           customClass: { popup: 'rounded-[3rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#7C3AED]' }
@@ -73,14 +109,14 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
     }
   };
 
-  // 3. UNIQUE VISUAL ARCHITECTURE
+  // 3. UNIQUE VISUAL ARCHITECTURE MOCKUP
   const WidgetVisual = useMemo(() => {
     const variants = {
       tip: (
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative text-left">
-          <div style={{ backgroundColor: colors.glow }} className="absolute -inset-10 blur-[100px] opacity-20 animate-pulse rounded-full" />
+          <div style={{ backgroundColor: colors.glow }} className="absolute -inset-10 blur-[100px] opacity-20 animate-pulse rounded-full pointer-events-none" />
           <div style={{ backgroundColor: colors.primary }} className="relative w-85 p-12 rounded-[50px] shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] border-4 border-slate-950 overflow-hidden text-left">
-            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><Zap size={140} fill="white" /></div>
+            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 text-white"><Zap size={140} fill="currentColor" /></div>
             <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white opacity-60 mb-2 italic">Incoming Interaction</p>
             <h2 className="text-3xl font-black italic tracking-tighter text-white mb-6 leading-none uppercase">Sultan_Gaming</h2>
             <div className="h-2 w-16 bg-white/20 rounded-full mb-6" />
@@ -109,11 +145,12 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
       milestone: (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md bg-white p-12 rounded-[50px] shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] border-4 border-slate-950 text-left">
           <div className="flex justify-between items-end mb-8 px-2">
-            <h4 className="text-2xl font-black uppercase italic tracking-tighter text-slate-950">{config.goal_title}</h4>
-            <span style={{ color: colors.primary }} className="text-3xl font-black italic">63%</span>
+            <h4 className="text-2xl font-black uppercase italic tracking-tighter text-slate-950 truncate max-w-[250px]">{config.goal_title}</h4>
+            {/* ✅ FIXED: Persentase dinamis mengikuti input form, bukan statis 63% */}
+            <span style={{ color: colors.primary }} className="text-3xl font-black italic">{milestonePercentage}%</span>
           </div>
           <div className="h-16 w-full bg-slate-100 rounded-[25px] p-2.5 border-4 border-slate-950 mb-8 shadow-inner">
-            <motion.div initial={{ width: 0 }} animate={{ width: '63%' }} style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.glow})` }} className="h-full rounded-[15px] border-r-4 border-white/20 shadow-lg" />
+            <motion.div initial={{ width: 0 }} animate={{ width: `${milestonePercentage}%` }} transition={{ duration: 0.5 }} style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.glow})` }} className="h-full rounded-[15px] border-r-4 border-white/20 shadow-lg" />
           </div>
           <p className="text-[10px] font-black uppercase text-slate-400 text-center tracking-[0.2em]">Rp {formatR(config.goal_current)} / Rp {formatR(config.goal_target)}</p>
         </motion.div>
@@ -122,8 +159,8 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-sm space-y-4">
            <div className="flex justify-center items-end gap-4 mb-12">
               <div style={{ backgroundColor: colors.primary }} className="w-24 h-32 rounded-[30px] flex flex-col items-center justify-center shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] relative translate-y-[-15px] border-4 border-slate-950">
-                 <Crown size={24} className="absolute -top-6 text-amber-400 fill-amber-400 drop-shadow-lg" />
-                 <div className="w-14 h-14 rounded-2xl bg-white/20 border-2 border-white/30" />
+                 <Crown size={24} className="absolute -top-6 text-amber-400 fill-amber-400 drop-shadow-lg animate-bounce" />
+                 <div className="w-14 h-14 rounded-2xl bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-black italic text-sm">#1</div>
               </div>
            </div>
            <div className="p-6 bg-white border-4 border-slate-950 rounded-[28px] flex justify-between items-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
@@ -134,7 +171,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
       )
     };
     return variants[activeSubMenu] || variants.tip;
-  }, [activeSubMenu, colors, config]);
+  }, [activeSubMenu, colors, config, milestonePercentage]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-16 pb-32 text-left selection:bg-indigo-100 font-sans px-4">
@@ -149,7 +186,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
           </h1>
           <p className="max-w-md text-slate-400 text-sm font-bold uppercase tracking-widest italic leading-relaxed"> {meta.desc} </p>
         </div>
-        <button onClick={handleDeploy} disabled={loading} className="px-14 py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] shadow-[8px_8px_0px_0px_#7C3AED] hover:translate-y-[-2px] hover:translate-x-[-2px] transition-all flex items-center gap-4 group active:scale-95 active:shadow-none">
+        <button type="button" onClick={handleDeploy} disabled={loading} className="px-14 py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] shadow-[8px_8px_0px_0px_#7C3AED] hover:translate-y-[-2px] hover:translate-x-[-2px] transition-all flex items-center gap-4 group active:scale-95 active:shadow-none border-0 cursor-pointer">
             {loading ? <Loader2 className="animate-spin" size={18} /> : 'Deploy Protocol'} <Save size={18} className="group-hover:rotate-12 transition-transform" />
         </button>
       </div>
@@ -169,10 +206,10 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-6 flex items-center gap-3 italic"> <ShieldCheck size={16} className="text-indigo-400" /> OBS Browser Source Protocol </h3>
                 <div className="bg-white/5 border-2 border-white/10 p-6 rounded-3xl flex items-center justify-between backdrop-blur-md">
                     <code className="text-[11px] font-mono text-indigo-300 font-bold truncate italic mr-8"> {showUrl ? `https://skuy-project.vercel.app/widget/${user?.username}/${activeSubMenu}` : '••••••••••••••••••••••••••••••••••••••••'} </code>
-                    <button onClick={() => setShowUrl(!showUrl)} className="text-white/40 hover:text-white transition-colors"> {showUrl ? <EyeOff size={22}/> : <Eye size={22}/>} </button>
+                    <button type="button" onClick={() => setShowUrl(!showUrl)} className="text-white/40 hover:text-white transition-colors bg-transparent border-0 cursor-pointer"> {showUrl ? <EyeOff size={22}/> : <Eye size={22}/>} </button>
                 </div>
              </div>
-             <button onClick={() => { navigator.clipboard.writeText(`https://skuy-project.vercel.app/widget/${user?.username}/${activeSubMenu}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-7 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={20} /> : <Copy size={20} />} {copied ? 'Linked' : 'Copy Key'} </button>
+             <button type="button" onClick={() => { navigator.clipboard.writeText(`https://skuy-project.vercel.app/widget/${user?.username}/${activeSubMenu}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-7 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl border-0 cursor-pointer ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={20} /> : <Copy size={20} />} {copied ? 'Linked' : 'Copy Key'} </button>
           </div>
         </div>
 
@@ -189,7 +226,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
                   <div className="group text-left">
                      <label className="text-[10px] font-black uppercase text-slate-400 mb-5 block px-1 tracking-[0.2em] italic">Activation Threshold (IDR)</label>
                      <div className="bg-slate-50 border-4 border-slate-100 group-focus-within:border-slate-950 group-focus-within:bg-white rounded-[30px] p-8 transition-all">
-                        <input type="number" value={config.min_tip} onChange={(e) => setConfig({...config, min_tip: e.target.value})} className="w-full bg-transparent font-black text-4xl outline-none tracking-tighter text-slate-950" />
+                        <input type="number" value={config.min_tip} onChange={(e) => setConfig({...config, min_tip: e.target.value})} className="w-full bg-transparent font-black text-4xl outline-none tracking-tighter text-slate-950 border-0" />
                      </div>
                   </div>
                 )}
@@ -211,7 +248,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
                     <div className="flex items-center gap-4 mb-10"> <Paintbrush size={22} className="text-fuchsia-500" /> <h4 className="text-sm font-black uppercase italic tracking-widest text-slate-950">Aesthetic Nodes</h4> </div>
                     <div className="grid grid-cols-1 gap-5">
                       {Object.keys(colors).map((key) => (
-                        <div key={key} className="group relative bg-white border-4 border-slate-100 p-6 rounded-[30px] hover:border-slate-950 transition-all cursor-pointer">
+                        <div key={key} className="group relative bg-white border-4 border-slate-100 p-6 rounded-[30px] hover:border-slate-950 transition-all">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-5">
                               <div style={{ backgroundColor: colors[key] }} className="w-14 h-14 rounded-2xl border-4 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]" />
@@ -220,7 +257,7 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Channel Node</p>
                               </div>
                             </div>
-                            <input type="color" value={colors[key]} onChange={(e) => setColors({...colors, [key]: e.target.value})} className="w-12 h-12 border-none bg-transparent cursor-pointer rounded-full overflow-hidden" />
+                            <input type="color" value={colors[key]} onChange={(e) => setColors({...colors, [key]: e.target.value})} className="w-12 h-12 border-none bg-transparent cursor-pointer rounded-full overflow-hidden p-0" />
                           </div>
                         </div>
                       ))}

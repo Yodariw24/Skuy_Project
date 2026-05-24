@@ -121,7 +121,7 @@ function DashboardPage() {
                 confirmButtonColor: "#7C3AED"
             });
         }
-        letting2FA = true; // Sesuai kodingan asli pembawa state lo
+        // ✅ FIXED: Menghapus baris typo letget2FA yang bikin crash screen
         setLoading2FA(true);
         try {
             const res = await api.post('/auth/setup-2fa', { userId: user.id });

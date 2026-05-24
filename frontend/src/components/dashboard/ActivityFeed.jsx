@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import api from '../../api/axios' 
 import { 
   Clock, Heart, RefreshCcw, Zap, 
@@ -76,12 +76,19 @@ function ActivityFeed() {
     }
   }, []);
 
+  // ✅ FIXED UX: Pemicu bootstrap data awal terisolasi murni dari flapping re-rendering
   useEffect(() => {
     fetchHistory();
-    // 🚀 LIVE STREAM SYNC: Refresh latar belakang tiap 15 detik biar responsif tanpa membebani server
-    const interval = setInterval(() => fetchHistory(true), 15000);
-    return () => clearInterval(interval);
   }, [fetchHistory]);
+
+  // ✅ BACKGROUND ENGINE POLLING: Mesin penangkap saweran harian live stand-by tiap 15 detik
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchHistory(true);
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const formatRelativeTime = (dateString) => {
     if (!dateString) return 'Baru saja';
@@ -98,7 +105,7 @@ function ActivityFeed() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 px-2 font-sans text-left">
+    <div className="max-w-4xl mx-auto pb-24 px-2 font-sans text-left selection:bg-violet-600 selection:text-white">
       
       {/* --- HEADER SULTAN HUB --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-14 gap-6 px-2">
@@ -121,6 +128,7 @@ function ActivityFeed() {
              <p className="text-[10px] font-bold text-emerald-500 uppercase italic">All Systems Operational</p>
           </div>
           <button 
+            type="button"
             onClick={() => fetchHistory()}
             disabled={loading || isRefreshing}
             className="group relative p-5 bg-white border-4 border-slate-950 rounded-2xl hover:bg-slate-50 transition-all active:translate-y-1 shadow-[6px_6px_0px_0px_#000]"
@@ -147,7 +155,6 @@ function ActivityFeed() {
         ) : history.length > 0 ? (
           <AnimatePresence mode='popLayout'>
             {history.map((item, i) => {
-              // 🛡️ DYNAMIC TIER RESOLVER: Menghubungkan visualisasi dengan data 'tier' Postgres
               const currentTier = item.tier?.toUpperCase() || 'STANDARD';
               const cfg = tierConfig[currentTier] || tierConfig.STANDARD;
 
@@ -160,34 +167,29 @@ function ActivityFeed() {
                   key={item.id} 
                   className={`group relative p-8 md:p-12 rounded-[3.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-start md:items-center gap-10 hover:translate-y-[-4px] hover:translate-x-[-4px] ${cfg.shadow} ${cfg.bg} transition-all duration-500 overflow-hidden`}
                 >
-                  {/* Floating Translucent Background Icon */}
                   <div className="absolute -top-6 -right-6 p-8 opacity-[0.02] group-hover:opacity-10 text-slate-950 transition-all group-hover:rotate-12 group-hover:scale-150 pointer-events-none duration-700">
                      {cfg.icon}
                   </div>
 
-                  {/* Left Side: Avatar Box / Dynamic Tier Icon */}
                   <div className="relative shrink-0 mx-auto md:mx-0">
                     <div className={`w-24 h-24 rounded-[2.5rem] border-4 border-slate-950 flex items-center justify-center transition-all duration-500 shadow-[6px_6px_0px_0px_#000] ${cfg.iconBg} group-hover:scale-105 group-hover:rotate-3`}>
                       {cfg.icon}
                     </div>
                   </div>
                   
-                  {/* Right Side: Information Panel */}
                   <div className="flex-1 w-full min-w-0 z-10 text-center md:text-left">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
                       <div>
                         <div className="flex flex-col md:flex-row items-center gap-4 mb-4 justify-center md:justify-start">
-                          <h3 className="font-black italic text-slate-950 uppercase tracking-tighter text-3xl leading-none flex items-center gap-2">
+                          <h3 className="font-black italic text-slate-950 uppercase tracking-tighter text-xl leading-none flex items-center gap-2">
                             <User size={22} className="text-slate-400" strokeWidth={3} /> {item.donatur_name}
                           </h3>
-                          {/* 🎖️ DYNAMIC BADGE SULTAN TIER */}
                           <span className={`text-[9px] font-black uppercase px-4 py-1.5 rounded-full shadow-sm tracking-widest ${cfg.badge}`}>
                             {cfg.badgeText}
                           </span>
                         </div>
                         
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                          {/* ✅ DATABASE ACCURACY: Membaca created_date dari tabel donations */}
                           <span className="flex items-center gap-1.5 bg-slate-100 px-3 py-2 rounded-xl text-slate-600 border border-slate-200">
                             <Clock size={14} strokeWidth={3} /> {formatRelativeTime(item.created_date)}
                           </span>
@@ -197,7 +199,6 @@ function ActivityFeed() {
                         </div>
                       </div>
 
-                      {/* NOMINAL PANEL BOX (Menggunakan gross_amount) */}
                       <div className="bg-slate-950 p-5 md:p-7 rounded-[2.2rem] shadow-[6px_6px_0px_0px_#000] transform group-hover:rotate-2 group-hover:scale-105 transition-all duration-300 border-2 border-slate-900 mx-auto lg:mx-0 w-fit">
                         <p className={`text-2xl md:text-4xl font-black italic tracking-tighter leading-none ${cfg.text}`}>
                           Rp {Number(item.gross_amount || item.amount).toLocaleString('id-ID')}
@@ -218,7 +219,6 @@ function ActivityFeed() {
             })}
           </AnimatePresence>
         ) : (
-          /* --- BEAUTIFUL EMPTY STATE HUB --- */
           <div className="bg-white rounded-[4rem] border-4 border-slate-950 py-32 text-center flex flex-col items-center shadow-[16px_16px_0px_0px_#f1f5f9] group border-dashed hover:border-solid transition-all duration-500">
             <div className="w-28 h-28 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mb-10 border-4 border-slate-200 group-hover:border-slate-950 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shadow-[6px_6px_0px_0px_#f1f5f9] group-hover:shadow-[6px_6px_0px_0px_#000]">
               <ShieldAlert size={48} className="text-slate-300 group-hover:text-violet-400 transition-colors animate-pulse" />
@@ -229,6 +229,7 @@ function ActivityFeed() {
                 Belum ada transaksi masuk dari para Sultan. Bagikan tautan profil unik milikmu sekarang!
               </p>
               <button 
+                type="button"
                 onClick={() => {
                   const userSession = JSON.parse(localStorage.getItem('user'));
                   if (userSession) {

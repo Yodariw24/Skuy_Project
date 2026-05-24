@@ -52,7 +52,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // 🛡️ 3. Multipart / Form Data Handling
+    // 🛡️ 3. Multipart / Form Data Handling (Auto-Detect Upload Avatar)
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }

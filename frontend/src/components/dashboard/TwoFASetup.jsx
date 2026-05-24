@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import api from '../api/axios';
+import React, { useState, useEffect } from 'react';
+import api from '../api/axios'; 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Loader2, MessageSquare, Mail, CheckCircle2, AlertTriangle, ArrowRight, Zap } from 'lucide-react';
+import { ShieldCheck, Loader2, MessageSquare, Mail, CheckCircle2, ArrowRight, Zap } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-function TwoFASetup({ user, setActiveMenu }) {
+// ✅ INJEKSI SINKRONISASI: Menambahkan setUser bawaan AuthContext agar state sinkron murni
+function TwoFASetup({ user, setUser, setActiveMenu }) {
   const [step, setStep] = useState(user?.is_two_fa_enabled ? 'enabled' : 'idle');
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -21,8 +22,8 @@ function TwoFASetup({ user, setActiveMenu }) {
       timer: 4000,
       timerProgressBar: true,
       customClass: {
-        popup: 'skuy-slim-toast',
-        title: 'skuy-toast-content'
+        popup: 'border-4 border-slate-950 bg-white rounded-2xl shadow-[4px_4px_0px_0px_#7C3AED]',
+        title: 'font-sans font-black uppercase text-slate-950 text-[10px] tracking-widest'
       }
     });
     Toast.fire({
@@ -30,6 +31,15 @@ function TwoFASetup({ user, setActiveMenu }) {
       title: title
     });
   };
+
+  // ✅ AUTO-SYNC: Selaraskan step visual jika status user berubah dari luar komponen
+  useEffect(() => {
+    if (user?.is_two_fa_enabled) {
+      setStep('enabled');
+    } else {
+      setStep('idle');
+    }
+  }, [user?.is_two_fa_enabled]);
 
   const handleRequestOTP = async () => {
     if (!sultanId) return;
@@ -44,9 +54,10 @@ function TwoFASetup({ user, setActiveMenu }) {
         confirmButtonText: "ISI SEKARANG",
         cancelButtonText: "NANTI AJA",
         customClass: {
-          popup: 'skuy-border skuy-shadow rounded-[2rem]',
-          confirmButton: 'bg-slate-950 text-white px-8 py-3 rounded-xl font-black uppercase italic mr-2',
-          cancelButton: 'bg-slate-100 text-slate-400 px-8 py-3 rounded-xl font-black uppercase italic'
+          popup: 'skuy-border border-4 border-slate-950 rounded-[2rem] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6',
+          title: 'font-black italic uppercase tracking-tight text-slate-950',
+          confirmButton: 'bg-slate-950 text-white px-8 py-3 rounded-xl font-black uppercase italic text-xs mr-2 border-2 border-slate-950 shadow-[3px_3px_0px_0px_#7C3AED]',
+          cancelButton: 'bg-slate-100 text-slate-400 px-8 py-3 rounded-xl font-black uppercase italic text-xs'
         },
         buttonsStyling: false
       }).then((result) => {
@@ -58,12 +69,11 @@ function TwoFASetup({ user, setActiveMenu }) {
 
     setLoadingOTP(true);
     try {
-      // ✅ PANGGILAN SULTAN: Tanpa double /api karena sudah di-handle axios.js
       const res = await api.post('/auth/setup-2fa', { userId: sultanId });
       
       if (res.data.success) {
-        setStep('verifying'); // Langsung buka kolom input
-        showSultanToast('<b>PROTOCOL SENT</b> <span>Cek WA & Email ariwirayuda24!</span>');
+        setStep('verifying'); 
+        showSultanToast('<b>PROTOCOL SENT</b> <span>Cek WA & Email lo, Ri!</span>', 'info');
       }
     } catch (err) {
       showSultanToast('<b>ENGINE ERROR</b> <span>Gagal kontak server OTP.</span>', 'error');
@@ -84,11 +94,17 @@ function TwoFASetup({ user, setActiveMenu }) {
         showSultanToast('<b>SECURED!</b> <span>2FA Berhasil Aktif.</span>');
         
         const updatedUser = { ...user, is_two_fa_enabled: true };
+        
+        // ✅ FIXED: Update state React global lewat context biar gak nge-lag sebelum force reload
+        if (typeof setUser === 'function') {
+          setUser(updatedUser);
+        }
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
         setStep('enabled');
         setOtp('');
-        // Kasih jeda biar user liat notif sukses dulu
+        
+        // Jeda aman sinkronisasi caching browser
         setTimeout(() => { window.location.reload(); }, 1500);
       }
     } catch (err) {
@@ -101,7 +117,7 @@ function TwoFASetup({ user, setActiveMenu }) {
 
   return (
     <div className="bg-white p-8 rounded-[2.5rem] border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-left relative overflow-hidden transition-all hover:shadow-[16px_16px_0px_0px_#7C3AED]">
-      <div className="absolute top-0 right-0 p-4 opacity-[0.03] rotate-12"><ShieldCheck size={120} /></div>
+      <div className="absolute top-0 right-0 p-4 opacity-[0.03] rotate-12 pointer-events-none"><ShieldCheck size={120} /></div>
 
       <div className="flex items-center gap-4 mb-10 relative z-10">
         <div className={`p-4 rounded-2xl border-4 border-slate-950 shadow-[4px_4px_0px_0px_#000] ${step === 'enabled' ? 'bg-emerald-500 text-white' : 'bg-slate-950 text-white'}`}>
@@ -142,6 +158,7 @@ function TwoFASetup({ user, setActiveMenu }) {
             </div>
             
             <button 
+              type="button"
               onClick={handleRequestOTP}
               disabled={loadingOTP}
               className="w-full py-6 bg-[#7C3AED] text-white rounded-[2rem] font-black italic uppercase tracking-widest hover:translate-y-[-2px] transition-all active:translate-y-1 shadow-[0_8px_0_0_#4c1d95] border-4 border-slate-950 flex items-center justify-center gap-3 group"
@@ -165,12 +182,12 @@ function TwoFASetup({ user, setActiveMenu }) {
                 className="w-full p-6 text-center text-5xl font-black border-4 border-slate-950 rounded-[2rem] outline-none focus:bg-violet-50 transition-all placeholder:text-slate-100 shadow-inner tracking-[0.2em]"
                 value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               />
-              <p className="text-[9px] font-bold text-slate-400 italic mt-4">Kode dikirim ke: {user?.phone_number} & ariwirayuda24</p>
+              <p className="text-[9px] font-bold text-slate-400 italic mt-4">Kode dikirim ke nomor WhatsApp dan Email lo yang terdaftar, Ri!</p>
             </div>
 
             <div className="flex gap-4">
-              <button onClick={() => { setStep('idle'); setOtp(''); }} className="flex-1 py-5 border-4 border-slate-950 rounded-2xl font-black uppercase text-[11px] hover:bg-slate-50 transition-all shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-none">Batal</button>
-              <button onClick={handleActivate} disabled={isVerifying || otp.length < 6} className="flex-[2] py-5 bg-slate-950 text-white rounded-2xl font-black uppercase text-[11px] shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:shadow-none disabled:border-slate-300">
+              <button type="button" onClick={() => { setStep('idle'); setOtp(''); }} className="flex-1 py-5 border-4 border-slate-950 rounded-2xl font-black uppercase text-[11px] hover:bg-slate-50 transition-all shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-none bg-white">Batal</button>
+              <button type="button" onClick={handleActivate} disabled={isVerifying || otp.length < 6} className="flex-[2] py-5 bg-slate-950 text-white rounded-2xl font-black uppercase text-[11px] shadow-[6px_6px_0px_0px_#7C3AED] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:shadow-none disabled:border-slate-300">
                 {isVerifying ? <Loader2 className="animate-spin" /> : 'CONFIRM NODE'}
               </button>
             </div>

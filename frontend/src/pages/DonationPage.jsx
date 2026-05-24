@@ -8,13 +8,14 @@ import {
   History, Skull, Heart, Info, Mail, User, Clock, ShieldCheck 
 } from 'lucide-react' 
 
+// ✅ UPGRADE: Menambahkan hex warna murni untuk mengunci shadow brutalism Tailwind
 const themeMap = {
-  violet: { gradient: 'from-violet-600 via-violet-700 to-fuchsia-600', text: 'text-violet-600', bg: 'bg-violet-600', bgLight: 'bg-violet-50', border: 'border-violet-100', shadow: 'shadow-violet-200', ring: 'focus:ring-violet-50/50', focusBorder: 'focus:border-violet-200' },
-  emerald: { gradient: 'from-emerald-500 via-emerald-600 to-teal-500', text: 'text-emerald-600', bg: 'bg-emerald-600', bgLight: 'bg-emerald-50', border: 'border-emerald-100', shadow: 'shadow-emerald-200', ring: 'focus:ring-emerald-50/50', focusBorder: 'focus:border-emerald-200' },
-  rose: { gradient: 'from-rose-500 via-rose-600 to-orange-500', text: 'text-rose-600', bg: 'bg-rose-600', bgLight: 'bg-rose-50', border: 'border-rose-100', shadow: 'shadow-rose-200', ring: 'focus:ring-rose-50/50', focusBorder: 'focus:border-rose-200' },
-  amber: { gradient: 'from-amber-500 via-amber-600 to-yellow-500', text: 'text-amber-600', bg: 'bg-amber-600', bgLight: 'bg-amber-50', border: 'border-amber-100', shadow: 'shadow-amber-200', ring: 'focus:ring-amber-50/50', focusBorder: 'focus:border-amber-200' },
-  sky: { gradient: 'from-sky-500 via-sky-600 to-indigo-500', text: 'text-sky-600', bg: 'bg-sky-600', bgLight: 'bg-sky-50', border: 'border-sky-100', shadow: 'shadow-sky-200', ring: 'focus:ring-sky-50/50', focusBorder: 'focus:border-sky-200' },
-  slate: { gradient: 'from-slate-800 via-slate-900 to-black', text: 'text-slate-900', bg: 'bg-slate-900', bgLight: 'bg-slate-100', border: 'border-slate-200', shadow: 'shadow-slate-300', ring: 'focus:ring-slate-200/50', focusBorder: 'focus:border-slate-300' }
+  violet: { gradient: 'from-violet-600 via-violet-700 to-fuchsia-600', text: 'text-violet-600', bg: 'bg-violet-600', bgHex: '#7C3AED', bgLight: 'bg-violet-50', border: 'border-violet-100', shadow: 'shadow-violet-200', ring: 'focus:ring-violet-50/50', focusBorder: 'focus:border-violet-200' },
+  emerald: { gradient: 'from-emerald-500 via-emerald-600 to-teal-500', text: 'text-emerald-600', bg: 'bg-emerald-600', bgHex: '#10B981', bgLight: 'bg-emerald-50', border: 'border-emerald-100', shadow: 'shadow-emerald-200', ring: 'focus:ring-emerald-50/50', focusBorder: 'focus:border-emerald-200' },
+  rose: { gradient: 'from-rose-500 via-rose-600 to-orange-500', text: 'text-rose-600', bg: 'bg-rose-600', bgHex: '#EF4444', bgLight: 'bg-rose-50', border: 'border-rose-100', shadow: 'shadow-rose-200', ring: 'focus:ring-rose-50/50', focusBorder: 'focus:border-rose-200' },
+  amber: { gradient: 'from-amber-500 via-amber-600 to-yellow-500', text: 'text-amber-600', bg: 'bg-amber-600', bgHex: '#F59E0B', bgLight: 'bg-amber-50', border: 'border-amber-100', shadow: 'shadow-amber-200', ring: 'focus:ring-amber-50/50', focusBorder: 'focus:border-amber-200' },
+  sky: { gradient: 'from-sky-500 via-sky-600 to-indigo-500', text: 'text-sky-600', bg: 'bg-sky-600', bgHex: '#0EA5E9', bgLight: 'bg-sky-50', border: 'border-sky-100', shadow: 'shadow-sky-200', ring: 'focus:ring-sky-50/50', focusBorder: 'focus:border-sky-200' },
+  slate: { gradient: 'from-slate-800 via-slate-900 to-black', text: 'text-slate-900', bg: 'bg-slate-900', bgHex: '#0F172A', bgLight: 'bg-slate-100', border: 'border-slate-200', shadow: 'shadow-slate-300', ring: 'focus:ring-slate-200/50', focusBorder: 'focus:border-slate-300' }
 };
 
 function DonationPage() {
@@ -26,7 +27,6 @@ function DonationPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
-  // 🛡️ STATE SIMULASI QRIS MOCK
   const [showQR, setShowQR] = useState(false)
   const [currentDonation, setCurrentDonation] = useState(null)
   
@@ -36,7 +36,6 @@ function DonationPage() {
 
   const shortcuts = [10000, 25000, 50000, 100000];
   
-  // ✅ SAFE THEME FALLBACK: Mengunci warna ungu jika data dari backend masih memuat/kosong
   const theme = themeMap[streamer?.theme_color] || themeMap.violet;
 
   // --- LOGIKA FETCH DATA SULTAN (Railway Sync) ---
@@ -49,7 +48,6 @@ function DonationPage() {
         const data = res.data.data;
         setStreamer(data);
 
-        // ✅ FIXED ENDPOINT: Sinkron dengan parameter streamer_id di backend lo
         const [resBalance, resHistory] = await Promise.all([
           api.get(`/donations/balance/${data.id}`),
           api.get(`/donations/public-history/${data.id}`)
@@ -77,17 +75,15 @@ function DonationPage() {
     
     setSubmitting(true);
     try {
-      // ✅ SINKRON: Mengirim data ke backend dengan status default 'PENDING'
+      // ✅ SINKRON: Mengunci payment_method murni ke 'QRIS' agar sinkron dengan Midtrans CoreAPI Backend
       const res = await api.post('/donations/create', {
         ...formData,
         streamer_id: streamer.id,
-        payment_method: 'QRIS_MOCK'
+        payment_method: 'QRIS'
       });
 
       if (res.data.success) {
-        // ✅ INJECT DATA: Menyimpan data donasi untuk dikirim ke komponen modal
         setCurrentDonation(res.data.data);
-        // ✅ POP UP MODAL: Membuka simulator QR Code lo
         setShowQR(true);
       }
     } catch (err) { 
@@ -155,7 +151,11 @@ function DonationPage() {
             <div className={`absolute top-0 right-0 w-40 h-40 ${theme.bgLight} rounded-full -mr-20 -mt-20 blur-3xl opacity-60`} />
             
             <div className="relative shrink-0">
-              <div className={`w-40 h-40 md:w-48 md:h-48 rounded-[3.5rem] p-2 bg-slate-950 shadow-[10px_10px_0px_0px_${theme.bg.replace('bg-', '#')}]`}>
+              {/* ✅ FIXED: Menggunakan inline-style style={{ boxShadow }} untuk memproses variable hex warna murni secara valid */}
+              <div 
+                className="w-40 h-40 md:w-48 md:h-48 rounded-[3.5rem] p-2 bg-slate-950"
+                style={{ boxShadow: `10px 10px 0px 0px ${theme.bgHex}` }}
+              >
                 <div className="w-full h-full rounded-[3rem] bg-white overflow-hidden border-4 border-white">
                   <img 
                     src={streamer.profile_picture ? (streamer.profile_picture.startsWith('http') ? streamer.profile_picture : `${import.meta.env.VITE_API_URL}/uploads/${streamer.profile_picture}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${streamer.username}`} 
@@ -181,7 +181,7 @@ function DonationPage() {
               
               <div className="flex gap-4 justify-center md:justify-start">
                 {['instagram', 'tiktok', 'youtube'].map(platform => streamer[platform] && (
-                  <a key={platform} href={streamer[platform]} target="_blank" rel="noreferrer" className="p-5 bg-slate-50 hover:bg-white rounded-3xl border-4 border-transparent hover:border-slate-950 shadow-sm transition-all hover:-translate-y-1 active:scale-95">
+                  <a key={platform} href={platform.startsWith('http') ? platform : `https://${platform}.com/${streamer[platform]}`} target="_blank" rel="noreferrer" className="p-5 bg-slate-50 hover:bg-white rounded-3xl border-4 border-transparent hover:border-slate-950 shadow-sm transition-all hover:-translate-y-1 active:scale-95">
                     <img src={`https://cdn.simpleicons.org/${platform}`} className="w-6 h-6" alt={platform} />
                   </a>
                 ))}
@@ -190,8 +190,8 @@ function DonationPage() {
           </motion.div>
 
           {/* BALANCE CARD */}
-          <motion.div initial={{opacity:0, y:30}} animate={{opacity:1, y:0}} transition={{delay:0.1}} className={`lg:col-span-4 bg-slate-950 p-12 rounded-[4rem] text-white flex flex-col justify-between shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden border-4 border-slate-900 group`}>
-            <div className={`absolute top-0 right-0 p-10 opacity-[0.05] group-hover:rotate-12 transition-transform duration-700`}><Zap size={200} fill="white" /></div>
+          <motion.div initial={{opacity:0, y:30}} animate={{opacity:1, y:0}} transition={{delay:0.1}} className="lg:col-span-4 bg-slate-950 p-12 rounded-[4rem] text-white flex flex-col justify-between shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden border-4 border-slate-900 group">
+            <div className="absolute top-0 right-0 p-10 opacity-[0.05] group-hover:rotate-12 transition-transform duration-700"><Zap size={200} fill="white" /></div>
             <div className="p-5 bg-white/10 backdrop-blur-2xl rounded-3xl border-2 border-white/20 w-fit shadow-2xl"><Wallet size={36} strokeWidth={2.5} /></div>
             <div className="relative z-10 mt-12">
               <span className="text-[11px] text-white/40 uppercase font-black tracking-[0.4em] block mb-4 italic">Power Collected</span>
@@ -260,7 +260,7 @@ function DonationPage() {
               
               <div className="space-y-8 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
                 {history.length > 0 ? history.map((h, i) => (
-                  <motion.div initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} transition={{delay: i * 0.05}} key={i} className={`group bg-slate-50/50 p-8 rounded-[3rem] border-4 border-slate-100 hover:border-slate-950 hover:bg-white transition-all shadow-sm`}>
+                  <motion.div initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} transition={{delay: i * 0.05}} key={i} className="group bg-slate-50/50 p-8 rounded-[3rem] border-4 border-slate-100 hover:border-slate-950 hover:bg-white transition-all shadow-sm">
                     <div className="flex justify-between items-start mb-6">
                         <div className="space-y-2">
                             <p className="font-black text-slate-950 text-lg uppercase italic tracking-tight">{h.donatur_name}</p>
