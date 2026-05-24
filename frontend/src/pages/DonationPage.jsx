@@ -28,7 +28,7 @@ function DonationPage() {
   
   const [showQR, setShowQR] = useState(false)
   const [currentDonation, setCurrentDonation] = useState(null)
-  const [snapToken, setSnapToken] = useState('') // ✅ ADD STATE: Penampung token Snap Midtrans rill
+  const [snapToken, setSnapToken] = useState('') 
   
   const [formData, setFormData] = useState({
     donatur_name: '', donatur_email: '', amount: '', message: ''
@@ -49,16 +49,16 @@ function DonationPage() {
         setStreamer(data);
 
         const [resBalance, resHistory] = await Promise.all([
-          api.get(`/donations/balance/${data.id}`),
-          api.get(`/donations/public-history/${data.id}`)
+          api.get(`/donations/balance/${parseInt(data.id, 10)}`), 
+          api.get(`/donations/public-history/${parseInt(data.id, 10)}`)
         ]);
 
         if (resBalance.data.success) setBalance(resBalance.data.total_saldo);
         if (resHistory.data.success) setHistory(resHistory.data.data);
       }
     } catch (err) { 
-      console.error("Node railway unreachable:", err.message);
-    } finally {
+      console.error("❌ Node railway balance sync failed:", err.message);
+    } finally { // ✅ FIXED: Mengganti kata kunci 'filter' menjadi 'finally' agar tertutup rapat
       setLoading(false); 
     }
   }, [username]);
@@ -75,21 +75,19 @@ function DonationPage() {
     
     setSubmitting(true);
     try {
-      // ✅ SINKRON: Mengunci payment_method murni ke 'QRIS' agar sinkron dengan Midtrans CoreAPI Backend
       const res = await api.post('/donations/create', {
         ...formData,
-        streamer_id: streamer.id,
+        streamer_id: parseInt(streamer.id, 10),
         payment_method: 'QRIS'
       });
 
       if (res.data.success) {
-        // ✅ SINKRON PAYLOAD: Tangkap token hasil kueri snap backend lo, Ri!
         setCurrentDonation(res.data.data);
-        setSnapToken(res.data.token || ''); 
+        setSnapToken(res.data.orderId || res.data.data?.id || ''); 
         setShowQR(true);
       }
     } catch (err) { 
-      alert("Energi transmission failed! Cek koneksi server Midtrans lo."); 
+      alert("Transmisi energi putus! Cek status engine server Railway lo, Ri."); 
     } finally {
       setSubmitting(false);
     }
@@ -126,10 +124,10 @@ function DonationPage() {
         isOpen={showQR} 
         onClose={() => {
           setShowQR(false);
-          fetchData(); // ✅ AUTO-REFRESH: Memperbarui live saldo & riwayat secara real-time saat modal ditutup
+          fetchData(); 
         }} 
         donationData={currentDonation}
-        token={snapToken} // ✅ PASS TOKEN: Kirim token ke jendela modal agar snap.pay() bisa tereksekusi
+        token={snapToken} 
       />
 
       {/* Dynamic Glow Background */}
