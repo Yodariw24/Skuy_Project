@@ -3,21 +3,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, QrCode, ShieldCheck, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-// ✅ FIXED INLINE EXPORT ENGINE: Langsung kunci ekspor di kepala fungsi agar lolos sensor Rollup
 export default function PaymentModal({ isOpen, onClose, donationData, token }) {
     const [copied, setCopied] = useState(false);
+    const [isImageReady, setIsImageReady] = useState(false); // ✅ ACCELERATOR STATE
 
-    // 📡 GATEWAY MONITORING LAYER: Deteksi jika token rill masuk untuk kebutuhan simulasi sandbox lo, Ri
+    // Otomatis reset status loading setiap kali modal dibuka kembali
     useEffect(() => {
-      if (isOpen && token) {
-        console.log("=== [METRIK INJEKSI TOKEN INTEGRASI] ===");
-        console.log("Token Sandbox Terdeteksi:", token);
-      }
-    }, [isOpen, token]);
+        if (isOpen) {
+            setIsImageReady(false);
+        }
+    }, [isOpen, donationData]);
 
     if (!isOpen || !donationData) return null;
 
-    // 📡 PARSING VARIABLE: Ambil payload murni hasil cetak QRIS Midtrans dari Controller kita
+    // 📡 PARSING VARIABLE: Ambil payload murni hasil cetak QRIS Midtrans
     const qrImageUrl = donationData?.qrCodeUrl || donationData?.qr_code_url || donationData?.actions?.[0]?.url;
     const orderId = donationData?.id || donationData?.orderId || donationData?.order_id;
     const amount = donationData?.gross_amount || donationData?.amount || 0;
@@ -28,19 +27,13 @@ export default function PaymentModal({ isOpen, onClose, donationData, token }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
 
-        // Notifikasi popup kecil premium biar user tahu token berhasil disalin
-        const Toast = Swal.mixin({
+        Swal.mixin({
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
             timer: 1500,
-            timerProgressBar: true,
-            didOpen: (toast) => {
-                toast.addEventListener('mouseenter', Swal.stopTimer)
-                toast.addEventListener('mouseleave', Swal.resumeTimer)
-            }
-        });
-        Toast.fire({
+            timerProgressBar: true
+        }).fire({
             icon: 'success',
             title: 'Order ID Berhasil Disalin, Ri!'
         });
@@ -81,17 +74,28 @@ export default function PaymentModal({ isOpen, onClose, donationData, token }) {
                         {donationData.donatur_email || 'donor@skuy.gg'}
                     </p>
 
-                    {/* QR CODE CANVAS */}
+                    {/* QR CODE CANVAS DENGAN UK / LOADING OPTIMIZED */}
                     <div className="group relative">
                         <div className="absolute -inset-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-[3rem] blur-xl opacity-20 group-hover:opacity-30 transition duration-500"></div>
                         
                         <div className="relative bg-white p-6 rounded-[2.5rem] border-4 border-slate-100 shadow-inner overflow-hidden flex items-center justify-center min-h-[260px]">
                             {qrImageUrl ? (
-                                <img 
-                                    src={qrImageUrl} 
-                                    alt="Midtrans QRIS Canvas"
-                                    className="w-full aspect-square rounded-2xl transition-all duration-500 select-none pointer-events-auto"
-                                />
+                                <>
+                                    {/* Tag gambar asli dikunci transisinya via state onLoad */}
+                                    <img 
+                                        src={qrImageUrl} 
+                                        alt="Midtrans QRIS Canvas"
+                                        onLoad={() => setIsImageReady(true)}
+                                        className={`w-full aspect-square rounded-2xl transition-all duration-300 ${isImageReady ? 'opacity-100 scale-100' : 'absolute opacity-0 scale-95'}`}
+                                    />
+                                    {/* Shimmer loading skeleton super smooth */}
+                                    {!isImageReady && (
+                                        <div className="flex flex-col items-center justify-center text-slate-300 py-12 animate-pulse">
+                                            <Loader2 className="animate-spin text-violet-600 mb-3" size={32} />
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Memuat Kode QRIS...</p>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="flex flex-col items-center justify-center text-slate-300 py-12">
                                     <Loader2 className="animate-spin text-violet-600 mb-3" size={32} />
@@ -101,7 +105,7 @@ export default function PaymentModal({ isOpen, onClose, donationData, token }) {
                         </div>
                     </div>
 
-                    {/* 🔑 ORDER ID COPIER LAYOUT (KUNCI SIMULATOR SANDBOX) */}
+                    {/* 🔑 ORDER ID COPIER LAYOUT */}
                     <div className="w-full bg-slate-950 text-white p-4 rounded-2xl border-2 border-slate-950 flex items-center justify-between font-mono text-[11px] mt-6 select-none">
                         <div className="min-w-0 flex-1 text-left px-1">
                             <span className="text-white/30 text-[9px] block uppercase font-sans font-black tracking-widest mb-0.5">Order ID / Token</span>

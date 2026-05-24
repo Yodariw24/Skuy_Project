@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useCallback, useMemo } from 'react' // ✅ FIXED: Pastikan useMemo terikat erat di atas
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios' 
 import { 
   Copy, ExternalLink, Edit3, Landmark, ChevronDown, 
@@ -27,14 +27,25 @@ function EarningsView({ user, bankData, openEditModal }) {
     try {
       setLoading(true);
       
-      // ✅ SINKRON: Menembak rute privat yang terproteksi token murni tanpa melempar ID di parameter URL
+      const targetStreamerId = user?.streamer_id || user?.id;
+      
+      // ✅ SINKRON TOTAL: Bersihkan dari jebakan double prefix /api sesuai pangkalan routes backend lo, Ri!
       const [resHistory, resBalance] = await Promise.all([
-        api.get('/api/donations/history'), 
-        api.get('/api/donations/balance')  
+        api.get(`/donations/list-internal/${parseInt(targetStreamerId, 10)}`), 
+        api.get(`/donations/balance/${parseInt(targetStreamerId, 10)}`)  
       ]);
       
-      if (resHistory.data && Array.isArray(resHistory.data.history)) {
-        setTransactions(resHistory.data.history);
+      if (resHistory.data && Array.isArray(resHistory.data.data)) {
+        // Map data agar simetris dengan penamaan kolom kueri UNION ALL lo
+        const normalizedTx = resHistory.data.data.map(tx => ({
+          id: tx.id,
+          amount: tx.gross_amount || tx.amount,
+          description: tx.donatur_name ? `Donasi dari ${tx.donatur_name}` : 'System Entry',
+          type: 'IN', // Default internal viewer list
+          created_at: tx.created_date || tx.created_at,
+          status: tx.status
+        }));
+        setTransactions(normalizedTx);
       } else {
         setTransactions([]);
       }
@@ -86,9 +97,9 @@ function EarningsView({ user, bankData, openEditModal }) {
     }
 
     try {
-      await api.post('/api/donations/withdraw', { 
-        userId: targetStreamerId, 
-        amount: parseInt(withdrawAmount), 
+      await api.post('/donations/withdraw', { 
+        userId: parseInt(targetStreamerId, 10), 
+        amount: parseInt(withdrawAmount, 10), 
         bank: bankData 
       });
       
@@ -119,6 +130,15 @@ function EarningsView({ user, bankData, openEditModal }) {
     });
   };
 
+  // 🧮 FORMATTER CORE
+  const walletDisplayLabel = useMemo(() => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(balance);
+  }, [balance]);
+
   return (
     <div className="animate-in fade-in duration-700 max-w-5xl mx-auto pb-24 px-2 font-sans text-left selection:bg-violet-100">
       
@@ -134,7 +154,7 @@ function EarningsView({ user, bankData, openEditModal }) {
         <button 
           type="button"
           onClick={() => setIsWithdrawModalOpen(true)} 
-          className="w-full md:w-auto bg-slate-950 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase italic tracking-widest hover:bg-violet-600 shadow-[8px_8px_0px_0px_rgba(124,58,237,0.3)] transition-all flex items-center justify-center gap-3 cursor-pointer"
+          className="w-full md:w-auto bg-slate-950 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase italic tracking-widest hover:bg-violet-600 shadow-[8px_8px_0px_0px_rgba(124,58,237,0.3)] transition-all flex items-center justify-center gap-3 cursor-pointer border-0"
         >
           Withdraw Funds <ArrowUpRight size={18} strokeWidth={3} />
         </button>
@@ -147,7 +167,7 @@ function EarningsView({ user, bankData, openEditModal }) {
           
           {/* CARD SALDO NEO-BRUTALISM */}
           <div className="bg-violet-600 border-4 border-slate-950 rounded-[3.5rem] p-10 text-white relative overflow-hidden shadow-[12px_12px_0px_0px_#000] group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
+            <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
                <Wallet size={180} />
             </div>
             
@@ -158,7 +178,7 @@ function EarningsView({ user, bankData, openEditModal }) {
                 <button 
                   type="button"
                   onClick={() => setLocalShowBalance(!localShowBalance)} 
-                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer flex items-center justify-center"
+                  className="bg-slate-950/40 hover:bg-slate-950/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-white/20 text-[10px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer flex items-center justify-center text-white"
                 >
                   {localShowBalance ? 'Hide Balance' : 'Show Balance'}
                 </button>
@@ -167,7 +187,7 @@ function EarningsView({ user, bankData, openEditModal }) {
               <div className="mt-8">
                 <p className="text-[11px] font-black uppercase tracking-[0.4em] text-violet-200 mb-3 italic">Total Available Sultan Balance</p>
                 <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter leading-none">
-                  {localShowBalance ? `Rp ${Number(balance).toLocaleString('id-ID')}` : '••••••••••'}
+                  {localShowBalance ? walletDisplayLabel : '••••••••••'}
                 </h2>
               </div>
             </div>
@@ -217,19 +237,19 @@ function EarningsView({ user, bankData, openEditModal }) {
                   {filteredTransactions.map((tx) => (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={tx.id} className="group flex flex-col md:flex-row md:items-center justify-between p-8 rounded-[2.5rem] bg-white border-4 border-transparent hover:border-slate-950 hover:shadow-[8px_8px_0px_0px_#F1F5F9] transition-all">
                       <div className="flex items-center gap-6">
-                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'} text-white`}>
+                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'bg-emerald-500' : 'bg-amber-500'} text-white`}>
                           {tx.type === 'IN' ? <ArrowDownLeft size={22} strokeWidth={3} /> : <ArrowUpRight size={22} strokeWidth={3} />}
                         </div>
                         <div>
                           <p className="font-black text-slate-950 uppercase italic tracking-tighter text-base mb-1">{tx.description || 'System Entry'}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-2 italic tracking-widest"><Clock size={12} /> {new Date(tx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-2 italic tracking-widest"><Clock size={12} /> {tx.created_at ? new Date(tx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'VORTEX'}</p>
                         </div>
                       </div>
                       <div className="text-right mt-5 md:mt-0">
-                         <p className={`text-3xl font-black italic tracking-tighter ${tx.type === 'IN' ? 'text-emerald-600' : 'text-slate-950'}`}>
-                           {tx.type === 'IN' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
+                         <p className="text-3xl font-black italic tracking-tighter text-slate-950">
+                           + Rp {Number(tx.amount).toLocaleString('id-ID')}
                          </p>
-                         <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full border-2 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : tx.status?.toUpperCase() === 'PENDING' ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-rose-600 bg-rose-50 border-rose-200'} tracking-[0.1em] mt-2 inline-block`}>
+                         <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full border-2 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-600 bg-amber-50 border-amber-200'} tracking-[0.1em] mt-2 inline-block`}>
                            {tx.status || 'Verified'}
                          </span>
                       </div>
@@ -258,7 +278,7 @@ function EarningsView({ user, bankData, openEditModal }) {
             </div>
             <div className="flex flex-col gap-3">
               <button type="button" onClick={() => copyToClipboard(`https://skuy-project.vercel.app/${user?.username}`, "Link Donasi Sultan Siap Disebar!")} className="w-full py-5 bg-violet-50 text-violet-600 border-2 border-violet-100 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-violet-100 transition-all cursor-pointer">Copy Link</button>
-              <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-xl italic tracking-widest hover:translate-y-[-2px] transition-all">Visit Page <ExternalLink size={14}/></a>
+              <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-xl italic tracking-widest hover:translate-y-[-2px] transition-all no-underline">Visit Page <ExternalLink size={14}/></a>
             </div>
           </div>
 
@@ -270,7 +290,6 @@ function EarningsView({ user, bankData, openEditModal }) {
             </div>
             
             <div className="p-10 bg-slate-50 border-4 border-dashed border-slate-200 rounded-[2.5rem] text-center relative z-10 group-hover:bg-white group-hover:border-violet-200 transition-all">
-              {/* ✅ FIXED VARIABLES: Menyelaraskan mapping struktur data bank object dengan DB */}
               {bankData?.bank_name && bankData?.bank_name !== 'Belum Diatur' ? (
                 <div className="space-y-4">
                   <div className="bg-violet-600 inline-block px-4 py-1.5 rounded-full"><p className="text-[9px] font-black text-white uppercase italic tracking-widest">{bankData.bank_name}</p></div>

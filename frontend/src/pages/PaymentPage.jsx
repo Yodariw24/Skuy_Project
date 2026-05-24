@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, QrCode, ShieldCheck, Zap, Copy, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, QrCode, ShieldCheck, Zap, Copy, CheckCircle2, Loader2 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
 // ✅ FIXED INLINE EXPORT ENGINE: Langsung kunci ekspor di kepala fungsi agar lolos sensor Rollup produksi
@@ -9,6 +9,7 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [copied, setCopied] = useState(false);
+  const [isImageReady, setIsImageReady] = useState(false); // ✅ ACCELERATOR STATE: Untuk kelancaran render gambar QRIS
 
   // 📡 PARSING MIDTRANS DATA: Mengambil lemparan data state dari penembakan form awal
   const donationData = location.state?.donationData;
@@ -26,6 +27,13 @@ export default function PaymentPage() {
       }).then(() => navigate(-1));
     }
   }, [donationData, navigate]);
+
+  // Reset loading gambar saat data donasi berubah
+  useEffect(() => {
+    if (donationData) {
+      setIsImageReady(false);
+    }
+  }, [donationData]);
 
   const handleCopyOrderId = () => {
     if (!donationId) return;
@@ -71,14 +79,22 @@ export default function PaymentPage() {
         </div>
         
         {/* REAL QRIS CANVAS FROM MIDTRANS */}
-        <div className="bg-white p-6 rounded-[3rem] mb-6 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#F1F5F9] relative group overflow-hidden">
+        <div className="bg-white p-6 rounded-[3rem] mb-6 border-4 border-slate-950 shadow-[10px_10px_0px_0px_#F1F5F9] relative group overflow-hidden flex items-center justify-center min-h-[260px]">
            {qrImageUrl ? (
-             <img 
-              src={qrImageUrl} 
-              alt="Midtrans Official QRIS" 
-              // ✅ FIXED: Ganti varian ilegal scale-102 menjadi scale-105 agar transisinya lolos sensor Tailwind
-              className="w-full aspect-square object-contain rounded-2xl group-hover:scale-105 transition-transform duration-500 select-none"
-             />
+             <>
+               <img 
+                src={qrImageUrl} 
+                alt="Midtrans Official QRIS" 
+                onLoad={() => setIsImageReady(true)}
+                className={`w-full aspect-square object-contain rounded-2xl group-hover:scale-105 transition-all duration-500 select-none ${isImageReady ? 'opacity-100 scale-100' : 'absolute opacity-0 scale-95'}`}
+               />
+               {!isImageReady && (
+                 <div className="flex flex-col items-center justify-center text-slate-300 py-12 animate-pulse">
+                     <Loader2 className="animate-spin text-violet-600 mb-3" size={36} />
+                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Memuat Kode QRIS...</p>
+                 </div>
+               )}
+             </>
            ) : (
              <div className="w-full aspect-square bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 font-mono text-[10px] uppercase font-black">Broken Node Payload</div>
            )}
