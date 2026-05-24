@@ -3,7 +3,6 @@ import { Target, Flag, Save, Copy, Palette, Sparkles, TrendingUp, Loader2 } from
 import Swal from 'sweetalert2';
 import api from '../../../api/axios'; 
 
-// ✅ FIXED INLINE EXPORT ENGINE: Langsung tancap ekspor di kepala fungsi agar terbaca absolut oleh Rollup
 export default function MilestoneView({ user }) {
   const currentUrl = window.location.origin;
   const overlayUrl = `${currentUrl}/widget/${user?.username || user?.id}/milestone`;
@@ -39,9 +38,10 @@ export default function MilestoneView({ user }) {
     }
   }, [userIdKey]);
 
+  // ✅ FIXED DEPENDENCY POOL: Bersihkan fungsi silumen fetchMediaShareConfig yang bikin crash
   useEffect(() => {
     fetchMilestoneLiveStats();
-  }, [fetchMediaShareConfig, fetchMilestoneLiveStats]); // Menjaga sinkronisasi pangkalan
+  }, [fetchMilestoneLiveStats]); 
 
   const showSultanToast = (title) => {
     const Toast = Swal.mixin({

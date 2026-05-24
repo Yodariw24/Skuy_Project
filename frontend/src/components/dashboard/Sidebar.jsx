@@ -8,7 +8,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
-function Sidebar({ user }) {
+// ✅ UPGRADE PARAMS: Tangkap props balance live yang di-supply dari DashboardPage induk
+function Sidebar({ user, balance }) {
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -29,6 +30,17 @@ function Sidebar({ user }) {
       setIsOverlayOpen(true);
     }
   }, [activeId]);
+
+  // 🧮 FORMATTER CORE: Mengubah nominal angka mentah menjadi format IDR Markas Sultan
+  const walletDisplayLabel = useMemo(() => {
+    const cash = Number(balance) || 0;
+    const formatted = new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(cash);
+    return `Wallet • ${formatted}`;
+  }, [balance]);
 
   const logout = async () => {
     const result = await Swal.fire({
@@ -66,7 +78,7 @@ function Sidebar({ user }) {
           if (onClickCustom) onClickCustom();
           else navigate(`/dashboard/${id}`); 
         }}
-        className={`w-full flex items-center justify-between transition-all duration-300 relative group ${
+        className={`w-full flex items-center justify-between transition-all duration-300 relative group border-0 font-sans cursor-pointer ${
           isSub ? 'px-6 py-2.5 my-0.5 rounded-xl' : 'px-4 py-3 rounded-2xl'
         } ${
           isActive 
@@ -78,7 +90,7 @@ function Sidebar({ user }) {
           <div className={`p-1 rounded-lg ${isActive ? 'text-violet-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
             <Icon size={isSub ? 16 : 19} strokeWidth={isActive ? 3 : 2.5} />
           </div>
-          <span className={`text-[12.5px] ${isSub ? 'text-[11px]' : ''} font-black uppercase tracking-tight ${isActive ? 'italic' : ''}`}>
+          <span className={`text-[12.5px] ${isSub ? 'text-[11px]' : ''} font-black uppercase tracking-tight text-left ${isActive ? 'italic' : ''}`}>
             {label}
           </span>
         </div>
@@ -100,7 +112,7 @@ function Sidebar({ user }) {
   };
 
   return (
-    <aside className="w-64 bg-white border-r-4 border-slate-950 flex flex-col h-screen sticky top-0 overflow-hidden font-sans text-left shadow-[4px_0px_0px_0px_rgba(0,0,0,0.05)]">
+    <aside className="w-64 bg-white border-r-4 border-slate-950 flex flex-col h-screen sticky top-0 overflow-hidden font-sans text-left shadow-[4px_0px_0px_0px_rgba(0,0,0,0.05)] select-none">
       
       {/* HEADER LOGO */}
       <div className="p-8 flex items-center gap-3.5 group cursor-pointer" onClick={() => navigate('/dashboard')}>
@@ -115,7 +127,8 @@ function Sidebar({ user }) {
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
-            <NavButton id="wallet" icon={Wallet} label="My Wallet" disabled={!isCreator} />
+            {/* ✅ LOGIC BINDING: Tukar label My Wallet statis dengan memoized nominal balance ter-update */}
+            <NavButton id="wallet" icon={Wallet} label={walletDisplayLabel} disabled={!isCreator} />
             <NavButton id="analytics" icon={BarChart3} label="Analisis Performa" disabled={!isCreator} />
           </nav>
         </div>

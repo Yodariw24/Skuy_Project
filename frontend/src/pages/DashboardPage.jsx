@@ -175,7 +175,8 @@ function DashboardPage() {
             {/* 🔥 REAL-TIME ALERT PROTOCOL */}
             <DonationAlert streamerId={user?.streamer_id || user?.id} />
             
-            <Sidebar user={user} />
+            {/* ✅ FIXED TRANSMISSION: Oper props balance live ke Sidebar agar nominal sinkron */}
+            <Sidebar user={user} balance={balance} />
             
             <main className="flex-1 p-6 md:p-12 overflow-y-auto">
                 <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-6 duration-700">
