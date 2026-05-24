@@ -1,5 +1,3 @@
--- Pastiin kolom secret tipenya TEXT biar gak kepotong
-ALTER TABLE users ALTER COLUMN two_fa_secret TYPE TEXT;
 
--- Reset data yang lama biar gak bentrok
-UPDATE users SET two_fa_secret = NULL, is_two_fa_enabled = false WHERE id = 9;
+-- (Opsional) Jika kolom bank_info lo ternyata tipenya terlanjur balik ke TEXT, paksa kunci ke JSONB lagi:
+ALTER TABLE withdrawals ALTER COLUMN bank_info TYPE JSONB USING bank_info::JSONB;
