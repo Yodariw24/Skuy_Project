@@ -6,7 +6,7 @@
 import express from 'express';
 const router = express.Router();
 
-// Import fungsi dari Controller (Termasuk perbaikan logika finansial & analitik)
+// Import fungsi dari Controller (Termasuk perbaikan logika finansial, analitik & webhook callback)
 import { 
     createDonation, 
     getDonationsByStreamer, 
@@ -15,7 +15,8 @@ import {
     getPublicHistory,
     getWalletHistory,
     withdrawBalance,
-    getStreamerAnalytics 
+    getStreamerAnalytics,
+    handleMidtransCallback // ✅ IMPORT WEBHOOK ENGINE BARU UNTUK OTOMATISASI SANDBOX
 } from '../controllers/donationController.js';
 
 import { validateDonation } from '../middleware/validator.js';
@@ -151,5 +152,10 @@ router.get('/profile/:username', async (req, res) => {
 // --- ===================================================================== ---
 router.post('/create', validateDonation, createDonation); 
 router.put('/status/:id', updateDonationStatus); 
+
+// ✅ MIDTRANS WEBHOOK CALLBACK ENDPOINT
+// Endpoint penampung data notifikasi otomatis pasca simulasi sukses dilakukan di Sandbox kit.
+// Wajib ditaruh di rute publik (Bebas Middleware 'protect') agar robot Midtrans bisa menembak sukses ke sistem.
+router.post('/midtrans-callback', handleMidtransCallback);
 
 export default router;

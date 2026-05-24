@@ -1,12 +1,13 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
  * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
+ * UPGRADED TO MIDTRANS SNAP MULTI-PAYMENT ENGINE WITH AUTOMATIC WEBHOOK CALLBACK
  */
 
 import midtransClient from 'midtrans-client';
 
-// Inisialisasi Core API Midtrans Sandbox (Gunakan credentials dari environment variables Railway)
-const coreApi = new midtransClient.CoreApi({
+// ✅ INEDX/INSTANSIASI SNAP API BAWAAN SDK MIDTRANS
+const snap = new midtransClient.Snap({
     isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true', 
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
@@ -40,7 +41,7 @@ export const getWalletHistory = async (req, res) => {
       SELECT 
         id::TEXT, 
         amount, 
-        -- ✅ SECURITY PROTECTION LAYER: Mencegah letupan syntax json jika format bank_info rusak
+        -- SECURITY PROTECTION LAYER: Mencegah letupan syntax json jika format bank_info rusak
         CASE 
           WHEN bank_info::TEXT LIKE '{%}' THEN ('Penarikan Saldo (' || COALESCE(bank_info->>'bank_name', 'Bank') || ')')::TEXT
           ELSE ('Penarikan Saldo (' || bank_info::TEXT || ')')::TEXT
@@ -64,8 +65,6 @@ export const getWalletHistory = async (req, res) => {
 
 /**
  * 2. GET STREAMER BALANCE (PRO-GRADE LIVE AGGREGATION ENGINE) 💰
- * Menghitung saldo bersih secara live langsung dari tabel donations sukses dikurangi withdrawals.
- * Dijamin sinkron total dengan halaman analitik di akun mana pun!
  */
 export const getStreamerBalance = async (req, res) => {
   const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
@@ -148,7 +147,7 @@ export const withdrawBalance = async (req, res) => {
 };
 
 /**
- * 4. CREATE DONATION (MIDTRANS QRIS CHARGE INITIALIZER) 🏎️
+ * 4. CREATE DONATION (MIDTRANS SNAP ALL-IN-ONE GATEWAY) 🏎️
  */
 export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
@@ -165,8 +164,8 @@ export const createDonation = async (req, res) => {
   else if (gross >= 100000) tier = 'SILVER';
 
   try {
+    // Payload fleksibel dibuka lebar agar semua opsi pembayaran di Sandbox aktif otomatis
     let parameter = {
-        "payment_type": "qris", 
         "transaction_details": {
             "order_id": orderId,
             "gross_amount": gross
@@ -180,14 +179,14 @@ export const createDonation = async (req, res) => {
         "customer_details": {
             "first_name": donatur_name,
             "email": donatur_email || "donor@skuy.gg"
-        },
-        "qris": {
-            "acquirer": "gopay"
         }
     };
 
-    const chargeResponse = await coreApi.charge(parameter);
-    const qrCodeUrl = chargeResponse.actions && chargeResponse.actions[0] ? chargeResponse.actions[0].url : null;
+    // Memproses multi-payment token bawaan Snap
+    const snapResponse = await snap.createTransaction(parameter);
+    
+    const snapToken = snapResponse.token;
+    const redirectUrl = snapResponse.redirect_url;
 
     const query = `
       INSERT INTO donations (
@@ -209,18 +208,19 @@ export const createDonation = async (req, res) => {
       gross,
       fee,
       net, 
-      payment_method || 'QRIS',
+      payment_method || 'MIDTRANS_SNAP', 
       tier
     ]);
     
     return res.status(201).json({ 
         success: true, 
         data: result.rows[0],
-        qrCodeUrl: qrCodeUrl,
+        snapToken: snapToken,      
+        redirectUrl: redirectUrl,  
         orderId: orderId
     });
   } catch (err) { 
-    console.error("❌ Error Create Donation Node:", err.message);
+    console.error("❌ Error Create Donation via Snap Engine:", err.message);
     return res.status(500).json({ success: false, error: err.message }); 
   }
 };
@@ -256,7 +256,7 @@ export const updateDonationStatus = async (req, res) => {
     );
     const donation = result.rows[0];
 
-    // ✅ ARCHITECTURE CLEAN OPTIMIZATION: Emit data live socket langsung dipicu tanpa terikat query tabel balance statis yang macet
+    // Emit data live socket langsung dipicu
     if (upperStatus === 'SUCCESS' && donation) {
         const streamerIdCast = parseInt(donation.streamer_id, 10);
 
@@ -350,5 +350,69 @@ export const getStreamerAnalytics = async (req, res) => {
       success: false, 
       message: "Gagal memproses kalkulasi analitik pangkalan data." 
     });
+  }
+};
+
+/**
+ * ✅ AUTOMATIC ENGINE: MIDTRANS WEBHOOK/CALLBACK NOTIFICATION HANDLER ⚡
+ * Daftarkan fungsi ini ke router POST kamu (Contoh backend route: router.post('/midtrans-callback', handleMidtransCallback))
+ * Dan pastikan URL ini juga dipasang di Dashboard Midtrans -> Settings -> Access Notification
+ */
+export const handleMidtransCallback = async (req, res) => {
+  try {
+    const notification = req.body;
+    
+    const orderId = notification.order_id;
+    const transactionStatus = notification.transaction_status;
+    const fraudStatus = notification.fraud_status;
+
+    let updateToStatus = 'PENDING';
+
+    if (transactionStatus === 'capture') {
+        if (fraudStatus === 'challenge') {
+            updateToStatus = 'CHALLENGE';
+        } else if (fraudStatus === 'accept') {
+            updateToStatus = 'SUCCESS';
+        }
+    } else if (transactionStatus === 'settlement') {
+        updateToStatus = 'SUCCESS'; 
+    } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
+        updateToStatus = 'FAILED';
+    } else if (transactionStatus === 'pending') {
+        updateToStatus = 'PENDING';
+    }
+
+    // Eksekusi pembaruan status terproteksi dengan Database Transaction SQL
+    await req.db.query('BEGIN');
+    const checkResult = await req.db.query(`SELECT status, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1 FOR UPDATE`, [orderId]);
+    const donationData = checkResult.rows[0];
+
+    if (!donationData) {
+        await req.db.query('ROLLBACK');
+        return res.status(404).json({ message: 'Order ID tidak ditemukan di database Skuy.GG!' });
+    }
+
+    if (donationData.status !== 'SUCCESS') {
+        await req.db.query(`UPDATE donations SET status = $1 WHERE id = $2`, [updateToStatus, orderId]);
+        
+        // Memicu trigger live alert socket IO agar animasi gif/suara muncul seketika di overlay streamer
+        if (updateToStatus === 'SUCCESS' && req.io) {
+            req.io.emit(`new-donation-${parseInt(donationData.streamer_id, 10)}`, {
+                donatur_name: donationData.donatur_name,
+                amount: donationData.gross_amount,
+                message: donationData.message,
+                tier: donationData.tier || 'STANDARD',
+                trigger_effect: true
+            });
+        }
+    }
+    
+    await req.db.query('COMMIT');
+    return res.status(200).json({ status: 'OK', message: 'Webhook Skuy.GG Terproses Berhasil' });
+
+  } catch (error) {
+    if (req.db) await req.db.query('ROLLBACK');
+    console.error("🔥 Error di Webhook Midtrans:", error.message);
+    return res.status(500).json({ error: error.message });
   }
 };
