@@ -10,7 +10,7 @@ import {
     getPublicHistory,
     getWalletHistory,
     withdrawBalance,
-    getStreamerAnalytics // ✅ SINKRON: Import fungsi agregasi analitik Postgres lo
+    getStreamerAnalytics 
 } from '../controllers/donationController.js';
 
 import { validateDonation } from '../middleware/validator.js';
@@ -45,32 +45,42 @@ const injectStreamerId = async (req, res, next) => {
     }
 };
 
+// --- ===================================================================== ---
+// --- 1. SULTAN PRIVACY ROUTES (Auth Required) - TARUH DI ATAS AGAR AMAN    ---
+// --- ===================================================================== ---
+
+router.post('/withdraw', protect, injectStreamerId, withdrawBalance); 
+router.get('/history', protect, injectStreamerId, getWalletHistory); 
+
+// ✅ SINKRON: Endpoint penggerak grafik Recharts dinamis untuk halaman analitik performa lo, Ri!
+router.get('/analytics-report', protect, injectStreamerId, getStreamerAnalytics);
+
+// ✅ FIXED COMPATIBILITY: Tambahkan jembatan /:id agar controller lo bisa membaca parameter dengan aman dan fleksibel
+router.get('/list-internal/:id', protect, injectStreamerId, getDonationsByStreamer);
+router.get('/list-internal', protect, injectStreamerId, getDonationsByStreamer);
+
 /**
- * --- 1. PUBLIC GATEWAY PROTOCOLS (No Auth Needed) ---
- * Akses publik terbuka tanpa token untuk donatur, widget OBS overlay, dan landing page explorer
+ * --- REFINED ACTIVITY FEED (Auth Required) ---
  */
-router.get('/profile/:username', async (req, res) => {
-    const { username } = req.params;
-    if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
-
+router.get('/activity-feed', protect, injectStreamerId, async (req, res) => {
     try {
-        const result = await req.db.query(
-            `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
-             FROM streamers s 
-             JOIN users u ON s.user_id = u.id 
-             WHERE s.username ILIKE $1`,
-            [username]
-        );
+        const targetStreamerId = req.user.streamer_id || req.user.id;
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "Sultan tidak terdeteksi!" });
-        }
-        res.json({ success: true, data: result.rows[0] });
+        const result = await req.db.query(
+            "SELECT * FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 15",
+            [targetStreamerId]
+        );
+        res.json({ success: true, donations: result.rows });
     } catch (err) {
-        console.error("🔥 Profile Fetch Error:", err.message);
-        res.status(500).json({ success: false, message: "Database Ngadat!" });
+        console.error("🔥 Activity Feed Error:", err.message);
+        res.status(500).json({ success: false, donations: [] });
     }
 });
+
+
+// --- ===================================================================== ---
+// --- 2. PUBLIC GATEWAY PROTOCOLS (No Auth Needed - Diletakkan di Bawah)     ---
+// --- ===================================================================== ---
 
 // Jalur pencarian chip kategori & list terbuka untuk Landing Page & Explore Hub lo, Ri ✅
 router.get('/categories', async (req, res) => {
@@ -95,6 +105,7 @@ router.get('/list', async (req, res) => {
             query += " WHERE s.category_id = $1";
             params.push(category);
         }
+        query += " ORDER BY s.id DESC";
         const result = await req.db.query(query, params);
         res.json({ success: true, streamers: result.rows });
     } catch (err) {
@@ -102,41 +113,36 @@ router.get('/list', async (req, res) => {
     }
 });
 
+// ✅ FIXED POSITION: Rute dinamis ditaruh di paling bawah agar tidak membajak path statis internal dashboard
 router.get('/balance/:id', getStreamerBalance); 
 router.get('/public-history/:id', getPublicHistory); 
 
-/**
- * --- 2. SULTAN PRIVACY ROUTES (Auth Required) 🛡️ ---
- * Rute eksklusif internal dashboard yang diproteksi ketat menggunakan enkripsi token session
- */
-router.post('/withdraw', protect, injectStreamerId, withdrawBalance); 
-router.get('/history', protect, injectStreamerId, getWalletHistory); 
-router.get('/list-internal', protect, injectStreamerId, getDonationsByStreamer); // Diubah jalurnya agar tidak bentrok dengan list publik
+router.get('/profile/:username', async (req, res) => {
+    const { username } = req.params;
+    if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
 
-// ✅ SINKRON: Endpoint penggerak grafik Recharts dinamis untuk halaman analitik performa lo, Ri!
-router.get('/analytics-report', protect, injectStreamerId, getStreamerAnalytics);
-
-/**
- * --- 3. REFINED ACTIVITY FEED (Auth Required) ---
- */
-router.get('/activity-feed', protect, injectStreamerId, async (req, res) => {
     try {
-        const targetStreamerId = req.user.streamer_id || req.user.id;
-
         const result = await req.db.query(
-            "SELECT * FROM donations WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS' ORDER BY created_date DESC LIMIT 15",
-            [targetStreamerId]
+            `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
+             FROM streamers s 
+             JOIN users u ON s.user_id = u.id 
+             WHERE s.username ILIKE $1`,
+            [username]
         );
-        res.json({ success: true, donations: result.rows });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Sultan tidak terdeteksi!" });
+        }
+        res.json({ success: true, data: result.rows[0] });
     } catch (err) {
-        console.error("🔥 Activity Feed Error:", err.message);
-        res.status(500).json({ success: false, donations: [] });
+        console.error("🔥 Profile Fetch Error:", err.message);
+        res.status(500).json({ success: false, message: "Database Ngadat!" });
     }
 });
 
-/**
- * --- 4. DONATION ENGINE (Transaksi Gateway Protocol) ---
- */
+// --- ===================================================================== ---
+// --- 3. DONATION ENGINE (Transaksi Gateway Protocol Webhook)               ---
+// --- ===================================================================== ---
 router.post('/create', validateDonation, createDonation); 
 router.put('/status/:id', updateDonationStatus); 
 

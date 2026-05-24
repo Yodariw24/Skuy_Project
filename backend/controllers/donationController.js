@@ -126,7 +126,6 @@ export const withdrawBalance = async (req, res) => {
       return res.status(400).json({ success: false, message: "Saldo available lo nggak cukup buat ditarik segitu, Ri!" });
     }
 
-    // Mengubah bank info ke format JSON String agar tersimpan rapi di kolom text/json database lo
     const formattedBank = typeof bank === 'object' ? JSON.stringify(bank) : String(bank);
     const result = await req.db.query(
       "INSERT INTO withdrawals (streamer_id, amount, bank_info, status, created_at) VALUES ($1, $2, $3, 'PENDING', NOW()) RETURNING *",
@@ -147,7 +146,7 @@ export const createDonation = async (req, res) => {
   const { streamer_id, donatur_name, donatur_email, message, amount, payment_method } = req.body;
   
   const gross = Number(amount);
-  const fee = gross * 0.05; // Potongan platform 5% kasta pangkalan
+  const fee = gross * 0.05; 
   const net = gross - fee;  
   const orderId = `SKUY-${Date.now()}`;
 
@@ -157,7 +156,6 @@ export const createDonation = async (req, res) => {
   else if (gross >= 100000) tier = 'SILVER';
 
   try {
-    // ✅ FIXED ARCHITECTURE PARAMETER: Set payment_type ke 'qris' agar dinamis menghasilkan link QRIS gambar pangkalan, bukan deeplink gopay murni.
     let parameter = {
         "payment_type": "qris", 
         "transaction_details": {
@@ -175,12 +173,11 @@ export const createDonation = async (req, res) => {
             "email": donatur_email || "donor@skuy.gg"
         },
         "qris": {
-            "acquirer": "gopay" // Integrasi pangkalan QRIS berdaya pikat GoPay engine
+            "acquirer": "gopay"
         }
     };
 
     const chargeResponse = await coreApi.charge(parameter);
-    // Ambil data url gambar QRIS string di index actions awal
     const qrCodeUrl = chargeResponse.actions && chargeResponse.actions[0] ? chargeResponse.actions[0].url : null;
 
     const query = `
@@ -228,10 +225,8 @@ export const updateDonationStatus = async (req, res) => {
   const upperStatus = status.toUpperCase();
   
   try {
-    // ✅ 1. PROSEDUR ATOMIC TRANSACTION: Mulai pembungkusan transaksi database
     await req.db.query('BEGIN');
 
-    // Gunakan klausa 'FOR UPDATE' untuk mengunci baris data di PostgreSQL agar terhindar dari manipulasi ganda concurrent webhook
     const checkQuery = `SELECT status, net_amount, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1 FOR UPDATE`;
     const checkResult = await req.db.query(checkQuery, [id]);
     const currentDonation = checkResult.rows[0];
@@ -241,20 +236,17 @@ export const updateDonationStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Data transaksi tidak ditemukan!" });
     }
 
-    // Cegah mutasi ganda jika status di database pangkalan aslinya sudah sukses diverifikasi
     if (currentDonation.status === 'SUCCESS') {
       await req.db.query('COMMIT');
       return res.json({ success: true, message: "Transaksi ini sudah diverifikasi sebelumnya.", data: currentDonation });
     }
 
-    // 2. Eksekusi update status transaksi donasi
     const result = await req.db.query(
       "UPDATE donations SET status = $1 WHERE id = $2 RETURNING *", 
       [upperStatus, id]
     );
     const donation = result.rows[0];
 
-    // 3. Jika transaksinya divalidasi sukses, suntikkan muatan saldo bersih langsung ke dompet target streamer
     if (upperStatus === 'SUCCESS' && donation) {
         await req.db.query(`
           INSERT INTO balance (streamer_id, total_saldo) 
@@ -263,7 +255,6 @@ export const updateDonationStatus = async (req, res) => {
           DO UPDATE SET total_saldo = balance.total_saldo + $2
         `, [donation.streamer_id, donation.net_amount]);
 
-        // 📡 TRANSMISIKAN ALERT INTERAKTIF LIVE KE OBS BROWSER SOURCE VIA SOCKET.IO
         if (req.io) {
             req.io.emit(`new-donation-${donation.streamer_id}`, {
                 donatur_name: donation.donatur_name,
@@ -306,11 +297,51 @@ export const getPublicHistory = async (req, res) => {
  */
 export const getDonationsByStreamer = async (req, res) => {
   const { id } = req.params;
+  const targetId = id || req.user?.streamer_id || req.user?.id;
   try {
-    const result = await req.db.query(`SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`, [id]);
+    const result = await req.db.query(`SELECT * FROM donations WHERE streamer_id = $1 ORDER BY created_date DESC`, [targetId]);
     return res.json({ success: true, data: result.rows });
   } catch (err) { 
     console.error("🔥 Error getDonationsByStreamer Node:", err.message);
     return res.status(500).json({ success: false, data: [] }); 
+  }
+};
+
+/**
+ * 8. GET STREAMER ANALYTICS (OMSET DONASI LIVE AGGREGATION SYSTEM) ✅
+ * Menyediakan data statistik performa keuangan streamer secara riil untuk Recharts frontend
+ */
+export const getStreamerAnalytics = async (req, res) => {
+  const targetStreamerId = req.user?.streamer_id || req.user?.id || req.params.id;
+
+  if (!targetStreamerId) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "ID Node tidak terdeteksi untuk kalkulasi analitik, Ri!" 
+    });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        COALESCE(SUM(net_amount), 0)::INT as total_earnings,
+        COUNT(id)::INT as total_donations,
+        COUNT(DISTINCT donatur_name)::INT as unique_donaturs
+      FROM donations 
+      WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS'
+    `;
+
+    const result = await req.db.query(query, [targetStreamerId]);
+    
+    return res.json({ 
+      success: true, 
+      analytics: result.rows[0] 
+    });
+  } catch (err) {
+    console.error("🔥 Error getStreamerAnalytics Node:", err.message);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Gagal memproses kalkulasi analitik pangkalan data." 
+    });
   }
 };
