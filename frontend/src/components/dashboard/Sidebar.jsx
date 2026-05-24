@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // ✅ FIXED: useMemo resmi di-import di sini, Ri!
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Wallet, Activity, Tv, LogOut, User, Zap, 
@@ -8,7 +8,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
-// ✅ UPGRADE PARAMS: Tangkap props balance live yang di-supply dari DashboardPage induk
 function Sidebar({ user, balance }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -127,7 +126,7 @@ function Sidebar({ user, balance }) {
         <div>
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] mb-4 px-4 italic">Revenue Hub</p>
           <nav className="space-y-1">
-            {/* ✅ LOGIC BINDING: Tukar label My Wallet statis dengan memoized nominal balance ter-update */}
+            {/* ✅ LOGIC BINDING: Menampilkan label nominal balance ter-update */}
             <NavButton id="wallet" icon={Wallet} label={walletDisplayLabel} disabled={!isCreator} />
             <NavButton id="analytics" icon={BarChart3} label="Analisis Performa" disabled={!isCreator} />
           </nav>
@@ -153,7 +152,7 @@ function Sidebar({ user, balance }) {
                   className="overflow-hidden ml-4 border-l-4 border-slate-100 mt-1 pl-1"
                 >
                   <NavButton id="tip" icon={Bell} label="Tip Alert" isSub />
-                  <NavButton id="mediashare" icon={Video} label="Mediashare" isSub />
+                  <NavButton id="mediashare" icon={Video} label="Media Share" isSub />
                   <NavButton id="milestone" icon={Target} label="Milestone" isSub />
                   <NavButton id="leaderboard" icon={Trophy} label="Leaderboard" isSub />
                 </motion.div>
