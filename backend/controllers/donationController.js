@@ -256,15 +256,9 @@ export const updateDonationStatus = async (req, res) => {
     );
     const donation = result.rows[0];
 
+    // ✅ ARCHITECTURE CLEAN OPTIMIZATION: Emit data live socket langsung dipicu tanpa terikat query tabel balance statis yang macet
     if (upperStatus === 'SUCCESS' && donation) {
         const streamerIdCast = parseInt(donation.streamer_id, 10);
-
-        await req.db.query(`
-          INSERT INTO balance (streamer_id, total_saldo) 
-          VALUES ($1, $2)
-          ON CONFLICT (streamer_id) 
-          DO UPDATE SET total_saldo = COALESCE(balance.total_saldo, 0) + $2
-        `, [streamerIdCast, donation.net_amount]);
 
         if (req.io) {
             req.io.emit(`new-donation-${streamerIdCast}`, {
