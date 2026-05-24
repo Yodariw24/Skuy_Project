@@ -1,13 +1,13 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
- * SYSTEM ENGINE BY: ARI (CLEAN IMPLEMENTATION)
+ * SYSTEM ENGINE BY: ARI (CLEAN & SECURE JSONB PARSING EDITION)
  */
 
 import midtransClient from 'midtrans-client';
 
 // Inisialisasi Core API Midtrans Sandbox (Gunakan credentials dari environment variables Railway)
 const coreApi = new midtransClient.CoreApi({
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true', // ✅ BOOTSTRAP: Konversi string env menjadi boolean murni
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true', 
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
@@ -26,7 +26,7 @@ export const getWalletHistory = async (req, res) => {
   try {
     const query = `
       SELECT 
-        id, 
+        id::TEXT, 
         gross_amount AS amount, 
         donatur_name::TEXT AS description, 
         'IN'::TEXT AS type, 
@@ -38,9 +38,13 @@ export const getWalletHistory = async (req, res) => {
       UNION ALL
       
       SELECT 
-        id, 
+        id::TEXT, 
         amount, 
-        ('Penarikan Saldo (' || bank_info->>'bank_name' || ')')::TEXT AS description, 
+        -- ✅ SECURITY PROTECTION LAYER: Mencegah letupan syntax json jika format bank_info rusak
+        CASE 
+          WHEN bank_info::TEXT LIKE '{%}' THEN ('Penarikan Saldo (' || COALESCE(bank_info->>'bank_name', 'Bank') || ')')::TEXT
+          ELSE ('Penarikan Saldo (' || bank_info::TEXT || ')')::TEXT
+        END AS description, 
         'OUT'::TEXT AS type, 
         created_at, 
         status::TEXT 
@@ -54,13 +58,12 @@ export const getWalletHistory = async (req, res) => {
     return res.json({ success: true, history: result.rows }); 
   } catch (err) {
     console.error("🔥 Error getWalletHistory Node:", err.message);
-    return res.status(500).json({ success: false, history: [] });
+    return res.status(500).json({ success: false, history: [], error: err.message });
   }
 };
 
 /**
  * 2. GET STREAMER BALANCE (FIXED & SYNCHRONIZED ACCOUNTS)
- * Menghitung saldo bersih yang tersedia (Saldo Utama - Antrean WD PENDING).
  */
 export const getStreamerBalance = async (req, res) => {
   const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
@@ -253,7 +256,6 @@ export const updateDonationStatus = async (req, res) => {
     if (upperStatus === 'SUCCESS' && donation) {
         const streamerIdCast = parseInt(donation.streamer_id, 10);
 
-        // ✅ CLEAN OPTIMIZATION: Mengamankan mutasi saldo dari potensi nilai NULL dengan COALESCE
         await req.db.query(`
           INSERT INTO balance (streamer_id, total_saldo) 
           VALUES ($1, $2)
