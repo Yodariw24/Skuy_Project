@@ -1,48 +1,46 @@
-import { useEffect, useState, useCallback, useMemo } from 'react' // ✅ FIXED: Pastikan useMemo terikat erat di atas
-import { useNavigate, useLocation } from 'react-router-dom'
-import api from '../../api/axios' 
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import api from '../../api/axios'; 
 import { 
   Copy, ExternalLink, Edit3, Landmark, ChevronDown, 
   Wallet, ArrowUpRight, Clock, Link as LinkIcon, 
   History, ArrowDownLeft, AlertCircle, RefreshCw, Zap
-} from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import Swal from 'sweetalert2'
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Swal from 'sweetalert2';
 
 function EarningsView({ user, bankData, openEditModal }) {
-  const [filter, setFilter] = useState('Semua')
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
-  const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [transactions, setTransactions] = useState([])
-  const [balance, setBalance] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('Semua');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   // 🛡️ LOCK LOKAL STATE: Mengamankan fitur Show/Hide balance biar berfungsi mandiri saat diklik
-  const [localShowBalance, setLocalShowBalance] = useState(false)
+  const [localShowBalance, setLocalShowBalance] = useState(false);
 
-  // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE (FIXED URL PATHS)
+  // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE (CLEAN PATHS)
   const fetchWalletData = useCallback(async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
       
-      const targetStreamerId = user?.streamer_id || user?.id;
-      
-      // ✅ SINKRON TOTAL: Bersihkan dari jebakan double prefix /api sesuai pangkalan routes backend lo, Ri!
+      // ✅ SINKRON TOTAL: Memanggil endpoint internal murni yang sudah dibersihkan dari double prefix /api
       const [resHistory, resBalance] = await Promise.all([
-        api.get(`/donations/list-internal/${parseInt(targetStreamerId, 10)}`), 
-        api.get(`/donations/balance/${parseInt(targetStreamerId, 10)}`)  
+        api.get('/donations/history'), 
+        api.get('/donations/balance')  
       ]);
       
-      if (resHistory.data && Array.isArray(resHistory.data.data)) {
-        // Map data agar simetris dengan penamaan kolom kueri UNION ALL lo
-        const normalizedTx = resHistory.data.data.map(tx => ({
+      if (resHistory.data && Array.isArray(resHistory.data.history)) {
+        // Pemetaan data yang simetris mengikuti format keluaran kueri UNION ALL backend lo, Ri
+        const normalizedTx = resHistory.data.history.map(tx => ({
           id: tx.id,
-          amount: tx.gross_amount || tx.amount,
-          description: tx.donatur_name ? `Donasi dari ${tx.donatur_name}` : 'System Entry',
-          type: 'IN', // Default internal viewer list
-          created_at: tx.created_date || tx.created_at,
+          amount: tx.amount,
+          description: tx.description || (tx.type === 'IN' ? 'Donasi Masuk' : 'Penarikan Saldo'),
+          type: tx.type?.toUpperCase(), 
+          created_at: tx.created_at,
           status: tx.status
         }));
         setTransactions(normalizedTx);
@@ -130,7 +128,7 @@ function EarningsView({ user, bankData, openEditModal }) {
     });
   };
 
-  // 🧮 FORMATTER CORE
+  // 🧮 FORMATTER CORE: Memoized penataan format mata uang rupiah rill
   const walletDisplayLabel = useMemo(() => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -237,17 +235,18 @@ function EarningsView({ user, bankData, openEditModal }) {
                   {filteredTransactions.map((tx) => (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={tx.id} className="group flex flex-col md:flex-row md:items-center justify-between p-8 rounded-[2.5rem] bg-white border-4 border-transparent hover:border-slate-950 hover:shadow-[8px_8px_0px_0px_#F1F5F9] transition-all">
                       <div className="flex items-center gap-6">
-                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'bg-emerald-500' : 'bg-amber-500'} text-white`}>
+                        {/* Dynamic Colors: Hijau untuk donasi masuk (IN) dan Merah untuk penarikan dana (OUT) */}
+                        <div className={`p-4 rounded-2xl shadow-lg border-2 border-slate-950 ${tx.type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'} text-white`}>
                           {tx.type === 'IN' ? <ArrowDownLeft size={22} strokeWidth={3} /> : <ArrowUpRight size={22} strokeWidth={3} />}
                         </div>
                         <div>
-                          <p className="font-black text-slate-950 uppercase italic tracking-tighter text-base mb-1">{tx.description || 'System Entry'}</p>
+                          <p className="font-black text-slate-950 uppercase italic tracking-tighter text-base mb-1">{tx.description}</p>
                           <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-2 italic tracking-widest"><Clock size={12} /> {tx.created_at ? new Date(tx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'VORTEX'}</p>
                         </div>
                       </div>
                       <div className="text-right mt-5 md:mt-0">
-                         <p className="text-3xl font-black italic tracking-tighter text-slate-950">
-                           + Rp {Number(tx.amount).toLocaleString('id-ID')}
+                         <p className={`text-3xl font-black italic tracking-tighter ${tx.type === 'IN' ? 'text-emerald-600' : 'text-slate-950'}`}>
+                           {tx.type === 'IN' ? '+' : '-'} Rp {Number(tx.amount).toLocaleString('id-ID')}
                          </p>
                          <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full border-2 ${tx.status?.toUpperCase() === 'SUCCESS' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-600 bg-amber-50 border-amber-200'} tracking-[0.1em] mt-2 inline-block`}>
                            {tx.status || 'Verified'}
@@ -331,7 +330,7 @@ function EarningsView({ user, bankData, openEditModal }) {
         )}
       </AnimatePresence>
     </div>
-  )
+  );
 }
 
 export default EarningsView;
