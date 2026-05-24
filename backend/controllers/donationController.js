@@ -1,6 +1,6 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
- * SYSTEM ENGINE BY: ARI (CLEAN & SECURE JSONB PARSING EDITION)
+ * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
  */
 
 import midtransClient from 'midtrans-client';
@@ -63,7 +63,9 @@ export const getWalletHistory = async (req, res) => {
 };
 
 /**
- * 2. GET STREAMER BALANCE (FIXED & SYNCHRONIZED ACCOUNTS)
+ * 2. GET STREAMER BALANCE (PRO-GRADE LIVE AGGREGATION ENGINE) 💰
+ * Menghitung saldo bersih secara live langsung dari tabel donations sukses dikurangi withdrawals.
+ * Dijamin sinkron total dengan halaman analitik di akun mana pun!
  */
 export const getStreamerBalance = async (req, res) => {
   const rawId = req.user?.streamer_id || req.user?.id || req.params.id;
@@ -75,26 +77,28 @@ export const getStreamerBalance = async (req, res) => {
 
   try {
     const query = `
-      SELECT 
-        COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS total_saldo
-      FROM (
-        SELECT $1::INT as streamer_id
-      ) s
-      LEFT JOIN balance b ON b.streamer_id = s.streamer_id
-      LEFT JOIN (
-        SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
+      SELECT (
+        -- Hitung total donasi bersih (net_amount) yang sukses masuk
+        SELECT COALESCE(SUM(net_amount), 0)::INT 
+        FROM donations 
+        WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS'
+      ) - (
+        -- Dikurangi total penarikan dana yang berstatus SUCCESS atau PENDING
+        SELECT COALESCE(SUM(amount), 0)::INT 
         FROM withdrawals 
-        WHERE UPPER(status) = 'PENDING' 
-        GROUP BY streamer_id
-      ) w ON w.streamer_id = s.streamer_id
+        WHERE streamer_id = $1 AND UPPER(status) IN ('SUCCESS', 'PENDING')
+      ) AS total_saldo
     `;
     
     const result = await req.db.query(query, [targetStreamerId]);
     const balance = result.rows.length > 0 ? parseInt(result.rows[0].total_saldo, 10) : 0;
     
-    return res.json({ success: true, total_saldo: balance < 0 ? 0 : balance });
+    return res.json({ 
+      success: true, 
+      total_saldo: balance < 0 ? 0 : balance 
+    });
   } catch (err) {
-    console.error("🔥 Error getStreamerBalance Node:", err.message);
+    console.error("🔥 Error getStreamerBalance Live Node:", err.message);
     return res.status(500).json({ success: false, total_saldo: 0 });
   }
 };
@@ -113,16 +117,15 @@ export const withdrawBalance = async (req, res) => {
 
   try {
     const balanceRes = await req.db.query(`
-      SELECT 
-        COALESCE(b.total_saldo, 0) - COALESCE(w.pending_wd, 0) AS available_balance
-      FROM (SELECT $1::INT as streamer_id) s
-      LEFT JOIN balance b ON b.streamer_id = s.streamer_id
-      LEFT JOIN (
-        SELECT streamer_id, COALESCE(SUM(amount), 0) as pending_wd 
+      SELECT (
+        SELECT COALESCE(SUM(net_amount), 0)::INT 
+        FROM donations 
+        WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS'
+      ) - (
+        SELECT COALESCE(SUM(amount), 0)::INT 
         FROM withdrawals 
-        WHERE UPPER(status) = 'PENDING' 
-        GROUP BY streamer_id
-      ) w ON w.streamer_id = s.streamer_id
+        WHERE streamer_id = $1 AND UPPER(status) IN ('SUCCESS', 'PENDING')
+      ) AS available_balance
     `, [targetStreamerId]);
     
     const availableBalance = balanceRes.rows.length > 0 ? parseInt(balanceRes.rows[0].available_balance, 10) : 0;

@@ -60,9 +60,8 @@ router.get('/history', protect, injectStreamerId, getWalletHistory);
 // ✅ SINKRON: Endpoint penggerak grafik Recharts dinamis untuk halaman analitik performa lo, Ri!
 router.get('/analytics-report', protect, injectStreamerId, getStreamerAnalytics);
 
-// ✅ FIXED COMPATIBILITY: Tambahkan jembatan /:id agar controller lo bisa membaca parameter dengan aman dan fleksibel
-router.get('/list-internal/:id', protect, injectStreamerId, getDonationsByStreamer);
-router.get('/list-internal', protect, injectStreamerId, getDonationsByStreamer);
+// ✅ CLEAN & PRO-GRADE: Menggabungkan list-internal menggunakan tanda tanya (?) agar parameter bersifat opsional dan ringkas
+router.get('/list-internal/:id?', protect, injectStreamerId, getDonationsByStreamer);
 
 /**
  * --- REFINED ACTIVITY FEED (Auth Required) ---
@@ -128,7 +127,7 @@ router.get('/profile/:username', async (req, res) => {
     if (!username) return res.status(400).json({ success: false, message: "Mana username-nya, Ri?" });
 
     try {
-        // ✅ FIXED TYPO: Membersihkan req.getStreamerIddb menjadi objek request database asli (req.db)
+        // ✅ FIXED TYPO: Membersihkan objek request database asli (req.db)
         const result = await req.db.query(
             `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
              FROM streamers s 
