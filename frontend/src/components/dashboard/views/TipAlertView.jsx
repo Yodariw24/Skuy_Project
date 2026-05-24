@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Copy, Eye, Save, Sparkles, Zap, Globe, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../../api/axios'; 
+import api from '../../../api/axios'; 
 
 function TipAlertView({ user }) {
   // ✅ Widget URL Protocol (Safe Guard dengan parameter username riil session)

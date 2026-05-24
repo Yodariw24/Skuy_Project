@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Target, Flag, Save, Copy, Palette, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../../api/axios'; 
+import api from '../../../api/axios'; 
 
 function MilestoneView({ user }) {
   const currentUrl = window.location.origin;

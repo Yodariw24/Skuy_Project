@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Youtube, Settings, ShieldAlert, Copy, Play, Save, Trash2, Clock, Loader2, ChevronRight } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../../api/axios'; 
+import api from '../../../api/axios'; 
 
 function MediaShareView({ user }) {
   const currentUrl = window.location.origin;

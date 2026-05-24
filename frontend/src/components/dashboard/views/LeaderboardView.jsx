@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Crown, Copy, Save, Filter, Sparkles, Loader2, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
-import api from '../../api/axios'; 
+import api from '../../../api/axios'; 
 
 function LeaderboardView({ user }) {
   // Ambil URL domain dinamis pangkalan
