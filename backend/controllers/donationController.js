@@ -6,7 +6,7 @@
 
 import midtransClient from 'midtrans-client';
 
-// ✅ INEDX/INSTANSIASI SNAP API BAWAAN SDK MIDTRANS
+// ✅ INDEX/INSTANSIASI SNAP API BAWAAN SDK MIDTRANS
 const snap = new midtransClient.Snap({
     isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true', 
     serverKey: process.env.MIDTRANS_SERVER_KEY,
@@ -355,8 +355,6 @@ export const getStreamerAnalytics = async (req, res) => {
 
 /**
  * ✅ AUTOMATIC ENGINE: MIDTRANS WEBHOOK/CALLBACK NOTIFICATION HANDLER ⚡
- * Daftarkan fungsi ini ke router POST kamu (Contoh backend route: router.post('/midtrans-callback', handleMidtransCallback))
- * Dan pastikan URL ini juga dipasang di Dashboard Midtrans -> Settings -> Access Notification
  */
 export const handleMidtransCallback = async (req, res) => {
   try {
@@ -414,5 +412,33 @@ export const handleMidtransCallback = async (req, res) => {
     if (req.db) await req.db.query('ROLLBACK');
     console.error("🔥 Error di Webhook Midtrans:", error.message);
     return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * ⚡ 9. GET SYSTEM AUDIT LOGS (SUPER ADMIN EXCLUSIVE POWER ENGINE)
+ * Menyuplai umpan data JSONB rill ke panel kontrol HQ Central Governance milik lo, Ri!
+ */
+export const getSystemAuditLogs = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        user_id,
+        action_type,
+        entity_id,
+        metadata,
+        ip_address,
+        user_agent,
+        created_at
+      FROM system_audit_logs 
+      ORDER BY created_at DESC 
+      LIMIT 100
+    `;
+    const result = await req.db.query(query);
+    return res.json({ success: true, logs: result.rows });
+  } catch (err) {
+    console.error("🔥 Error getSystemAuditLogs:", err.message);
+    return res.status(500).json({ success: false, logs: [], error: err.message });
   }
 };

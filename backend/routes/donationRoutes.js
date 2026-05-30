@@ -16,11 +16,15 @@ import {
     getWalletHistory,
     withdrawBalance,
     getStreamerAnalytics,
-    handleMidtransCallback // ✅ IMPORT WEBHOOK ENGINE BARU UNTUK OTOMATISASI SANDBOX
+    handleMidtransCallback, // ✅ IMPORT WEBHOOK ENGINE BARU UNTUK OTOMATISASI SANDBOX
+    getSystemAuditLogs // ✅ IMPORT ENGINE POWER BARU UNTUK DATA LOG ADMIN CONTROL
 } from '../controllers/donationController.js';
 
 import { validateDonation } from '../middleware/validator.js';
 import { protect } from '../middleware/authMiddleware.js';
+
+// ✅ IMPORT MIDDLEWARE AUDIT LOG UTAMA
+import { logActivity } from '../middleware/auditLogger.js';
 
 /**
  * 🛡️ INTERNAL MIDDLEWARE: AUTOMATED ID CONVERTER INTERCEPTOR
@@ -51,11 +55,24 @@ const injectStreamerId = async (req, res, next) => {
     }
 };
 
+/**
+ * 🛡️ INTERNAL MIDDLEWARE: OWNER ROLE VALIDATOR
+ * Memastikan token yang masuk bener-bener milik SUPER_ADMIN (Ari) sebelum diizinkan mengintip log
+ */
+const isAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'SUPER_ADMIN') {
+        next();
+    } else {
+        res.status(403).json({ success: false, message: "Akses ilegal! Anda bukan Pemegang Kuasa PT SkuyGG, Ri!" });
+    }
+};
+
 // --- ===================================================================== ---
 // --- 1. SULTAN PRIVACY ROUTES (Auth Required) - TARUH DI ATAS AGAR AMAN    ---
 // --- ===================================================================== ---
 
-router.post('/withdraw', protect, injectStreamerId, withdrawBalance); 
+// 📸 MONITOR: Catat setiap request penarikan saldo rill dari akun streamer
+router.post('/withdraw', protect, injectStreamerId, logActivity('WITHDRAW_REQUESTED'), withdrawBalance); 
 router.get('/history', protect, injectStreamerId, getWalletHistory); 
 
 // ✅ SINKRON: Endpoint penggerak grafik Recharts dinamis untuk halaman analitik performa lo, Ri!
@@ -150,12 +167,23 @@ router.get('/profile/:username', async (req, res) => {
 // --- ===================================================================== ---
 // --- 3. DONATION ENGINE (Transaksi Gateway Protocol Webhook)               ---
 // --- ===================================================================== ---
-router.post('/create', validateDonation, createDonation); 
-router.put('/status/:id', updateDonationStatus); 
+
+// 📸 MONITOR: Rekam setiap kali ada donatur yang menekan tombol kirim donasi (inisialisasi QRIS)
+router.post('/create', validateDonation, logActivity('DONATION_INITIATED'), createDonation); 
+
+// 📸 MONITOR: Rekam mutasi perubahan status manual (jika ada)
+router.put('/status/:id', logActivity('MANUAL_STATUS_UPDATED'), updateDonationStatus); 
 
 // ✅ MIDTRANS WEBHOOK CALLBACK ENDPOINT
-// Endpoint penampung data notifikasi otomatis pasca simulasi sukses dilakukan di Sandbox kit.
-// Wajib ditaruh di rute publik (Bebas Middleware 'protect') agar robot Midtrans bisa menembak sukses ke sistem.
-router.post('/midtrans-callback', handleMidtransCallback);
+// 📸 MONITOR: Rekam log respon otomatis saat sistem diserang webhook sukses paska simulasi di Sandbox
+router.post('/midtrans-callback', logActivity('PAYMENT_WEBHOOK_RECEIVED'), handleMidtransCallback);
+
+
+// --- ===================================================================== ---
+// --- 4. SUPER ADMIN HQ CONTROL CENTER (Exclusive Governance Layer)          ---
+// --- ===================================================================== ---
+
+// ✅ TERKUNCI DOUBLE SHIELD: Wajib lolos validasi token sesi login (protect) DAN verifikasi role database (isAdmin)
+router.get('/super-admin/audit-logs', protect, isAdmin, getSystemAuditLogs);
 
 export default router;
