@@ -48,6 +48,13 @@ const injectStreamerId = async (req, res, next) => {
             // ✅ FIXED FALLBACK: Paksa konversi ke integer murni agar tidak merusak kueri controller
             req.user.streamer_id = parseInt(req.user.id, 10);
         }
+
+        // ⚡ BULLETPROOF AMAN: Ambil ulang role terbaru dari database untuk menghindari desinkronisasi token di Vercel
+        const roleCheck = await req.db.query("SELECT role FROM users WHERE id = $1", [parseInt(req.user.id, 10)]);
+        if (roleCheck.rows.length > 0) {
+            req.user.role = roleCheck.rows[0].role;
+        }
+
         next();
     } catch (err) {
         console.error("🔥 Interceptor ID Error:", err.message);
