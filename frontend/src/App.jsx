@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import PaymentPage from './pages/PaymentPage';
 import WidgetClient from './pages/WidgetClient';
 import Explore from './pages/Explore'; // Creators Discovery Hub
+import SuperAdminDashboard from './pages/SuperAdminDashboard'; // ✅ IMPORT DASHBOARD OWNER PT BARU
 import api from './api/axios';
 
 import 'animate.css';
@@ -18,6 +19,24 @@ const ProtectedRoute = ({ children }) => {
   if (!token) {
     return <Navigate to="/auth" replace />;
   }
+  return children;
+};
+
+// --- 2. LOGIC EXCLUSIVE ADMIN ROUTE (PT Owner Governance Guard) ---
+// ✅ CLEAN PROTECTION: Memvalidasi role akun rill langsung dari localStorage hasil sinkronisasi Cloud
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem('user_token');
+  const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  if (!token) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (savedUser.role !== 'SUPER_ADMIN') {
+    alert("Akses ilegal! Area ini hanya untuk Pemegang Kuasa PT SkuyGG, Ri!");
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 };
 
@@ -102,10 +121,21 @@ function App() {
             } 
           />
 
-          {/* --- 4. DYNAMIC CREATOR PROFILE (Public) --- */}
+          {/* --- 4. SUPER ADMIN HQ CONTROL PANEL (Exclusive Owner Layer) --- */}
+          {/* ✅ TERKUNCI MULTI-LAYER: Diproteksi dengan AdminRoute agar hanya diakses oleh email lo, Ri! */}
+          <Route 
+            path="/pt-owner/audit-center" 
+            element={
+              <AdminRoute>
+                <SuperAdminDashboard />
+              </AdminRoute>
+            } 
+          />
+
+          {/* --- 5. DYNAMIC CREATOR PROFILE (Public) --- */}
           <Route path="/:username" element={<DonationPage />} />
           
-          {/* --- 5. 404 REDIRECT FALLBACK --- */}
+          {/* --- 6. 404 REDIRECT FALLBACK --- */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

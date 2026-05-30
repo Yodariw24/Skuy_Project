@@ -1,3 +1,3 @@
 
--- (Opsional) Jika kolom bank_info lo ternyata tipenya terlanjur balik ke TEXT, paksa kunci ke JSONB lagi:
-ALTER TABLE withdrawals ALTER COLUMN bank_info TYPE JSONB USING bank_info::JSONB;
+-- 2. Naikkan pangkat akun lo sendiri jadi SUPER_ADMIN (Ganti email dengan email login lo, Ri!)
+UPDATE users SET role = 'SUPER_ADMIN' WHERE email = 'ariwirayuda24@gmail.com';
