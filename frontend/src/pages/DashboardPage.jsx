@@ -88,7 +88,6 @@ function DashboardPage() {
         if (!targetId) return;
 
         try {
-            // Bersihkan URL dari double prefix api jika instansiasi axios lo sudah mengunci base /api
             const balanceRes = await api.get(`/donations/balance/${parseInt(targetId, 10)}`);
             if (balanceRes.data && balanceRes.data.success) {
                 setBalance(balanceRes.data.total_saldo);
@@ -114,7 +113,18 @@ function DashboardPage() {
         if (userIdFallback || savedUser?.id) {
             fetchLiveBalance();
         }
-    }, [userIdFallback, tab, fetchLiveBalance]); // Ikut memantau perubahan tab untuk me-refresh saldo live secara on-the-fly
+    }, [userIdFallback, tab, fetchLiveBalance]);
+
+    // ⚡ CUSTOM SETUSER INTERCEPTOR:
+    // Menjamin setiap kali komponen anak (e.g., ProfileSettings) mengubah data, 
+    // cache di LocalStorage otomatis terkunci sinkron rill tanpa perlu refresh halaman manual!
+    const handleSetUser = (updatedData) => {
+        setUser((prev) => {
+            const finalMerged = typeof updatedData === 'function' ? updatedData(prev) : { ...prev, ...updatedData };
+            localStorage.setItem('user', JSON.stringify(finalMerged));
+            return finalMerged;
+        });
+    };
 
     // --- LOGIKA DUAL-OTP ---
     const handleRequestOTP = async () => {
@@ -194,8 +204,10 @@ function DashboardPage() {
                     )}
                     
                     {tab === 'activity' && <ActivityFeed user={user} />}
-                    {tab === 'profile' && <ProfileSettings user={user} setUser={setUser} />}
-                    {tab === 'appearance' && <AppearanceView user={user} setUser={setUser} />}
+                    
+                    {/* ✅ INTERCEPTED ATTACHMENT: Menggunakan handler pintar agar cache data terselamatkan */}
+                    {tab === 'profile' && <ProfileSettings user={user} setUser={handleSetUser} />}
+                    {tab === 'appearance' && <AppearanceView user={user} setUser={handleSetUser} />}
                     
                     {tab === 'security' && (
                         <SecurityView 

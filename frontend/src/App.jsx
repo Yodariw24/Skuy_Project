@@ -32,12 +32,13 @@ const AdminRoute = ({ children }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  if (savedUser.role !== 'SUPER_ADMIN') {
-    alert("Akses ilegal! Area ini hanya untuk Pemegang Kuasa PT SkuyGG, Ri!");
-    return <Navigate to="/dashboard" replace />;
+  // 🛡️ DUAL-SHIELD BYPASS: Jika role database belum sinkron di token, jebol proteksi langsung via email valid lo, Ri!
+  if (savedUser.role === 'SUPER_ADMIN' || savedUser.email === 'ariwirayuda24@gmail.com') {
+    return children;
   }
 
-  return children;
+  alert("Akses ilegal! Area ini hanya untuk Pemegang Kuasa PT SkuyGG, Ri!");
+  return <Navigate to="/dashboard" replace />;
 };
 
 function App() {
@@ -57,8 +58,14 @@ function App() {
     try {
       const res = await api.get('/user/dashboard-sync');
       if (res.data.success) {
-        setUser(res.data.user);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
+        // ⚡ INJECTION FORCE: Jika server backend belum kirim key role, paksa injeksi role SUPER_ADMIN khusus untuk email lo di sisi client
+        let userData = res.data.user;
+        if (userData.email === 'ariwirayuda24@gmail.com') {
+          userData.role = 'SUPER_ADMIN';
+        }
+
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
       }
     } catch (err) {
       console.error("🛡️ Shield Broken: Sesi Gagal Sinkron / Token Ilegal.");

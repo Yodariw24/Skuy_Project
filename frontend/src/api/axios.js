@@ -3,6 +3,7 @@ import axios from 'axios';
 /**
  * KONFIGURASI AXIOS SKUY.GG v2.7 🛡️
  * Anti-Illegal Path & Auto-Sanitize Protocol
+ * RE-CALIBRATED BY: ARI WIRAYUDA (FINAL STERILE PRODUCTION EDITION)
  */
 const api = axios.create({
   baseURL: (() => {
@@ -11,7 +12,7 @@ const api = axios.create({
     
     // 2. Protokol Pembersihan Sultan:
     // Hapus slash di akhir dan tulisan /api (jika ada) agar tidak double prefix
-    const cleanBase = rawUrl.replace(/\/$/, "").replace(/\/api$/, "");
+    const cleanBase = rawUrl.trim().replace(/\/$/, "").replace(/\/api$/, "");
     
     const finalURL = `${cleanBase}/api`;
     
@@ -35,15 +36,22 @@ api.interceptors.request.use(
   (config) => {
     // 🛡️ 1. Basmi Double Prefix & Double Slash
     if (config.url) {
-      // Jika user ngetik "/api/user", bersihkan jadi "/user"
+      config.url = config.url.trim();
+
+      // Jika user ngetik "/api/user" atau "api/user", bersihkan jadi "/user"
       if (config.url.startsWith('/api')) {
         config.url = config.url.replace(/^\/api/, '');
+      } else if (config.url.startsWith('api')) {
+        config.url = config.url.replace(/^api/, '');
       }
       
-      // Pastikan url dimulai dengan satu slash "/"
+      // Pastikan url dijamin dimulai dengan tepat satu slash "/"
       if (!config.url.startsWith('/')) {
         config.url = `/${config.url}`;
       }
+
+      // Bersihkan jika ada double slash berulang di tengah path akibat salah ketik (e.g., /user//bank)
+      config.url = config.url.replace(/\/+/g, '/');
     }
 
     // 🛡️ 2. Sultan Token Injection

@@ -17,7 +17,11 @@ function Sidebar({ user, balance }) {
   const activeId = pathSegments[2] || 'wallet';
 
   const role = user?.role?.toLowerCase();
-  const isCreator = role === 'creator' || role === 'streamer' || role === 'admin';
+  
+  // 🛡️ RE-CALIBRATED ACCESS SHIELD:
+  // Menyuntikkan role 'super_admin' ke dalam whitelist kreator agar panel kontrol menu lo 
+  // tidak ikut membeku/disabled pas akun lo naik kasta jadi pemegang kuasa PT, Ri!
+  const isCreator = role === 'creator' || role === 'streamer' || role === 'admin' || role === 'super_admin';
   const isSecured = user?.is_two_fa_enabled; 
   
   const overlayTabs = ['tip', 'mediashare', 'milestone', 'leaderboard'];
