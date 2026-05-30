@@ -42,13 +42,12 @@ const upload = multer({
 
 /**
  * ✅ WALLET HISTORY NODE
- * FIXED: Kebal bentrok ID, otomatis melacak log withdrawals berdasarkan Streamer ID asli dari tabel relation
+ * OPTIMIZED: Memanfaatkan req.user.streamer_id bertipe integer yang sudah disuplai instan oleh middleware protect terbaru!
  */
 router.get('/wallet/history/:id', protect, async (req, res) => {
     try {
-        // Pancing ID streamer asli berdasarkan token user agar tidak salah rute params di Postgres
-        const streamerCheck = await req.db.query("SELECT id FROM streamers WHERE user_id = $1", [req.user.id]);
-        const targetStreamerId = streamerCheck.rows.length > 0 ? streamerCheck.rows[0].id : req.params.id;
+        // Kebal bentrok ID: Jika protect sudah menginjeksi streamer_id rill, pakai langsung tanpa kueri ulang
+        const targetStreamerId = req.user?.streamer_id || req.params.id;
 
         const query = `
             SELECT id, amount, status, created_at, bank_info 
@@ -56,7 +55,7 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
             WHERE streamer_id = $1 
             ORDER BY created_at DESC
         `;
-        const result = await req.db.query(query, [targetStreamerId]);
+        const result = await req.db.query(query, [parseInt(targetStreamerId, 10)]);
         res.json({ success: true, history: result.rows });
     } catch (err) {
         console.error("❌ Wallet History Error:", err.message);
@@ -66,8 +65,7 @@ router.get('/wallet/history/:id', protect, async (req, res) => {
 
 /**
  * ✅ DASHBOARD SYNC (SaaS Pro Upgrade)
- * FIXED: 1. Menyeleksi s.id AS streamer_id agar frontend tidak dapet undefined.
- * 2. Menggunakan Sub-Query matematika live untuk mencocokkan total saldo bersih donasi vs withdrawals.
+ * FIXED: Sinkronisasi mutlak data session user, streamer_id, dan akumulasi total saldo
  */
 router.get('/dashboard-sync', protect, async (req, res) => {
     try {
@@ -90,7 +88,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
             JOIN streamers s ON u.id = s.user_id
             WHERE u.id = $1
         `;
-        const result = await req.db.query(query, [req.user.id]);
+        const result = await req.db.query(query, [parseInt(req.user.id, 10)]);
         if (result.rows.length > 0) {
             res.json({ success: true, user: result.rows[0] });
         } else {
@@ -103,7 +101,7 @@ router.get('/dashboard-sync', protect, async (req, res) => {
 });
 
 /**
- * ✅ PROFILE & BANK ACTIONS (Terproteksi Token Token Session)
+ * ✅ PROFILE & BANK ACTIONS (Terproteksi Token Session)
  */
 router.post('/upload-avatar', protect, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: "Mana fotonya Ri?" });

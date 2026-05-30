@@ -1,6 +1,7 @@
 /**
  * SKUYGG FINANCIAL & DONATION CORE ROUTER (PRO GRADE EDITION)
- * SYSTEM ENGINE BY: ARI (RE-CALIBRATED SECURE INTERCEPTOR)
+ * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
+ * OPTIMIZED: REMOVED INTERCEPTOR REDUNDANCY FOR HIGH-THROUGHPUT PERFORMANCE
  */
 
 import express from 'express';
@@ -27,42 +28,6 @@ import { protect } from '../middleware/authMiddleware.js';
 import { logActivity } from '../middleware/auditLogger.js';
 
 /**
- * 🛡️ INTERNAL MIDDLEWARE: AUTOMATED ID CONVERTER INTERCEPTOR
- * Fungsi sakti untuk menjamin req.user.streamer_id selalu terisi 
- * berdasarkan data join asli database sebelum dilempar ke controller.
- */
-const injectStreamerId = async (req, res, next) => {
-    try {
-        if (!req.user?.id) return next();
-        
-        // Pancing ID streamer asli dari database berdasarkan User ID yang sedang aktif login
-        const streamerCheck = await req.db.query(
-            "SELECT id FROM streamers WHERE user_id = $1", 
-            [parseInt(req.user.id, 10)] // ✅ FIXED: Amankan kueri pencarian user_id bertipe Integer
-        );
-        
-        if (streamerCheck.rows.length > 0) {
-            // Kunci streamer_id asli ke dalam object request session (Integer)
-            req.user.streamer_id = parseInt(streamerCheck.rows[0].id, 10);
-        } else {
-            // ✅ FIXED FALLBACK: Paksa konversi ke integer murni agar tidak merusak kueri controller
-            req.user.streamer_id = parseInt(req.user.id, 10);
-        }
-
-        // ⚡ BULLETPROOF AMAN: Ambil ulang role terbaru dari database untuk menghindari desinkronisasi token di Vercel
-        const roleCheck = await req.db.query("SELECT role FROM users WHERE id = $1", [parseInt(req.user.id, 10)]);
-        if (roleCheck.rows.length > 0) {
-            req.user.role = roleCheck.rows[0].role;
-        }
-
-        next();
-    } catch (err) {
-        console.error("🔥 Interceptor ID Error:", err.message);
-        next();
-    }
-};
-
-/**
  * 🛡️ INTERNAL MIDDLEWARE: OWNER ROLE VALIDATOR
  * Memastikan token yang masuk bener-bener milik SUPER_ADMIN (Ari) sebelum diizinkan mengintip log
  */
@@ -77,21 +42,22 @@ const isAdmin = (req, res, next) => {
 // --- ===================================================================== ---
 // --- 1. SULTAN PRIVACY ROUTES (Auth Required) - TARUH DI ATAS AGAR AMAN    ---
 // --- ===================================================================== ---
+// ⚡ NOTE: injectStreamerId dieliminasi karena req.user.streamer_id sudah disuplai instan oleh middleware protect!
 
 // 📸 MONITOR: Catat setiap request penarikan saldo rill dari akun streamer
-router.post('/withdraw', protect, injectStreamerId, logActivity('WITHDRAW_REQUESTED'), withdrawBalance); 
-router.get('/history', protect, injectStreamerId, getWalletHistory); 
+router.post('/withdraw', protect, logActivity('WITHDRAW_REQUESTED'), withdrawBalance); 
+router.get('/history', protect, getWalletHistory); 
 
 // ✅ SINKRON: Endpoint penggerak grafik Recharts dinamis untuk halaman analitik performa lo, Ri!
-router.get('/analytics-report', protect, injectStreamerId, getStreamerAnalytics);
+router.get('/analytics-report', protect, getStreamerAnalytics);
 
 // ✅ CLEAN & PRO-GRADE: Menggabungkan list-internal menggunakan tanda tanya (?) agar parameter bersifat opsional dan ringkas
-router.get('/list-internal/:id?', protect, injectStreamerId, getDonationsByStreamer);
+router.get('/list-internal/:id?', protect, getDonationsByStreamer);
 
 /**
  * --- REFINED ACTIVITY FEED (Auth Required) ---
  */
-router.get('/activity-feed', protect, injectStreamerId, async (req, res) => {
+router.get('/activity-feed', protect, async (req, res) => {
     try {
         const targetStreamerId = req.user.streamer_id || req.user.id;
         const castId = parseInt(targetStreamerId, 10); // ✅ SAFETY FIRST

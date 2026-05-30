@@ -1,6 +1,7 @@
 /**
  * SKUYGG WIDGET & OBS INTERACTIVE ENGINE CONTROLLER
- * SYSTEM ENGINE BY: ARI
+ * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
+ * ARCHITECTURE LOCK: MULTI-CHANNEL SOCKET RE-CALIBRATION
  */
 
 // --- 1. UPDATE SETTINGS (Deploy Protocol dari Dashboard) ---
@@ -13,6 +14,10 @@ export const updateSettings = async (req, res) => {
     }
 
     try {
+        // Ambil data username rill terlebih dahulu dari database untuk memperkuat pipa transmisi socket
+        const streamerQuery = await req.db.query("SELECT username FROM streamers WHERE user_id = $1", [parseInt(userId, 10)]);
+        const currentUsername = streamerQuery.rows[0]?.username || null;
+
         const query = `
             INSERT INTO widget_settings 
             (user_id, widget_type, primary_color, accent_color, text_color, glow_color, min_tip, duration, goal_title, goal_target)
@@ -32,7 +37,7 @@ export const updateSettings = async (req, res) => {
         `;
         
         const values = [
-            userId, 
+            parseInt(userId, 10), // ✅ SAFETY: Paksa cast integer murni di layer parameter array
             widgetType, 
             colors.primary || '#7C3AED', // Sultan Violet Default
             colors.accent || '#FF1493', 
@@ -47,10 +52,11 @@ export const updateSettings = async (req, res) => {
         const result = await req.db.query(query, values);
         const rowData = result.rows[0];
 
-        // ✅ FIXED SINKRONISASI REAL-TIME SOCKET:
-        // Bungkus payload socket agar format key-nya cocok 100% dengan state WidgetClient.jsx di OBS lo!
+        // ✅ FIXED MULTI-CHANNEL REAL-TIME SOCKET EMITTER:
+        // Memancarkan sinyal ganda baik ke channel berbasis ID maupun Username (streamKey).
+        // Langkah ini menjamin Client OBS lo langsung berubah warna seketika tanpa perlu restart browser source!
         if (req.io) {
-            req.io.emit(`widget-update-${userId}`, {
+            const socketPayload = {
                 type: widgetType,
                 settings: {
                     primary_color: rowData.primary_color,
@@ -62,7 +68,15 @@ export const updateSettings = async (req, res) => {
                     goal_title: rowData.goal_title,
                     goal_target: rowData.goal_target
                 }
-            });
+            };
+
+            // Jalur 1: Emit berdasarkan ID murni (Untuk dashboard internal)
+            req.io.emit(`widget-update-${userId}`, socketPayload);
+
+            // Jalur 2: Emit berdasarkan Username/StreamKey (Untuk OBS Browser Source Client)
+            if (currentUsername) {
+                req.io.emit(`widget-update-${currentUsername.toLowerCase()}`, socketPayload);
+            }
         }
 
         res.status(200).json({ 

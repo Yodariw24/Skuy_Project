@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken';
 export const protect = async (req, res, next) => {
     let token;
 
-    // 🛡️ 1. Cek apakah ada token di Header Authorization
+    // 🛡️ 1. Cek validitas format header Authorization awal
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             // Ambil tokennya murni setelah string 'Bearer '
@@ -18,7 +18,7 @@ export const protect = async (req, res, next) => {
 
             /**
              * 🛡️ 3. Sync Database: Ambil data user paling seger dari PostgreSQL Railway!
-             * ✅ FIXED MAPPING: Seleksi s.profile_picture sebagai pangkalan utama avatar streamer lo, Ri
+             * ✅ FIXED MAPPING: Seleksi s.profile_picture dan s.id AS streamer_id langsung terinjeksi sempurna
              */
             const query = `
                 SELECT u.id, u.username, u.email, u.role, u.is_two_fa_enabled, 
@@ -28,7 +28,7 @@ export const protect = async (req, res, next) => {
                 WHERE u.id = $1
             `;
             
-            const { rows } = await req.db.query(query, [decoded.id]);
+            const { rows } = await req.db.query(query, [parseInt(decoded.id, 10)]);
 
             if (rows.length === 0) {
                 return res.status(401).json({ 
@@ -39,7 +39,13 @@ export const protect = async (req, res, next) => {
 
             // 🛡️ 4. Injeksi data komplit ke dalam object request session
             req.user = rows[0];
-            return next(); // Langsung return next agar eksekusi berhenti di sini dan lanjut ke router/controller
+            
+            // ✅ EXPEDITED FORCE CASTING: Menjamin properti streamer_id berformat integer murni di memori request
+            if (req.user.streamer_id) {
+                req.user.streamer_id = parseInt(req.user.streamer_id, 10);
+            }
+
+            return next(); // Lanjut ke middleware berikutnya atau langsung ke controller
         } catch (err) {
             console.error("🔥 SHIELD_BREAK_ERROR:", err.message);
             return res.status(401).json({ 
@@ -49,7 +55,7 @@ export const protect = async (req, res, next) => {
         }
     }
 
-    // 🛡️ 5. FALLBACK ACCESS DENIED: Jika token kosong atau format header hancur
+    // 🛡️ 5. FALLBACK ACCESS DENIED: Jika token kosong, null, atau format header hancur berkeping-keping
     if (!token) {
         return res.status(401).json({ 
             success: false, 

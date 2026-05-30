@@ -37,9 +37,9 @@ export const updateProfileInfo = async (req, res) => {
             await req.db.query(`UPDATE streamers SET username = $1 WHERE user_id = $2`, [cleanUsername, targetId]);
         }
 
-        // ✅ UPGRADE RETURN STRUCTURAL DATA: Tarik data gabungan terbaru agar front-end dapet data super segar!
+        // ✅ UPGRADE RETURN STRUCTURAL DATA: Tarik data gabungan terbaru beserta kolom role rill agar front-end dapet data super segar!
         const finalDataRes = await req.db.query(`
-            SELECT u.username, s.display_name, s.bio, s.instagram, s.tiktok, s.youtube, s.theme_color, s.phone_number, s.category_id, s.profile_picture
+            SELECT u.username, u.role, s.display_name, s.bio, s.instagram, s.tiktok, s.youtube, s.theme_color, s.phone_number, s.category_id, s.profile_picture
             FROM streamers s
             JOIN users u ON s.user_id = u.id
             WHERE s.user_id = $1
@@ -110,12 +110,13 @@ export const getAllStreamers = async (req, res) => {
     const { category } = req.query;
 
     try {
+        // ✅ FIXED INTERCEPTOR CLASSIFICATION: Mengizinkan role 'SUPER_ADMIN' yang juga merangkap kreator agar datanya tidak hilang dari pangkalan analytics
         let query = `
             SELECT s.id, u.username, s.display_name, s.full_name, s.profile_picture, s.theme_color, u.role, s.bio, c.name as category_name
             FROM streamers s
             JOIN users u ON s.user_id = u.id
             LEFT JOIN categories c ON s.category_id = c.id
-            WHERE u.role = 'creator'
+            WHERE u.role IN ('creator', 'SUPER_ADMIN')
         `;
         
         const params = [];

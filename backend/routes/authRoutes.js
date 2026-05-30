@@ -146,11 +146,13 @@ router.post('/google', async (req, res) => {
         res.json({
             success: true,
             token: generateToken(user),
+            // ✅ PERBAIKAN: Suntikkan properti 'role' hasil sinkronisasi database rill
             user: { 
                 id: user.id, 
                 username: user.username, 
                 full_name: profile.full_name || user.username, 
-                profile_picture: profile.profile_picture || '' 
+                profile_picture: profile.profile_picture || '',
+                role: user.role || 'creator'
             }
         });
     } catch (err) {
@@ -185,7 +187,14 @@ router.post('/login', async (req, res) => {
         res.json({ 
             success: true, 
             token: generateToken(user), 
-            user: { id: user.id, username: user.username, full_name: user.full_name, profile_picture: user.profile_picture } 
+            // ✅ PERBAIKAN: Menyertakan data 'role' rill (SUPER_ADMIN / creator) ke dalam payload response
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                full_name: user.full_name, 
+                profile_picture: user.profile_picture,
+                role: user.role || 'creator'
+            } 
         });
     } catch (err) {
         res.status(500).json({ success: false, message: "Server Error." });
@@ -236,11 +245,13 @@ router.post('/verify-2fa', async (req, res) => {
             res.json({ 
                 success: true, 
                 token: generateToken(user), 
+                // ✅ PERBAIKAN: Menyertakan 'role' paska lolos otentikasi dua faktor (2FA)
                 user: { 
                     id: user.id, 
                     username: user.username, 
                     full_name: user.full_name, 
                     profile_picture: user.profile_picture, 
+                    role: user.role || 'creator',
                     is_two_fa_enabled: true 
                 } 
             });

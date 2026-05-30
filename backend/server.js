@@ -39,10 +39,16 @@ const allowedOrigins = [
   "https://skuy-gg.vercel.app"
 ];
 
+// Helper Checker Dinamis biar reusable untuk Express & Socket.io
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  const cleanOrigin = origin.replace(/\/$/, "");
+  return allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith(".vercel.app");
+};
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Izinkan akses tanpa origin (misal mobile/insomnia) atau dari domain Vercel lo
-    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error('CORS Protocol Blocked by SkuyGG Shield!'));
@@ -59,10 +65,17 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
 
-// ✅ FIXED SOCKET.IO CONFIG: Sinkronisasi CORS dengan allowedOrigins resmi lo
+// ✅ FIXED DYNAMIC CORS SOCKET.IO CONFIG: 
+// Menggunakan fungsi origin dinamis agar kebal dari pemblokiran jabat tangan (handshake) domain Vercel produksi lo, Ri!
 const io = new Server(server, { 
   cors: { 
-    origin: allowedOrigins, 
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS Socket Blocked by SkuyGG Shield!'));
+      }
+    },
     credentials: true 
   },
   transports: ['websocket', 'polling']

@@ -164,7 +164,6 @@ export const createDonation = async (req, res) => {
   else if (gross >= 100000) tier = 'SILVER';
 
   try {
-    // Payload fleksibel dibuka lebar agar semua opsi pembayaran di Sandbox aktif otomatis
     let parameter = {
         "transaction_details": {
             "order_id": orderId,
@@ -182,7 +181,6 @@ export const createDonation = async (req, res) => {
         }
     };
 
-    // Memproses multi-payment token bawaan Snap
     const snapResponse = await snap.createTransaction(parameter);
     
     const snapToken = snapResponse.token;
@@ -256,7 +254,6 @@ export const updateDonationStatus = async (req, res) => {
     );
     const donation = result.rows[0];
 
-    // Emit data live socket langsung dipicu
     if (upperStatus === 'SUCCESS' && donation) {
         const streamerIdCast = parseInt(donation.streamer_id, 10);
 
@@ -380,7 +377,6 @@ export const handleMidtransCallback = async (req, res) => {
         updateToStatus = 'PENDING';
     }
 
-    // Eksekusi pembaruan status terproteksi dengan Database Transaction SQL
     await req.db.query('BEGIN');
     const checkResult = await req.db.query(`SELECT status, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1 FOR UPDATE`, [orderId]);
     const donationData = checkResult.rows[0];
@@ -393,7 +389,6 @@ export const handleMidtransCallback = async (req, res) => {
     if (donationData.status !== 'SUCCESS') {
         await req.db.query(`UPDATE donations SET status = $1 WHERE id = $2`, [updateToStatus, orderId]);
         
-        // Memicu trigger live alert socket IO agar animasi gif/suara muncul seketika di overlay streamer
         if (updateToStatus === 'SUCCESS' && req.io) {
             req.io.emit(`new-donation-${parseInt(donationData.streamer_id, 10)}`, {
                 donatur_name: donationData.donatur_name,
@@ -421,15 +416,20 @@ export const handleMidtransCallback = async (req, res) => {
  */
 export const getSystemAuditLogs = async (req, res) => {
   try {
+    // ✅ CALIBRATION PROTECTION: Memaksa casting explicit ke bentuk JSONB asli di layer database Postgres
+    // Langkah ini menjamin Deep Package Inspector di frontend tidak akan meletup pecah saat melakukan parsing metadata.
     const query = `
       SELECT 
-        id,
-        user_id,
-        action_type,
-        entity_id,
-        metadata,
-        ip_address,
-        user_agent,
+        id::TEXT,
+        user_id::INT,
+        action_type::TEXT,
+        entity_id::TEXT,
+        CASE 
+          WHEN metadata::TEXT LIKE '{%}' THEN metadata::JSONB
+          ELSE json_build_object('raw_log', metadata::TEXT)::JSONB
+        END AS metadata,
+        ip_address::TEXT,
+        user_agent::TEXT,
         created_at
       FROM system_audit_logs 
       ORDER BY created_at DESC 

@@ -1,6 +1,7 @@
 /**
  * SKUYGG CENTRALIZED AUDIT LOGGER MIDDLEWARE
  * ARCHITECTURE BY: ARI WIRAYUDA (PRO-GRADE PT SYSTEM)
+ * RE-CALIBRATED EDITION: BACKEND WEBHOOK ENTITY EXTRACTOR SINKRON
  */
 
 export const logActivity = (actionType) => {
@@ -15,18 +16,49 @@ export const logActivity = (actionType) => {
       // Jalankan pencatatan log di latar belakang (Asynchronous - Fire and Forget)
       process.nextTick(async () => {
         try {
-          // Identifikasi siapa aktornya (User login / parameter body)
-          const userId = req.user?.id || req.body?.streamer_id || null;
-          
-          // Cari tahu apakah ada ID referensi transaksi (Order ID atau sejenisnya)
-          const entityId = req.params?.id || req.body?.orderId || data?.orderId || data?.data?.id || null;
+          // 1. Ambil data jaringan rill lebih awal
+          const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+          const userAgent = req.headers['user-agent'];
 
-          // Bungkus data detail yang masuk dan keluar ke dalam Metadata JSONB
+          // 2. Cari tahu apakah ada ID referensi transaksi (Order ID atau sejenisnya)
+          const entityId = req.params?.id || req.body?.order_id || req.body?.orderId || data?.orderId || data?.data?.id || null;
+
+          // 3. Identifikasi siapa aktor utamanya (User login / parameter body)
+          let userId = req.user?.id || req.body?.streamer_id || null;
+
+          // 🧠 EXCLUSIVE ADVANCED DETECTOR:
+          // Jika ini adalah aksi otomatis dari Webhook Midtrans, user_id rill dipastikan kosong di request session.
+          // Kita paksa sistem melakukan kueri instan ke tabel donations menggunakan entityId (order_id) 
+          // untuk menemukan siapa user_id (streamer_id) pemilik asli dari uang donasi tersebut!
+          if (!userId && actionType === 'PAYMENT_WEBHOOK_RECEIVED' && entityId) {
+            try {
+              // Cari streamer_id dari data transaksi donasi
+              const donationCheck = await req.db.query(
+                "SELECT streamer_id FROM donations WHERE id = $1", 
+                [String(entityId)]
+              );
+              if (donationCheck.rows.length > 0) {
+                const streamerId = donationCheck.rows[0].streamer_id;
+                // Cari user_id asli yang terikat dengan profil streamer tersebut
+                const userCheck = await req.db.query(
+                  "SELECT user_id FROM streamers WHERE id = $1", 
+                  [parseInt(streamerId, 10)]
+                );
+                if (userCheck.rows.length > 0) {
+                  userId = userCheck.rows[0].user_id;
+                }
+              }
+            } catch (dbErr) {
+              console.error("⚠️ Gagal mengekstrak relasi webhook actor log:", dbErr.message);
+            }
+          }
+
+          // 4. Bungkus data detail yang masuk dan keluar ke dalam Metadata JSONB
           const metadata = {
             endpoint: req.originalUrl,
             method: req.method,
-            request_body: req.body ? { ...req.body, password: undefined, otp: undefined } : {}, // Sensor data sensitif
-            response_data: data?.success ? { message: data.message || "Success" } : { error: data.error || "Failed" }
+            request_body: req.body ? { ...req.body, password: undefined, otp: undefined, serverKey: undefined } : {}, // Sensor data sensitif
+            response_data: data?.success || data?.status === 'OK' ? { message: data.message || "Success" } : { error: data.error || "Failed" }
           };
 
           const query = `
@@ -35,11 +67,7 @@ export const logActivity = (actionType) => {
             VALUES ($1, $2, $3, $4, $5, $6, NOW())
           `;
 
-          // Ambil data jaringan rill
-          const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-          const userAgent = req.headers['user-agent'];
-
-          // Tembak ke database log
+          // Tembak ke database log dengan data yang sudah disinkronkan sempurna
           await req.db.query(query, [
             userId ? parseInt(userId, 10) : null,
             actionType,

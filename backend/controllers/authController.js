@@ -79,7 +79,14 @@ export const googleAuth = async (req, res) => {
         res.json({
             success: true,
             token: generateToken(user),
-            user: { id: user.id, username: user.username, full_name: user.display_name || name, profile_picture: picture }
+            // ✅ FIXED SINKRONISASI: Menyuntikkan properti role agar terbaca utuh di Vercel frontend
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                full_name: user.display_name || name, 
+                profile_picture: picture,
+                role: user.role || 'creator' 
+            }
         });
     } catch (err) {
         if (req.db) await req.db.query('ROLLBACK');
@@ -136,12 +143,14 @@ export const verify2FA = async (req, res) => {
             res.json({ 
                 success: true, 
                 token: generateToken(user),
+                // ✅ FIXED SINKRONISASI: Menyuntikkan properti role pasca aktivasi 2FA
                 user: { 
                     id: user.id, 
                     username: user.username, 
                     full_name: user.full_name || user.username, 
                     profile_picture: user.profile_picture || '',
                     streamer_id: user.streamer_id,
+                    role: user.role || 'creator',
                     is_two_fa_enabled: true 
                 }
             });
