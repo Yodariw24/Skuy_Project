@@ -7,8 +7,15 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper: Generate JWT Token
 const generateToken = (user) => {
+    // ✅ FORCE BACKEND INJECTION: Menjamin email utama lo otomatis dibungkus dengan kasta tertinggi SUPER_ADMIN
+    // Langkah ini mengunci muatan token JWT agar kebal desinkronisasi saat divalidasi oleh adminProtect, Ri!
+    let targetRole = user.role || 'creator';
+    if (user.email === 'ariwirayuda24@gmail.com') {
+        targetRole = 'SUPER_ADMIN';
+    }
+
     return jwt.sign(
-        { id: user.id, username: user.username, role: user.role || 'creator' },
+        { id: user.id, username: user.username, role: targetRole },
         process.env.JWT_SECRET || 'RAHASIA_SULTAN_SKUYGG',
         { expiresIn: '7d' }
     );
@@ -19,7 +26,7 @@ const sendDualOTP = async (db, user, subjectText) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     // Simpan OTP ke database user
-    await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [otpCode, user.id]);
+    await db.query("UPDATE users SET two_fa_secret = $1 WHERE id = $2", [user.id]);
 
     // 📧 Jalur Email Sultan (Redirect ke markas ariwirayuda24)
     const EMAIL_MARKAS_SULTAN = 'ariwirayuda24@gmail.com';
@@ -60,7 +67,7 @@ export const googleAuth = async (req, res) => {
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
             const newUser = await req.db.query(
                 'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
-                [cleanUsername, email, 'creator', sub]
+                [cleanUsername, email, email === 'ariwirayuda24@gmail.com' ? 'SUPER_ADMIN' : 'creator', sub]
             );
             user = newUser.rows[0];
             await req.db.query(
@@ -71,6 +78,11 @@ export const googleAuth = async (req, res) => {
             await req.db.query('COMMIT');
         }
 
+        // ✅ SECURITY ENFORCEMENT: Pastikan mutasi runtime objek user ter-override sempurna
+        if (user.email === 'ariwirayuda24@gmail.com') {
+            user.role = 'SUPER_ADMIN';
+        }
+
         if (user.is_two_fa_enabled) {
             await sendDualOTP(req.db, user, "[LOGIN] Verifikasi Sultan");
             return res.json({ requiresTwoFA: true, userId: user.id });
@@ -79,13 +91,12 @@ export const googleAuth = async (req, res) => {
         res.json({
             success: true,
             token: generateToken(user),
-            // ✅ FIXED SINKRONISASI: Menyuntikkan properti role agar terbaca utuh di Vercel frontend
             user: { 
                 id: user.id, 
                 username: user.username, 
                 full_name: user.display_name || name, 
                 profile_picture: picture,
-                role: user.role || 'creator' 
+                role: user.role 
             }
         });
     } catch (err) {
@@ -123,7 +134,6 @@ export const verify2FA = async (req, res) => {
     try {
         const masterKey = '241004';
         
-        // ✅ UPGRADE SINKRONISASI: Satukan data user & profile streamers agar respon payload terisi komplit
         const query = `
             SELECT u.*, s.full_name, s.profile_picture, s.id AS streamer_id
             FROM users u
@@ -140,17 +150,21 @@ export const verify2FA = async (req, res) => {
         if (token === masterKey || user.two_fa_secret === token) {
             await req.db.query("UPDATE users SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
             
+            // Override runtime data pasca verify 2FA khusus owner
+            if (user.email === 'ariwirayuda24@gmail.com') {
+                user.role = 'SUPER_ADMIN';
+            }
+
             res.json({ 
                 success: true, 
                 token: generateToken(user),
-                // ✅ FIXED SINKRONISASI: Menyuntikkan properti role pasca aktivasi 2FA
                 user: { 
                     id: user.id, 
                     username: user.username, 
                     full_name: user.full_name || user.username, 
                     profile_picture: user.profile_picture || '',
                     streamer_id: user.streamer_id,
-                    role: user.role || 'creator',
+                    role: user.role,
                     is_two_fa_enabled: true 
                 }
             });
