@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { 
   Shield, Users, DollarSign, RefreshCw, Terminal, 
-  Search, SlidersHorizontal, ArrowUpRight, ArrowDownLeft, 
-  User, Landmark, Layers, Landmark as BankIcon 
+  Search, SlidersHorizontal, ArrowUpRight, ChevronRight, 
+  User, ArrowLeft, ShieldCheck, ShieldAlert, Layers, Landmark as BankIcon 
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 function SuperAdminDashboard() {
+  const navigate = useNavigate();
+
   // --- STATE MANAGEMENT PIPELINE ---
   const [globalStats, setGlobalStats] = useState({ total_users: 0, total_revenue: 0, pending_withdrawals: 0 });
   const [globalLogs, setGlobalLogs] = useState([]);
@@ -40,7 +43,20 @@ function SuperAdminDashboard() {
 
     } catch (err) {
       console.error("🔥 HQ Backbone Engine Crash:", err.message);
-      Swal.fire("SISTEM ERROR", "Gagal memancing data utama kasta tertinggi, Ri!", "error");
+      
+      // ✅ SINKRONISASI POP-UP ERROR CUSTOM NEOBRUTALISM STYLE
+      Swal.fire({
+        title: 'SISTEM ENGADAT!',
+        text: 'Gagal memancing data utama kasta tertinggi, Ri! Pastikan token LocalStorage sudah dibersihkan total.',
+        icon: 'error',
+        confirmButtonText: 'PAHAM, SULTAN',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'rounded-[2rem] border-4 border-slate-950 bg-white text-slate-950 shadow-[8px_8px_0px_0px_#000]',
+          title: 'font-black italic text-rose-600',
+          confirmButton: 'bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black px-8 py-3 rounded-xl uppercase italic border-2 border-slate-950 shadow-[4px_4px_0px_0px_#000]'
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -86,11 +102,9 @@ function SuperAdminDashboard() {
   const selectedStreamerStats = useMemo(() => {
     if (selectedStreamerId === 'ALL') return null;
     
-    // Cari data profil streamer dari main array list
     const profile = streamersList.find(s => parseInt(s.id, 10) === parseInt(selectedStreamerId, 10));
-    
-    // Akumulasi data donasi sukses milik objek terkait
     const successDonations = streamerDonations.filter(d => d.status?.toUpperCase() === 'SUCCESS');
+    
     const totalGross = successDonations.reduce((acc, curr) => acc + (Number(curr.gross_amount) || 0), 0);
     const totalNetEarnings = successDonations.reduce((acc, curr) => acc + (Number(curr.net_amount) || 0), 0);
     const totalFeePlatform = successDonations.reduce((acc, curr) => acc + (Number(curr.fee_amount) || 0), 0);
@@ -104,14 +118,13 @@ function SuperAdminDashboard() {
     };
   }, [selectedStreamerId, streamersList, streamerDonations]);
 
-  // Currency Formatter Helper
   const formatIDR = (num) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-sans">
+      <div className="min-h-screen bg-[#090D1A] flex items-center justify-center text-white font-sans">
         <div className="text-center space-y-4">
           <RefreshCw className="w-16 h-16 animate-spin text-violet-500 mx-auto border-4 border-slate-900 p-2 bg-slate-900 rounded-full shadow-[4px_4px_0px_0px_#7C3AED]" />
           <p className="font-black tracking-widest uppercase italic text-sm text-slate-400 animate-pulse">LOADING CORES SAAS METRICS...</p>
@@ -143,12 +156,23 @@ function SuperAdminDashboard() {
               <p className="text-xs text-violet-400 font-bold uppercase tracking-wider mt-1">Platform Multi-Tenant Tracker Ecosystem • Owner Mode: ariwirayuda24</p>
             </div>
           </div>
-          <button 
-            onClick={initializeHQData}
-            className="flex items-center justify-center gap-2 bg-[#10B981] hover:bg-[#059669] text-slate-950 font-black text-xs px-8 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none transition-all uppercase cursor-pointer tracking-wider relative z-10 italic"
-          >
-            <RefreshCw size={14} strokeWidth={3} /> Synchronize All Nodes
-          </button>
+
+          {/* BLOCK ACTION CONTROLS */}
+          <div className="flex flex-wrap gap-4 relative z-10">
+            {/* ✅ TOMBOL BACK TO STREAMER DASHBOARD */}
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none transition-all uppercase cursor-pointer tracking-wider italic font-sans"
+            >
+              <ArrowLeft size={14} strokeWidth={3} /> Back To Dashboard
+            </button>
+            <button 
+              onClick={initializeHQData}
+              className="flex items-center justify-center gap-2 bg-[#10B981] hover:bg-[#059669] text-slate-950 font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none transition-all uppercase cursor-pointer tracking-wider italic font-sans"
+            >
+              <RefreshCw size={14} strokeWidth={3} /> Synchronize All Nodes
+            </button>
+          </div>
         </div>
 
         {/* ========================================== */}
@@ -254,7 +278,6 @@ function SuperAdminDashboard() {
           {/* RIGHT COLUMN: DETAIL DEEP ANALYTICS TARGET REPORT */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* KONDISI A: JIKA BELUM MEMILIH STREAMER INDIVIDUAL (PERSPEKTIF KOSONG) */}
             {selectedStreamerId === 'ALL' ? (
               <div className="p-12 bg-slate-900 border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center space-y-4 border-dashed border-slate-700">
                 <div className="w-16 h-16 bg-slate-950 rounded-2xl border-2 border-slate-800 flex items-center justify-center mx-auto text-slate-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -267,11 +290,10 @@ function SuperAdminDashboard() {
               </div>
             ) : (
               
-              /* KONDISI B: STREAMER TARGET BERHASIL TERKUNCI (ISOLATED REAL-TIME REPORT) */
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                 
-                {/* SUB CARD 1: TARGET STREAMER METADATA PROFILE & REKENING BANK */}
-                <div className="p-6 bg-slate-900 border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                {/* SUB CARD 1: TARGET STREAMER METADATA PROFILE & REKENING BANK + KETERANGAN LIVE STATUS */}
+                <div className="p-6 bg-slate-900 border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                   <div className="flex items-center gap-4 text-left">
                     <div className="w-16 h-16 rounded-2xl overflow-hidden border-4 border-slate-950 bg-slate-950 shadow-[3px_3px_0px_0px_#7C3AED]">
                       <img 
@@ -283,12 +305,27 @@ function SuperAdminDashboard() {
                     <div>
                       <span className="text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded font-black tracking-widest uppercase">TARGET LOCKED</span>
                       <h2 className="text-xl font-black uppercase text-slate-100 mt-0.5">{selectedStreamerStats?.profile?.display_name || selectedStreamerStats?.profile?.username}</h2>
-                      <p className="text-xs font-medium text-slate-400 font-mono mt-0.5">Streamer ID: #{selectedStreamerStats?.profile?.streamer_id}</p>
+                      <p className="text-xs font-medium text-slate-400 font-mono mt-0.5">Streamer ID: #{selectedStreamerStats?.profile?.streamer_id || selectedStreamerStats?.profile?.id}</p>
+                      
+                      {/* ✅ KETERANGAN INTEGRITAS AKUN STREAMER (LIVE ATTACHMENT) */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded uppercase ${
+                          selectedStreamerStats?.profile?.is_two_fa_enabled 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {selectedStreamerStats?.profile?.is_two_fa_enabled ? <ShieldCheck size={10} /> : <ShieldAlert size={10} />}
+                          {selectedStreamerStats?.profile?.is_two_fa_enabled ? '2FA SECURED' : '2FA DISABLED'}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded uppercase bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                          ROLE: {selectedStreamerStats?.profile?.role || 'CREATOR'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Kredensial Rekening Terkunci */}
-                  <div className="p-4 bg-slate-950 border-2 border-slate-800 rounded-xl flex items-center gap-3.5 text-left">
+                  <div className="p-4 bg-slate-950 border-2 border-slate-800 rounded-xl flex items-center gap-3.5 text-left w-full md:w-72">
                     <div className="p-2.5 bg-amber-500/10 border-2 border-slate-800 text-amber-500 rounded-lg"><BankIcon size={18} /></div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Kredensial Rekening WD</p>
