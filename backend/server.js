@@ -28,8 +28,11 @@ const pool = new Pool({
 });
 
 // --- 2. SECURITY & CORS PROTOCOL ---
+// ✅ FIX BUSTING COOP: Mengkalibrasi ulang tameng Helmet agar meloloskan window popups Google OAuth
+// Langkah ini melenyapkan eror "would block the window.postMessage call" di konsol browser lo, Ri!
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Penting: Biar file uploads tampil di frontend & Vercel overlay tanpa kena blokir
+  crossOriginResourcePolicy: false, // Biar file uploads tampil lancar di overlay Vercel
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" } // ✅ Pintu gerbang Google Sign-In dibuka aman
 }));
 
 const allowedOrigins = [
@@ -66,7 +69,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const server = http.createServer(app);
 
 // ✅ FIXED DYNAMIC CORS SOCKET.IO CONFIG: 
-// Menggunakan fungsi origin dinamis agar kebal dari pemblokiran jabat tangan (handshake) domain Vercel produksi lo, Ri!
 const io = new Server(server, { 
   cors: { 
     origin: (origin, callback) => {
@@ -87,7 +89,6 @@ io.on('connection', (socket) => {
     socket.join(`streamer_${streamerId}`);
     console.log(`📡 Node OBS Linked: Streamer ID ${streamerId}`);
     
-    // Log pelacak ketika koneksi widget OBS terputus
     socket.on('disconnect', () => {
       console.log(`🔌 Node OBS Unlinked: Streamer ID ${streamerId}`);
     });
@@ -96,7 +97,6 @@ io.on('connection', (socket) => {
 
 // Inject DB, IO Instance, & Global Security Header
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   req.db = pool;
   req.io = io;
   next();
@@ -111,9 +111,6 @@ apiRouter.use('/donations', donationRoutes);
 
 /**
  * ✅ SOLUSI MULTI-PATH SULTAN:
- * Kita pasang userRoutes di dua tempat sekaligus:
- * 1. Di root ('/') supaya /api/wallet/history/:id nembak kesini (Fix Error 404 lo).
- * 2. Di '/user' supaya rute /api/user/update-profile lo gak patah.
  */
 apiRouter.use('/', userRoutes); 
 apiRouter.use('/user', userRoutes);
@@ -135,7 +132,6 @@ app.get('/', (req, res) => {
 
 // --- 🕵️ 5. 404 & ERROR HANDLING PIPELINE ---
 
-// 🛡️ EMERGENCY PROTOCOL SAFE ZONE: Dipindah ke bawah rute utama agar tidak membajak sub-path dinamis
 app.use('/api', (req, res) => {
   res.status(200).json({
     success: false,
