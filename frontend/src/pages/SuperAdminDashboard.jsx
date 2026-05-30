@@ -5,9 +5,21 @@ import {
   Shield, Users, DollarSign, RefreshCw, 
   Search, SlidersHorizontal, ArrowUpRight, ChevronRight, 
   User, ArrowLeft, ShieldCheck, ShieldAlert, Layers, 
-  Landmark as BankIcon, CreditCard, CheckCircle, Activity
+  Landmark as BankIcon, CheckCircle, Activity, CreditCard, Landmark
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
+
+// Varian Animasi Halus Khas SkuyGG Terminal Engine
+const containerVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut", staggerChildren: 0.1 } }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "backOut" } }
+};
 
 function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -37,7 +49,7 @@ function SuperAdminDashboard() {
     } catch (err) {
       console.error("🔥 HQ Backbone Engine Crash:", err.message);
       Swal.fire({
-        title: 'GATEWAY DESINKRONISASI!',
+        title: 'HANDSHAKE TIMEOUT!',
         text: 'Pipa data utama gagal melakukan jabat tangan (handshake). Silakan refresh sesi pangkalan lo, Ri.',
         icon: 'error',
         confirmButtonText: 'RE-CALIBRATE',
@@ -100,21 +112,20 @@ function SuperAdminDashboard() {
   }, [selectedStreamerId, streamersList, streamerDonations]);
 
   // ✅ PRO-GRADE METODE PEMBAYARAN PARSER BADGE
-  // Fungsi cerdas untuk mendeteksi payload sandbox Midtrans lo dan merubahnya jadi badge eksklusif
   const renderPaymentMethodBadge = (method) => {
     const cleanMethod = method ? method.toUpperCase() : 'UNKNOWN';
     
     if (cleanMethod.includes('QRIS')) {
-      return <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[10px] font-black tracking-wider uppercase shadow-[2px_2px_0px_0px_rgba(16,185,129,0.1)]">🟢 QRIS LIVE</span>;
+      return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-300 rounded-md text-[10px] font-black tracking-wider uppercase">🟢 QRIS LIVE</span>;
     }
     if (cleanMethod.includes('GOPAY')) {
-      return <span className="px-2.5 py-1 bg-sky-100 text-sky-700 border border-sky-300 rounded-md text-[10px] font-black tracking-wider uppercase shadow-[2px_2px_0px_0px_rgba(14,165,233,0.1)]">🔹 GOPAY</span>;
+      return <span className="px-2.5 py-1 bg-sky-50 text-sky-600 border border-sky-300 rounded-md text-[10px] font-black tracking-wider uppercase">🔹 GOPAY</span>;
     }
     if (cleanMethod.includes('BCA')) {
-      return <span className="px-2.5 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded-md text-[10px] font-black tracking-wider uppercase">🏦 VA BCA</span>;
+      return <span className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-300 rounded-md text-[10px] font-black tracking-wider uppercase">🏦 VA BCA</span>;
     }
     if (cleanMethod.includes('BNI') || cleanMethod.includes('BRI') || cleanMethod.includes('MANDIRI') || cleanMethod.includes('BANK_TRANSFER')) {
-      return <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-md text-[10px] font-black tracking-wider uppercase">🏛️ BANK VA</span>;
+      return <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 border border-indigo-300 rounded-md text-[10px] font-black tracking-wider uppercase">🏛️ BANK VA</span>;
     }
     return <span className="px-2.5 py-1 bg-slate-100 text-slate-600 border border-slate-300 rounded-md text-[10px] font-black tracking-wider uppercase">💳 {cleanMethod}</span>;
   };
@@ -135,7 +146,12 @@ function SuperAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-10 font-sans text-left selection:bg-violet-600 selection:text-white">
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-10 font-sans text-left selection:bg-violet-600 selection:text-white"
+    >
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* ========================================== */}
@@ -146,9 +162,12 @@ function SuperAdminDashboard() {
             <Shield size={180} />
           </div>
           <div className="flex items-center gap-5 relative z-10">
-            <div className="p-4 bg-violet-600 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] text-white rotate-[-2deg]">
+            <motion.div 
+              whileHover={{ rotate: -6, scale: 1.05 }}
+              className="p-4 bg-violet-600 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] text-white"
+            >
               <Shield size={36} strokeWidth={2.5} />
-            </div>
+            </motion.div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-3xl font-black uppercase tracking-tight italic text-slate-950">SKUYGG MANAGEMENT CORE</h1>
@@ -170,7 +189,7 @@ function SuperAdminDashboard() {
               onClick={initializeHQData}
               className="flex items-center justify-center gap-2 bg-[#10B981] hover:bg-[#059669] text-slate-950 font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-none transition-all uppercase cursor-pointer tracking-wider italic font-sans"
             >
-              <RefreshCw size={14} strokeWidth={3} /> Sync System Cotes
+              <RefreshCw size={14} strokeWidth={3} /> Sync System Cores
             </button>
           </div>
         </div>
@@ -193,29 +212,30 @@ function SuperAdminDashboard() {
         {/* 2. STATISTIK METRIK GLOBAL PLATFORM CORPO  */}
         {/* ========================================== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-violet-600 flex items-center justify-between group hover:-translate-y-1 transition-transform duration-300">
+          <motion.div variants={cardVariants} className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-violet-600 flex items-center justify-between group">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Active Merchant Nodes</p>
               <h3 className="text-4xl font-black italic mt-1 text-slate-900">{globalStats?.total_users || 0} <span className="text-xs text-slate-400 font-bold not-italic">Accounts</span></h3>
             </div>
-            <div className="p-4 bg-violet-50 rounded-xl border-2 border-slate-950 text-violet-600 shadow-[2px_2px_0px_0px_#000]"><Users size={24} strokeWidth={2.5} /></div>
-          </div>
+            <div className="p-4 bg-violet-50 rounded-xl border-2 border-slate-950 text-violet-600 shadow-[2px_2px_0px_0px_#000] transition-transform group-hover:scale-110"><Users size={24} strokeWidth={2.5} /></div>
+          </motion.div>
 
-          <div className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-emerald-600 flex items-center justify-between group hover:-translate-y-1 transition-transform duration-300">
+          <motion.div variants={cardVariants} className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-emerald-600 flex items-center justify-between group">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Net Gross Platform Margin (5%)</p>
               <h3 className="text-4xl font-black italic mt-1 text-emerald-600">{formatIDR(globalStats?.total_revenue)}</h3>
             </div>
-            <div className="p-4 bg-emerald-50 rounded-xl border-2 border-slate-950 text-emerald-600 shadow-[2px_2px_0px_0px_#000]"><DollarSign size={24} strokeWidth={2.5} /></div>
-          </div>
+            <div className="p-4 bg-emerald-50 rounded-xl border-2 border-slate-950 text-emerald-600 shadow-[2px_2px_0px_0px_#000] transition-transform group-hover:scale-110"><DollarSign size={24} strokeWidth={2.5} /></div>
+          </motion.div>
 
-          <div className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-amber-600 flex items-center justify-between group hover:-translate-y-1 transition-transform duration-300">
+          <motion.div variants={cardVariants} className="p-6 bg-white border-4 border-slate-950 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-b-amber-600 flex items-center justify-between group">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Liquidity Payout Queue</p>
-              <h3 className="text-4xl font-black italic mt-1 text-amber-400">{globalStats?.pending_withdrawals || 0} <span className="text-xs text-slate-400 font-bold not-italic">Requests</span></h3>
+              <h3 className="text-4xl font-black italic mt-1 text-amber-600">{globalStats?.pending_withdrawals || 0} <span className="text-xs text-slate-400 font-bold not-italic">Requests</span></h3>
             </div>
-            <div className="p-4 bg-amber-50 rounded-xl border-2 border-slate-950 text-amber-600 shadow-[2px_2px_0px_0px_#000]"><Terminal size={24} strokeWidth={2.5} /></div>
-          </div>
+            {/* ✅ FIXED ICON BY ARI: Mengganti Terminal yang crash dengan Landmark Bank Icon */}
+            <div className="p-4 bg-amber-50 rounded-xl border-2 border-slate-950 text-amber-600 shadow-[2px_2px_0px_0px_#000] transition-transform group-hover:scale-110"><Landmark size={24} strokeWidth={2.5} /></div>
+          </motion.div>
         </div>
 
         {/* ========================================== */}
@@ -285,9 +305,13 @@ function SuperAdminDashboard() {
           </div>
 
           {/* RIGHT COLUMN: DETAIL DEEP ANALYTICS TARGET REPORT */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-8">
             {selectedStreamerId === 'ALL' ? (
-              <div className="p-16 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center space-y-4 border-dashed border-slate-300">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-16 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center space-y-4 border-dashed border-slate-300"
+              >
                 <div className="w-16 h-16 bg-[#F8FAFF] rounded-2xl border-2 border-slate-200 flex items-center justify-center mx-auto text-slate-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)]">
                   <User size={28} />
                 </div>
@@ -295,9 +319,14 @@ function SuperAdminDashboard() {
                   <h3 className="font-black uppercase tracking-wider text-sm italic text-slate-800">Operational Target Idle</h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 font-medium">Silakan tentukan salah satu identitas nama akun creator di panel kiri untuk membuka korelasi data finansial, rincian rekening kliring, serta lacak metode pembayaran donasi rill dari sandbox Midtrans, Ri!</p>
                 </div>
-              </div>
+              </motion.div>
             ) : (
-              <div className="space-y-6 animate-in fade-in duration-300">
+              <motion.div 
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4 }}
+                className="space-y-6"
+              >
                 
                 {/* METADATA PROFILE */}
                 <div className="p-6 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
@@ -383,7 +412,6 @@ function SuperAdminDashboard() {
                               <td className="p-3 text-left font-sans font-black uppercase tracking-tight text-slate-700 truncate max-w-[120px]">{donation.donatur_name}</td>
                               <td className="p-3 text-slate-800 font-black">{formatIDR(donation.gross_amount)}</td>
                               
-                              {/* ✅ RENDERING BADGE METODE PEMBAYARAN LIVE SANDBOX MIDTRANS */}
                               <td className="p-3 font-sans font-bold">
                                 {renderPaymentMethodBadge(donation.payment_method)}
                               </td>
@@ -402,14 +430,14 @@ function SuperAdminDashboard() {
                   </div>
                 </div>
 
-              </div>
+              </motion.div>
             )}
           </div>
 
         </div>
 
       </div>
-    </div>
+    </motion.div>
   );
 }
 
