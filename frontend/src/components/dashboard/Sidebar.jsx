@@ -206,6 +206,18 @@ function Sidebar({ user, balance }) {
             </div>
           </div>
         </div>
+
+        {/* 🛡️ OPTION A: EXCLUSIVE GOVERNANCE CONTROL GATEWAY */}
+        {/* Tombol ini otomatis gaib, cuma merangkak muncul pas email lo terverifikasi sistem, Ri! */}
+        {(role === 'super_admin' || user?.email === 'ariwirayuda24@gmail.com') && (
+          <button 
+            type="button"
+            onClick={() => navigate('/pt-owner/audit-center')}
+            className="w-full flex items-center justify-center gap-2 text-white bg-violet-600 hover:bg-violet-700 font-black text-[10px] uppercase py-3 px-4 rounded-xl border-2 border-slate-950 shadow-[4px_4px_0px_0px_#000] mb-4 tracking-widest cursor-pointer transition-all active:translate-y-0.5 active:shadow-none italic font-sans"
+          >
+            <ShieldCheck size={13} strokeWidth={3} /> HQ Control Center
+          </button>
+        )}
         
         <button onClick={logout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-500 font-black text-[9px] uppercase transition-all group py-1.5 tracking-widest bg-transparent border-0 cursor-pointer">
           <LogOut size={12} className="group-hover:-translate-x-1 transition-transform" /> Sign Out Protocol
