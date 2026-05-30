@@ -2,6 +2,7 @@
  * SKUYGG CENTRALIZED AUDIT LOGGER MIDDLEWARE
  * ARCHITECTURE BY: ARI WIRAYUDA (PRO-GRADE PT SYSTEM)
  * RE-CALIBRATED EDITION: BACKEND WEBHOOK ENTITY EXTRACTOR SINKRON
+ * STATUS: STERILE PRODUCTION LIGHT-SHIELD PRO-GRADE
  */
 
 export const logActivity = (actionType) => {
@@ -32,18 +33,24 @@ export const logActivity = (actionType) => {
           // untuk menemukan siapa user_id (streamer_id) pemilik asli dari uang donasi tersebut!
           if (!userId && actionType === 'PAYMENT_WEBHOOK_RECEIVED' && entityId) {
             try {
-              // Cari streamer_id dari data transaksi donasi
+              // Cari streamer_id dari data transaksi donasi (Gunakan String casting agar kebal alphanumeric ID)
               const donationCheck = await req.db.query(
-                "SELECT streamer_id FROM donations WHERE id = $1", 
+                "SELECT streamer_id FROM donations WHERE id = $1::text OR id = $1", 
                 [String(entityId)]
               );
+              
               if (donationCheck.rows.length > 0) {
                 const streamerId = donationCheck.rows[0].streamer_id;
+                
+                // 🛡️ ADAPTIVE CASTING: Cek jika streamerId adalah angka valid, lakukan parsing. Jika tidak, kirim string mentah.
+                const targetStreamerId = isNaN(streamerId) ? streamerId : parseInt(streamerId, 10);
+
                 // Cari user_id asli yang terikat dengan profil streamer tersebut
                 const userCheck = await req.db.query(
-                  "SELECT user_id FROM streamers WHERE id = $1", 
-                  [parseInt(streamerId, 10)]
+                  "SELECT user_id FROM streamers WHERE id = $1 OR id::text = $2::text", 
+                  [isNaN(targetStreamerId) ? 0 : targetStreamerId, String(streamerId)]
                 );
+                
                 if (userCheck.rows.length > 0) {
                   userId = userCheck.rows[0].user_id;
                 }

