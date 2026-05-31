@@ -1,4 +1,5 @@
 // Jalur: src/utils/receiptPrinter.js
+import Swal from 'sweetalert2';
 
 export const printDonaturReceipt = (donationData) => {
   if (!donationData) return;
@@ -15,7 +16,13 @@ export const printDonaturReceipt = (donationData) => {
   
   // 🛡️ PROTEKSI POP-UP BLOCKER: Peringatkan user jika browser ngeblokir jendela baru
   if (!printWindow) {
-    alert("Pop-up diblokir oleh browser! Tolong izinkan pop-up (Allow pop-ups) di pojok kanan atas address bar, lalu coba cetak lagi.");
+    Swal.fire({
+      icon: 'warning',
+      title: 'Pop-up Diblokir!',
+      text: 'Browser ngeblokir jendela PDF struk. Tolong izinkan (Allow pop-ups) di pojok kanan atas address bar, lalu coba cetak lagi ya!',
+      confirmButtonColor: '#10B981',
+      customClass: { popup: 'rounded-3xl border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]' }
+    });
     return;
   }
 

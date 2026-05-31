@@ -1,3 +1,5 @@
+import Swal from 'sweetalert2';
+
 export const printFinancialStatement = (donations, statsProfile) => {
   if (!donations || donations.length === 0) return;
 
@@ -45,7 +47,13 @@ export const printFinancialStatement = (donations, statsProfile) => {
   
   // 🛡️ PROTEKSI POP-UP BLOCKER: Cegah frontend crash kalau jendela PDF diblokir browser
   if (!printWindow) {
-    alert("Pop-up diblokir oleh browser! Tolong izinkan pop-up (Allow pop-ups) di pojok kanan atas address bar, lalu coba cetak lagi.");
+    Swal.fire({
+      icon: 'warning',
+      title: 'Akses Pop-up Terkunci!',
+      text: 'Browser menahan jendela Laporan SkuyGG. Tolong izinkan pop-up (Allow pop-ups) di address bar agar PDF bisa terbuka.',
+      confirmButtonColor: '#7c3aed',
+      customClass: { popup: 'rounded-3xl border-4 border-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]' }
+    });
     return;
   }
 

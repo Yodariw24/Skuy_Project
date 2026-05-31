@@ -1,95 +1,85 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Download, ArrowRight, Mail } from 'lucide-react';
-import { printDonaturReceipt } from '../utils/receiptPrinter';
+import { useEffect, useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { CheckCircle2, Printer, Home } from 'lucide-react';
 import api from '../api/axios';
+import { printDonaturReceipt } from '../utils/receiptPrinter';
 
-export default function DonationSuccess() {
+function DonationSuccess() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const [donationData, setDonationData] = useState(null);
+  const orderId = searchParams.get('order_id');
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Ambil order_id dari URL parameter yang dilempar Midtrans/Frontend setelah payment
-  const orderId = searchParams.get('order_id');
-
   useEffect(() => {
-    const getTransactionDetail = async () => {
-      if (!orderId) {
-        setLoading(false);
-        return;
-      }
-      try {
-        // Tarik data rill transaksi dari database PostgreSQL Railway lo buat struk
-        const res = await api.get(`/donations/status/${orderId}`);
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
+    api.get(`/donations/status/${orderId}`)
+      .then(res => {
         if (res.data.success) {
-          setDonationData(res.data.data);
+          setData(res.data.data);
         }
-      } catch (err) {
-        console.error("🔥 Gagal memuat data kwitansi:", err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getTransactionDetail();
+      })
+      .catch(err => {
+        console.error("Gagal menarik data struk:", err);
+      })
+      .finally(() => setLoading(false));
   }, [orderId]);
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-black animate-pulse text-slate-600 uppercase tracking-wider">Verifying payment block status...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFF]">
+        <div className="w-16 h-16 border-8 border-slate-100 border-t-emerald-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFF] text-center p-6">
+        <h2 className="text-3xl font-black uppercase italic text-rose-500 mb-4">Struk Tidak Ditemukan</h2>
+        <p className="text-slate-500 font-bold mb-8">Data transaksi tidak valid atau referensi ID struk terputus, Ri!</p>
+        <Link to="/" className="px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:-translate-y-1 transition-all">Kembali ke Markas</Link>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
-      <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-xl text-center">
-        
-        {/* ICON BERKILAU SUCCESS */}
-        <div className="flex justify-center mb-5 text-emerald-500">
-          <CheckCircle size={64} strokeWidth={2.5} className="animate-bounce" />
+    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans flex flex-col items-center justify-center p-6 selection:bg-emerald-100">
+      <motion.div 
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="max-w-xl w-full bg-white p-10 rounded-[3rem] border-4 border-slate-950 shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] text-center relative overflow-hidden"
+      >
+        <motion.div 
+          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
+          className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-slate-950 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)]"
+        >
+          <CheckCircle2 size={48} strokeWidth={3} className="text-white" />
+        </motion.div>
+
+        <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">Transmisi Sukses!</h1>
+        <p className="text-slate-500 font-bold mb-10">Energi dukungan berhasil masuk ke kantong Sultan.</p>
+
+        <div className="bg-slate-50 rounded-[2rem] p-6 mb-10 border-2 border-slate-100 text-left space-y-4 shadow-inner">
+          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Order ID</span><span className="font-black text-slate-900 font-mono text-sm">#{data.id}</span></div>
+          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Nominal</span><span className="font-black text-emerald-500 text-xl">Rp {Number(data.gross_amount || data.amount).toLocaleString('id-ID')}</span></div>
+          <div className="flex justify-between items-center"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Sender</span><span className="font-black text-slate-900">{data.donatur_name}</span></div>
         </div>
 
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Dukungan Berhasil Dikirim!</h1>
-        <p className="text-sm text-slate-500 mt-2 px-4">
-          Terima kasih banyak, Sultan! Kontribusi lo sudah tersalurkan dan langsung mengaktifkan alert live streamer.
-        </p>
-
-        {/* NOTIFIKASI EMAIL JALUR 2 INFO BOX */}
-        <div className="mt-5 p-4 bg-violet-50 rounded-2xl border border-violet-100 flex items-center gap-3 text-left">
-          <Mail size={20} className="text-violet-600 shrink-0" />
-          <div>
-            <p className="text-xs font-bold text-violet-900">Salinan Struk Telah Dikirim</p>
-            <p className="text-[11px] text-violet-700 mt-0.5">Sistem otomatis mengirimkan kwitansi resmi ke email lo.</p>
-          </div>
-        </div>
-
-        {/* REVENUE RINGKASAN MINI */}
-        {donationData && (
-          <div className="my-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-2">
-            <div className="flex justify-between text-xs"><span className="text-slate-400 font-medium">Order ID</span><span className="font-mono font-bold text-slate-800">#{donationData.id}</span></div>
-            <div className="flex justify-between text-xs"><span className="text-slate-400 font-medium">Donatur</span><span className="font-bold text-slate-800 uppercase text-[11px]">{donationData.donatur_name}</span></div>
-            <div className="flex justify-between text-xs border-t pt-2 mt-2"><span className="text-slate-700 font-bold">Total Bayar</span><span className="font-mono font-extrabold text-emerald-600 text-sm">Rp {(donationData.gross_amount || donationData.amount)?.toLocaleString('id-ID')}</span></div>
-          </div>
-        )}
-
-        {/* ACTION BUTTON CONTROLS */}
-        <div className="space-y-3 mt-6">
-          <button
-            onClick={() => printDonaturReceipt(donationData)}
-            disabled={!donationData}
-            className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3.5 px-6 rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
-          >
-            <Download size={16} /> Unduh Kwitansi Resmi (.PDF)
+        <div className="flex flex-col md:flex-row gap-4 justify-center">
+          <button onClick={() => printDonaturReceipt(data)} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-black py-5 px-6 rounded-2xl uppercase tracking-widest transition-all active:translate-y-1 active:shadow-none border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-3">
+            <Printer size={20} strokeWidth={3} /> Cetak Struk
           </button>
-
-          <button
-            onClick={() => navigate('/')}
-            className="w-full flex items-center justify-center gap-1.5 bg-transparent hover:bg-slate-100 text-slate-600 font-bold text-xs py-2.5 rounded-xl transition-all"
-          >
-            Kembali ke Beranda <ArrowRight size={12} />
-          </button>
+          <Link to="/" className="flex-1 bg-slate-100 hover:bg-white text-slate-900 font-black py-5 px-6 rounded-2xl uppercase tracking-widest transition-all active:translate-y-1 active:shadow-none border-4 border-slate-950 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-3">
+            <Home size={20} strokeWidth={3} /> Hub Utama
+          </Link>
         </div>
-
-      </div>
+      </motion.div>
     </div>
   );
 }
+
+export default DonationSuccess;

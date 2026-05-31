@@ -9,6 +9,7 @@ import PaymentPage from './pages/PaymentPage';
 import WidgetClient from './pages/WidgetClient';
 import Explore from './pages/Explore'; // Creators Discovery Hub
 import SuperAdminDashboard from './pages/SuperAdminDashboard'; // ✅ IMPORT DASHBOARD OWNER PT BARU
+import DonationSuccess from './pages/DonationSuccess'; // ✅ IMPORT HALAMAN STRUK DONASI SULTAN
 import api from './api/axios';
 
 import 'animate.css';
@@ -102,6 +103,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} /> 
           <Route path="/payment/:donationId" element={<PaymentPage />} />
+          <Route path="/donation-success" element={<DonationSuccess />} />
           
           {/* ✅ JALUR UTAMA EXPLORE CREATORS HUB (Aman dari dynamic hijacking) */}
           <Route path="/explore" element={<Explore />} />
