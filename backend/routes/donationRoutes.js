@@ -147,6 +147,25 @@ router.post('/create', validateDonation, logActivity('DONATION_INITIATED'), crea
 // 📸 MONITOR: Rekam mutasi perubahan status manual (jika ada)
 router.put('/status/:id', logActivity('MANUAL_STATUS_UPDATED'), updateDonationStatus); 
 
+// ✅ ENDPOINT BARU: Ambil detail data untuk halaman Kwitansi (DonationSuccess) berdasarkan Order ID
+router.get('/status/:orderId', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        // Casting id::text agar aman jika orderId mengandung string (seperti TRX-...)
+        const result = await req.db.query(
+            "SELECT * FROM donations WHERE id::text = $1 OR order_id = $1", 
+            [orderId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Kwitansi tidak ditemukan!" });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        console.error("🔥 Error GET Struk Donasi:", err.message);
+        res.status(500).json({ success: false, message: "Gagal memuat status kwitansi" });
+    }
+});
+
 // ✅ MIDTRANS WEBHOOK CALLBACK ENDPOINT
 // 📸 MONITOR: Rekam log respon otomatis saat sistem diserang webhook sukses paska simulasi di Sandbox
 router.post('/midtrans-callback', logActivity('PAYMENT_WEBHOOK_RECEIVED'), handleMidtransCallback);

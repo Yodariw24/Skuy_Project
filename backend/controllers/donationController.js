@@ -2,10 +2,11 @@
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
  * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
  * UPGRADED TO MIDTRANS SNAP MULTI-PAYMENT ENGINE WITH AUTOMATIC WEBHOOK CALLBACK
- * STATUS: FULLY SYNCHRONIZED LAYER BAJA
+ * STATUS: FULLY SYNCHRONIZED LAYER BAJA WITH EMAIL E-RECEIPT PROTOCOL (DUAL CONFIG REGION)
  */
 
 import midtransClient from 'midtrans-client';
+import nodemailer from 'nodemailer';
 
 // ✅ INDEX/INSTANSIASI SNAP API BAWAAN SDK MIDTRANS
 const snap = new midtransClient.Snap({
@@ -13,6 +14,67 @@ const snap = new midtransClient.Snap({
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
+
+// ✅ SETUP CONFIGURATION SMTP TRANSPORT EMAIL SKUYGG (PRO-GRADE OPSI B DUAL CONFIG)
+const transporter = nodemailer.createTransport({
+  service: 'gmail', 
+  auth: {
+    // Otomatis membaca EMAIL_USER & EMAIL_PASS lama lo, Ri! Aman tanpa ubah .env
+    user: process.env.EMAIL_SMTP_USER || process.env.EMAIL_USER || 'ariwirayuda24@gmail.com',
+    pass: process.env.EMAIL_SMTP_PASSWORD || process.env.EMAIL_PASS
+  }
+});
+
+// ✅ FUNGSI PEMBANTU: PENGIRIM HTML E-RECEIPT RESMI KE EMAIL DONATUR
+const sendEmailReceiptToDonatur = async (donation) => {
+  try {
+    const formattedAmount = new Intl.NumberFormat('id-ID', { 
+      style: 'currency', 
+      currency: 'IDR', 
+      minimumFractionDigits: 0 
+    }).format(donation.gross_amount || donation.amount);
+    
+    const dateTime = new Date(donation.created_date || donation.created_at || Date.now()).toLocaleString('id-ID', {
+      day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const emailHTML = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 35px; border: 1px solid #e2e8f0; border-radius: 16px; color: #1e293b; background: #ffffff;">
+        <h2 style="color: #7c3aed; text-align: center; font-weight: 800; margin-bottom: 5px;">SKUY.GG</h2>
+        <p style="text-align: center; font-size: 13px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0;">Kwitansi Kontribusi Resmi Donatur</p>
+        <hr style="border: none; border-top: 1px dashed #cbd5e1; margin: 25px 0;" />
+        <p style="font-size: 14px; line-height: 1.5;">Halo <b>${donation.donatur_name}</b>,</p>
+        <p style="font-size: 14px; line-height: 1.5; color: #475569;">Terima kasih banyak atas dukungan finansial lo! Pembayaran donasi lo telah sukses divalidasi oleh gerbang pembayaran Midtrans dan disalurkan ke sirkuit merchant.</p>
+        
+        <table style="width: 100%; font-size: 13px; margin: 25px 0; border-collapse: collapse;">
+          <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Order Reference ID</td><td style="padding: 12px; font-weight: bold; font-family: monospace; text-align: right;">#${donation.id}</td></tr>
+          <tr><td style="padding: 12px; color: #64748b; font-weight: 500;">Waktu Transaksi</td><td style="padding: 12px; font-weight: 600; text-align: right;">${dateTime}</td></tr>
+          <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Metode Pembayaran</td><td style="padding: 12px; font-weight: bold; text-transform: uppercase; text-align: right; color: #7c3aed;">${donation.payment_method || 'MIDTRANS_SNAP'}</td></tr>
+          <tr><td style="padding: 12px; color: #64748b; font-weight: 500;">Status Kliring</td><td style="padding: 12px; font-weight: 800; color: #16a34a; text-align: right;">● SETTLEMENT (VERIFIED)</td></tr>
+          <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Target Streamer ID</td><td style="padding: 12px; font-weight: bold; text-align: right;">#${donation.streamer_id}</td></tr>
+          <tr><td style="padding: 12px; color: #64748b; font-weight: 500; vertical-align: top;">Pesan Dukungan</td><td style="padding: 12px; font-style: italic; color: #475569; text-align: right; max-width: 250px;">"${donation.message || 'Tidak ada pesan tertulis.'}"</td></tr>
+          <tr style="background: #f1f5f9; font-size: 16px; font-weight: bold; border-top: 2px solid #0f172a;"><td style="padding: 15px; color: #0f172a;">Total Kontribusi</td><td style="padding: 15px; color: #16a34a; font-family: monospace; text-align: right; font-size: 18px;">${formattedAmount}</td></tr>
+        </table>
+
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 35px; line-height: 1.4;">
+          Struk digital ini dihasilkan otomatis sebagai bukti pembayaran sah yang terekam di ekosistem cloud database PostgreSQL Railway.<br/>
+          <b>PT Skuy Media Teknologi Ecosystem</b> • Hub: ariwirayuda24@gmail.com
+        </p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: '"Skuy.gg Cloud System" <noreply@skuy.gg>',
+      to: donation.donatur_email, 
+      subject: `[SKUY.GG] Struk Bukti Donasi Sah Bukti Transaksi #${donation.id}`,
+      html: emailHTML
+    });
+
+    console.log(`✉️ [JALUR 2] E-receipt berhasil dilempar ke email donatur: ${donation.donatur_email}`);
+  } catch (error) {
+    console.error("❌ Sirkuit SMTP Email Sender Jalur 2 Crash:", error.message);
+  }
+};
 
 /**
  * 1. GET WALLET HISTORY (PRIVAT / INTERN DASHBOARD LOG MUTASI)
@@ -232,7 +294,7 @@ export const updateDonationStatus = async (req, res) => {
   try {
     await req.db.query('BEGIN');
 
-    const checkQuery = `SELECT status, net_amount, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1 FOR UPDATE`;
+    const checkQuery = `SELECT id, status, net_amount, streamer_id, donatur_name, donatur_email, gross_amount, message, tier, payment_method, created_date FROM donations WHERE id = $1 FOR UPDATE`;
     const checkResult = await req.db.query(checkQuery, [id]);
     const currentDonation = checkResult.rows[0];
 
@@ -252,6 +314,7 @@ export const updateDonationStatus = async (req, res) => {
     );
     const donation = result.rows[0];
 
+    // ✅ EKSEKUSI JALUR 2 VIA INTEGRASI REKONSILIASI MANUAL DASHBOARD
     if (upperStatus === 'SUCCESS' && donation) {
         const streamerIdCast = parseInt(donation.streamer_id, 10);
 
@@ -263,6 +326,11 @@ export const updateDonationStatus = async (req, res) => {
                 tier: donation.tier || 'STANDARD', 
                 trigger_effect: true
             });
+        }
+        
+        // Picu otomatisasi pengiriman struk email donatur jika email terdaftar rill
+        if (donation.donatur_email) {
+          await sendEmailReceiptToDonatur(donation);
         }
     }
     
@@ -359,7 +427,6 @@ export const handleMidtransCallback = async (req, res) => {
     const orderId = notification.order_id;
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
-    // ✅ EXTRACT GATEWAY METHOD: Ambil tipe pembayaran rill sandbox (qris, gopay, bank_transfer, dll.)
     const paymentType = notification.payment_type || 'MIDTRANS_SNAP';
 
     let updateToStatus = 'PENDING';
@@ -380,9 +447,8 @@ export const handleMidtransCallback = async (req, res) => {
 
     await req.db.query('BEGIN');
     
-    // ✅ EXTRA CASTING: Gunakan casting explicitly ::text agar aman dicocokkan di database cloud Railway
     const checkResult = await req.db.query(
-      `SELECT status, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1::text OR id = $1 FOR UPDATE`, 
+      `SELECT id, status, streamer_id, donatur_name, donatur_email, gross_amount, message, tier, created_date FROM donations WHERE id = $1::text OR id = $1 FOR UPDATE`, 
       [orderId]
     );
     const donationData = checkResult.rows[0];
@@ -393,20 +459,30 @@ export const handleMidtransCallback = async (req, res) => {
     }
 
     if (donationData.status !== 'SUCCESS') {
-        // ✅ FULL UPDATE SINKRON: Perbarui status sekaligus ikat tipe pembayaran rill dari Midtrans
-        await req.db.query(
-          `UPDATE donations SET status = $1, payment_method = $2 WHERE id = $3::text OR id = $3`, 
+        // ✅ FULL UPDATE SINKRON: Pasang status terverifikasi beserta tipe payment_type rill
+        const updateResult = await req.db.query(
+          `UPDATE donations SET status = $1, payment_method = $2 WHERE id = $3::text OR id = $3 RETURNING *`, 
           [updateToStatus, paymentType.toUpperCase(), orderId]
         );
+        const updatedDonationRow = updateResult.rows[0];
         
-        if (updateToStatus === 'SUCCESS' && req.io) {
-            req.io.emit(`new-donation-${parseInt(donationData.streamer_id, 10)}`, {
-                donatur_name: donationData.donatur_name,
-                amount: donationData.gross_amount,
-                message: donationData.message,
-                tier: donationData.tier || 'STANDARD',
-                trigger_effect: true
-            });
+        if (updateToStatus === 'SUCCESS') {
+            const streamerIdCast = parseInt(donationData.streamer_id, 10);
+
+            if (req.io) {
+                req.io.emit(`new-donation-${streamerIdCast}`, {
+                    donatur_name: donationData.donatur_name,
+                    amount: donationData.gross_amount,
+                    message: donationData.message,
+                    tier: donationData.tier || 'STANDARD',
+                    trigger_effect: true
+                });
+            }
+
+            // ✅ EKSEKUSI JALUR 2 WEBHOOK NOTIFIKASI AUTOMATION AUTOMATIC
+            if (updatedDonationRow && updatedDonationRow.donatur_email) {
+              await sendEmailReceiptToDonatur(updatedDonationRow);
+            }
         }
     }
     
