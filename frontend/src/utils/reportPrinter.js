@@ -37,7 +37,7 @@ export const printFinancialStatement = (donations, statsProfile) => {
         <td style="padding: 12px;">Payment</td>
         <td style="padding: 12px; font-weight: bold; text-transform: uppercase;">${renderPaymentMethodText(tx.payment_method)}</td>
         <td style="padding: 12px; font-family: monospace; color: #475569;">${tx.donatur_email || 'donor@skuy.gg'}</td>
-        <td style="padding: 12px; font-weight: 800; color: #16a34a;">Settlement</td>
+        <td style="padding: 12px; font-weight: 800; color: ${tx.status?.toUpperCase() === 'PENDING' ? '#f59e0b' : '#16a34a'}; text-transform: uppercase;">${tx.status || 'SUCCESS'}</td>
         <td style="padding: 12px; font-weight: 800; color: #0f172a; text-align: right; font-family: monospace;">${formatIDR(tx.gross_amount || tx.amount)}</td>
       </tr>
     `;

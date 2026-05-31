@@ -69,7 +69,7 @@ export const printDonaturReceipt = (donationData) => {
           </div>
           <div class="grid-row" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px;">
             <span class="label">Status Keamanan</span>
-            <span class="value" style="color: #16a34a; text-transform: uppercase;">● SETTLEMENT (VERIFIED)</span>
+            <span class="value" style="color: ${donationData.status?.toUpperCase() === 'PENDING' ? '#f59e0b' : '#16a34a'}; text-transform: uppercase;">● ${donationData.status?.toUpperCase() === 'PENDING' ? 'PENDING (UNPAID)' : 'SETTLEMENT (VERIFIED)'}</span>
           </div>
 
           <div class="grid-row">

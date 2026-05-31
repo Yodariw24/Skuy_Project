@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Printer, Home } from 'lucide-react';
+import { CheckCircle2, Printer, Home, Clock } from 'lucide-react';
 import api from '../api/axios';
 import { printDonaturReceipt } from '../utils/receiptPrinter';
 
@@ -46,6 +46,8 @@ function DonationSuccess() {
     );
   }
 
+  const isPending = data.status?.toUpperCase() === 'PENDING';
+
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans flex flex-col items-center justify-center p-6 selection:bg-emerald-100">
       <motion.div 
@@ -55,13 +57,17 @@ function DonationSuccess() {
       >
         <motion.div 
           initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-          className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-slate-950 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)]"
+          className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-slate-950 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] ${isPending ? 'bg-amber-500' : 'bg-emerald-500'}`}
         >
-          <CheckCircle2 size={48} strokeWidth={3} className="text-white" />
+          {isPending ? <Clock size={48} strokeWidth={3} className="text-white" /> : <CheckCircle2 size={48} strokeWidth={3} className="text-white" />}
         </motion.div>
 
-        <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">Transmisi Sukses!</h1>
-        <p className="text-slate-500 font-bold mb-10">Energi dukungan berhasil masuk ke kantong Sultan.</p>
+        <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-950 mb-2">
+          {isPending ? 'Menunggu Pembayaran!' : 'Transmisi Sukses!'}
+        </h1>
+        <p className="text-slate-500 font-bold mb-10">
+          {isPending ? 'Segera selesaikan instruksi pembayaran Midtrans lo agar energi dukungan masuk.' : 'Energi dukungan berhasil masuk ke kantong Sultan.'}
+        </p>
 
         <div className="bg-slate-50 rounded-[2rem] p-6 mb-10 border-2 border-slate-100 text-left space-y-4 shadow-inner">
           <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Order ID</span><span className="font-black text-slate-900 font-mono text-sm">#{data.id}</span></div>

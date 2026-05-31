@@ -96,7 +96,8 @@ function DonationPage() {
               navigate(`/donation-success?order_id=${result.order_id || res.data.data.id}`);
             },
             onPending: function (result) {
-              alert("Menunggu penyelesaian transmisi pembayaran...");
+              // ✅ FIXED: Langsung arahkan ke receipt dengan status PENDING
+              navigate(`/donation-success?order_id=${result.order_id || res.data.data.id}`);
             },
             onError: function (result) {
               alert("Transmisi pembayaran terputus/gagal!");
