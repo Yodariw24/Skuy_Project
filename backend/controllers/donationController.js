@@ -579,3 +579,66 @@ export const getDonationStatusWithSync = async (req, res) => {
     res.status(500).json({ success: false, message: "Gagal memuat status kwitansi" });
   }
 };
+
+/**
+ * ⚡ 11. MASS SYNC TRANSACTIONS (SUPER ADMIN POWER)
+ * Menyinkronkan paksa semua transaksi PENDING lama dengan status asli di Midtrans API
+ */
+export const syncAllPendingTransactions = async (req, res) => {
+  try {
+    // 1. Tarik semua data detail PENDING (Bukan cuma ID-nya doang biar bisa kirim email)
+    const query = `
+      SELECT d.*, s.display_name AS streamer_name 
+      FROM donations d 
+      LEFT JOIN streamers s ON d.streamer_id = s.id 
+      WHERE d.status = 'PENDING'
+    `;
+    const result = await req.db.query(query);
+    const pendingDonations = result.rows;
+
+    if (pendingDonations.length === 0) {
+      return res.json({ success: true, message: "Semua data sudah sinkron, tidak ada yang nyangkut!" });
+    }
+
+    let syncCount = 0;
+
+    for (const tx of pendingDonations) {
+      try {
+        const midtransStatus = await snap.transaction.status(tx.id);
+        const transactionStatus = midtransStatus.transaction_status;
+        const fraudStatus = midtransStatus.fraud_status;
+
+        let updateToStatus = 'PENDING';
+        if (transactionStatus === 'capture') updateToStatus = fraudStatus === 'challenge' ? 'CHALLENGE' : 'SUCCESS';
+        else if (transactionStatus === 'settlement') updateToStatus = 'SUCCESS';
+        else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') updateToStatus = 'FAILED';
+
+        if (updateToStatus !== 'PENDING') {
+          await req.db.query("UPDATE donations SET status = $1 WHERE id = $2", [updateToStatus, tx.id]);
+          syncCount++;
+          
+          // 2. 🚀 EKSEKUSI JALUR EMAIL & SOCKET JIKA TERNYATA SUKSES
+          if (updateToStatus === 'SUCCESS') {
+            tx.status = updateToStatus; // Update status objek untuk template struk
+            const streamerIdCast = parseInt(tx.streamer_id, 10);
+            
+            if (req.io) {
+              req.io.emit(`new-donation-${streamerIdCast}`, { 
+                donatur_name: tx.donatur_name, amount: tx.gross_amount, 
+                message: tx.message, tier: tx.tier || 'STANDARD', trigger_effect: true 
+              });
+            }
+            if (tx.donatur_email) {
+              await sendEmailReceiptToDonatur(tx);
+            }
+          }
+        }
+      } catch (midtransErr) { continue; } // Lewati jika data Midtrans tidak valid
+    }
+
+    res.json({ success: true, message: `${syncCount} transaksi PENDING berhasil ditarik dan disinkronkan ke status aslinya! 🔥` });
+  } catch (err) {
+    console.error("🔥 Error Mass Sync:", err.message);
+    res.status(500).json({ success: false, message: "Gagal melakukan mass sync!" });
+  }
+};
