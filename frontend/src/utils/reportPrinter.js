@@ -42,6 +42,13 @@ export const printFinancialStatement = (donations, statsProfile) => {
   }).join('');
 
   const printWindow = window.open('', '_blank');
+  
+  // 🛡️ PROTEKSI POP-UP BLOCKER: Cegah frontend crash kalau jendela PDF diblokir browser
+  if (!printWindow) {
+    alert("Pop-up diblokir oleh browser! Tolong izinkan pop-up (Allow pop-ups) di pojok kanan atas address bar, lalu coba cetak lagi.");
+    return;
+  }
+
   printWindow.document.write(`
     <html>
       <head>

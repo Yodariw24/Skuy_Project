@@ -12,6 +12,13 @@ export const printDonaturReceipt = (donationData) => {
   });
 
   const printWindow = window.open('', '_blank');
+  
+  // 🛡️ PROTEKSI POP-UP BLOCKER: Peringatkan user jika browser ngeblokir jendela baru
+  if (!printWindow) {
+    alert("Pop-up diblokir oleh browser! Tolong izinkan pop-up (Allow pop-ups) di pojok kanan atas address bar, lalu coba cetak lagi.");
+    return;
+  }
+
   printWindow.document.write(`
     <html>
       <head>
