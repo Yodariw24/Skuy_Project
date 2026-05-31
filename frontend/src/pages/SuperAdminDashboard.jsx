@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { Shield, RefreshCw, Search, SlidersHorizontal, ChevronRight, ArrowLeft, Layers, Landmark, FileText, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
+import socket from '../api/socket';
 
 import DashboardStats from '../components/dashboard/DashboardStats';
 import MerchantDonationsTable from '../components/dashboard/MerchantDonationsTable';
@@ -61,6 +62,20 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => { initializeHQData(); }, []);
   useEffect(() => { fetchSelectedStreamerDonations(selectedStreamerId); }, [selectedStreamerId]);
+
+  // 📡 REAL-TIME SOCKET LISTENER: Bikin tabel Admin auto-update saat sultan berhasil bayar
+  useEffect(() => {
+    if (selectedStreamerId !== 'ALL') {
+      const eventName = `new-donation-${selectedStreamerId}`;
+      const handleNewDonation = () => {
+        fetchSelectedStreamerDonations(selectedStreamerId);
+        initializeHQData();
+      };
+      
+      socket.on(eventName, handleNewDonation);
+      return () => socket.off(eventName, handleNewDonation);
+    }
+  }, [selectedStreamerId]);
 
   const fetchSelectedStreamerDonations = async (id) => {
     if (id === 'ALL') { setStreamerDonations([]); return; }

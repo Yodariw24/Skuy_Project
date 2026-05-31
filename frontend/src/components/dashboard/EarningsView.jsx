@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
+import socket from '../../api/socket'; 
 
 function EarningsView({ user, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua');
@@ -64,6 +65,20 @@ function EarningsView({ user, bankData, openEditModal }) {
       fetchWalletData(); 
     }
   }, [user?.id, fetchWalletData]);
+
+  // 📡 REAL-TIME SOCKET LISTENER: Refresh dompet & tabel otomatis saat ada yang nyawer
+  useEffect(() => {
+    const streamerId = user?.streamer_id || user?.id;
+    if (!streamerId) return;
+
+    const eventName = `new-donation-${streamerId}`;
+    const handleNewDonation = () => {
+      fetchWalletData();
+    };
+
+    socket.on(eventName, handleNewDonation);
+    return () => socket.off(eventName, handleNewDonation);
+  }, [user, fetchWalletData]);
 
   // 📊 FILTER ENGINE LOGS
   const filteredTransactions = (Array.isArray(transactions) ? transactions : []).filter(tx => {
