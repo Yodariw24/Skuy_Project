@@ -65,6 +65,7 @@ function DonationSuccess() {
 
         <div className="bg-slate-50 rounded-[2rem] p-6 mb-10 border-2 border-slate-100 text-left space-y-4 shadow-inner">
           <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Order ID</span><span className="font-black text-slate-900 font-mono text-sm">#{data.id}</span></div>
+          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Target Sultan</span><span className="font-black text-violet-600">{data.streamer_name || `ID #${data.streamer_id}`}</span></div>
           <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Nominal</span><span className="font-black text-emerald-500 text-xl">Rp {Number(data.gross_amount || data.amount).toLocaleString('id-ID')}</span></div>
           <div className="flex justify-between items-center"><span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Sender</span><span className="font-black text-slate-900">{data.donatur_name}</span></div>
         </div>

@@ -82,7 +82,7 @@ export const printDonaturReceipt = (donationData) => {
           </div>
           <div class="grid-row" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px;">
             <span class="label">Target Penerima (Merchant)</span>
-            <span class="value" style="text-transform: uppercase;">ID Creator: #${donationData.streamer_id}</span>
+            <span class="value" style="text-transform: uppercase; color: #7c3aed;">${donationData.streamer_name || 'ID Creator: #' + donationData.streamer_id}</span>
           </div>
 
           <div class="grid-row" style="flex-direction: column; gap: 4px; margin-bottom: 15px;">
