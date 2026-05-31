@@ -16,16 +16,30 @@ function DonationSuccess() {
       setLoading(false);
       return;
     }
-    api.get(`/donations/status/${orderId}`)
-      .then(res => {
+    
+    let intervalId;
+
+    const checkStatus = () => {
+      api.get(`/donations/status/${orderId}`).then(res => {
         if (res.data.success) {
           setData(res.data.data);
+          // 🚀 AUTO-PILOT: Jika statusnya masih PENDING, refresh data di balik layar tiap 3 detik
+          if (res.data.data.status?.toUpperCase() === 'PENDING' && !intervalId) {
+            intervalId = setInterval(() => {
+              api.get(`/donations/status/${orderId}`).then(pollRes => {
+                if (pollRes.data.success) {
+                  setData(pollRes.data.data);
+                  if (pollRes.data.data.status?.toUpperCase() !== 'PENDING') clearInterval(intervalId);
+                }
+              });
+            }, 3000);
+          }
         }
-      })
-      .catch(err => {
-        console.error("Gagal menarik data struk:", err);
-      })
-      .finally(() => setLoading(false));
+      }).catch(err => console.error("Gagal menarik data struk:", err)).finally(() => setLoading(false));
+    };
+
+    checkStatus();
+    return () => { if (intervalId) clearInterval(intervalId); };
   }, [orderId]);
 
   if (loading) {

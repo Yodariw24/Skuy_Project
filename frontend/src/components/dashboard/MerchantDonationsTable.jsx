@@ -48,9 +48,9 @@ export default function MerchantDonationsTable({ donations, loading }) {
           </thead>
           <tbody className="divide-y-2 divide-slate-100 font-mono text-[11px]">
             {loading ? (
-              <tr><td colSpan="8" className="p-6 text-center text-slate-400 font-black uppercase animate-pulse">Syncing midtrans cloud core blocks...</td></tr>
+              <tr><td colSpan="8" className="p-6 text-center text-slate-400 font-black uppercase animate-pulse">Menghubungkan Radar Midtrans...</td></tr>
             ) : donations.length === 0 ? (
-              <tr><td colSpan="8" className="p-6 text-center text-slate-400 font-black uppercase italic">Tidak ada sirkuit mutasi finansial, Ri!</td></tr>
+              <tr><td colSpan="8" className="p-6 text-center text-slate-400 font-black uppercase italic">Belum Ada Transaksi Tercatat!</td></tr>
             ) : (
               donations.map((tx) => (
                 <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
