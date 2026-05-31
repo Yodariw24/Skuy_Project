@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { 
-  Shield, RefreshCw, Search, SlidersHorizontal, ChevronRight, 
-  ArrowLeft, Layers, Landmark as BankIcon, FileText, Activity
-} from 'lucide-react';
+import { Shield, RefreshCw, Search, SlidersHorizontal, ChevronRight, ArrowLeft, Layers, Landmark, FileText, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Swal from 'sweetalert2';
 
 import DashboardStats from '../components/dashboard/DashboardStats';
 import MerchantDonationsTable from '../components/dashboard/MerchantDonationsTable';
@@ -36,9 +34,28 @@ export default function SuperAdminDashboard() {
       const streamersRes = await api.get('/user/list');
       if (streamersRes.data.success) setStreamersList(streamersRes.data.streamers || []);
     } catch (err) {
-      console.error("🔥 HQ Backbone Engine Crash:", err.message);
+      console.error("🔥 Error Data Backbone:", err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMassSync = async () => {
+    Swal.fire({
+      title: 'SYNCHRONIZING...',
+      text: 'Menghubungkan database Railway ke hulu server Sandbox Midtrans...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+    try {
+      const res = await api.post('/donations/admin/transactions/sync');
+      if (res.data.success) {
+        Swal.fire('SINKRONISASI SUKSES!', res.data.message, 'success');
+        initializeHQData();
+        if (selectedStreamerId !== 'ALL') fetchSelectedStreamerDonations(selectedStreamerId);
+      }
+    } catch (err) {
+      Swal.fire('TIMEOUT!', 'Gagal sinkronisasi otomatis: ' + err.message, 'error');
     }
   };
 
@@ -52,7 +69,7 @@ export default function SuperAdminDashboard() {
       const res = await api.get(`/donations/list-internal/${id}`);
       if (res.data.success) setStreamerDonations(res.data.data || []);
     } catch (err) {
-      console.error("🔥 Error fetch internal nodes:", err.message);
+      console.error("🔥 Error fetching internal notes:", err.message);
     } finally {
       setLoadingStreamerData(false);
     }
@@ -75,12 +92,6 @@ export default function SuperAdminDashboard() {
     return { profile, totalGross, totalNetEarnings, totalFeePlatform, count: successDonations.length };
   }, [selectedStreamerId, streamersList, streamerDonations]);
 
-  const handleExportPDF = () => {
-    if (selectedStreamerId !== 'ALL' && streamerDonations.length > 0) {
-      printFinancialStatement(streamerDonations, selectedStreamerStats);
-    }
-  };
-
   const formatIDR = (num) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
   };
@@ -101,8 +112,8 @@ export default function SuperAdminDashboard() {
           </div>
           <div className="flex flex-wrap gap-4">
             <button onClick={() => navigate('/dashboard')} className="bg-slate-100 font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] uppercase cursor-pointer italic"><ArrowLeft size={14} className="inline mr-2" /> Return</button>
-            <button onClick={initializeHQData} className="bg-[#10B981] font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] uppercase cursor-pointer italic"><RefreshCw size={14} className="inline mr-2" /> Sync Cores</button>
-            <button onClick={handleExportPDF} disabled={selectedStreamerId === 'ALL' || streamerDonations.length === 0} className="bg-violet-600 text-white font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] uppercase cursor-pointer disabled:opacity-50 italic"><FileText size={14} className="inline mr-2" /> Export (.PDF)</button>
+            <button onClick={handleMassSync} className="bg-[#10B981] font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] uppercase cursor-pointer text-white italic"><RefreshCw size={14} className="inline mr-2" /> Sync Cores</button>
+            <button onClick={() => printFinancialStatement(streamerDonations, selectedStreamerStats)} disabled={selectedStreamerId === 'ALL' || streamerDonations.length === 0} className="bg-violet-600 text-white font-black text-xs px-6 py-4 border-4 border-slate-950 rounded-2xl shadow-[4px_4px_0px_0px_#000] uppercase cursor-pointer disabled:opacity-50 italic"><FileText size={14} className="inline mr-2" /> Export (.PDF)</button>
           </div>
         </div>
 
@@ -121,7 +132,7 @@ export default function SuperAdminDashboard() {
               <Search className="absolute left-4 top-3.5 text-slate-400 w-4 h-4" />
               <input type="text" placeholder="Cari Merchant ID / Nama..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#F8FAFF] border-2 border-slate-200 rounded-xl py-3 pl-11 pr-4 text-xs font-bold" />
             </div>
-            <div className="space-y-1.5 max-h-[350px] overflow-y-auto">
+            <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
               <button onClick={() => setSelectedStreamerId('ALL')} className={`w-full text-left px-4 py-3 rounded-xl border-2 text-xs font-black uppercase ${selectedStreamerId === 'ALL' ? 'bg-violet-50 border-violet-500 text-violet-600' : 'bg-[#F8FAFF]'}`}><Layers size={14} className="inline mr-2" /> All Operational Merchants</button>
               {filteredStreamers.map(s => (
                 <button key={s.id} onClick={() => setSelectedStreamerId(s.id)} className={`w-full text-left px-4 py-3 rounded-xl border-2 text-xs font-black uppercase flex items-center justify-between ${parseInt(selectedStreamerId, 10) === parseInt(s.id, 10) ? 'bg-violet-50 border-violet-500 text-violet-600' : 'bg-[#F8FAFF]'}`}>
@@ -133,7 +144,7 @@ export default function SuperAdminDashboard() {
 
           <div className="lg:col-span-8">
             {selectedStreamerId === 'ALL' ? (
-              <div className="p-16 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_#000] text-center border-dashed font-bold text-sm text-slate-500">Silakan pilih salah satu merchant creator di panel kiri untuk membuka data finansial sandbox Midtrans, Ri!</div>
+              <div className="p-16 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_#000] text-center border-dashed font-bold text-sm text-slate-400">Silakan pilih salah satu merchant creator di panel kiri untuk membuka data finansial sandbox Midtrans, Ri!</div>
             ) : (
               <div className="space-y-6">
                 <div className="p-6 bg-white border-4 border-slate-950 rounded-3xl shadow-[6px_6px_0px_0px_#000] flex flex-col md:flex-row justify-between gap-6">
@@ -143,7 +154,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs font-mono text-slate-500 mt-0.5">UID: #{selectedStreamerStats?.profile?.id}</p>
                   </div>
                   <div className="p-4 bg-[#F8FAFF] border-2 rounded-xl flex items-center gap-3 w-full md:w-64">
-                    <BankIcon size={18} className="text-amber-600" />
+                    <Landmark size={18} className="text-amber-600" />
                     <div className="truncate"><p className="text-[9px] font-black text-slate-400">Payout Destination</p><p className="text-xs font-black truncate">{selectedStreamerStats?.profile?.bank_name || 'NOT SET'}</p></div>
                   </div>
                 </div>
