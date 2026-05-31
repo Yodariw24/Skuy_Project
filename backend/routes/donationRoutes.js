@@ -153,7 +153,7 @@ router.get('/status/:orderId', async (req, res) => {
         const { orderId } = req.params;
         // Casting id::text agar aman jika orderId mengandung string (seperti TRX-...)
         const result = await req.db.query(
-            "SELECT * FROM donations WHERE id::text = $1 OR order_id = $1", 
+            "SELECT * FROM donations WHERE id::text = $1", 
             [orderId]
         );
         if (result.rows.length === 0) {
