@@ -6,7 +6,7 @@
  */
 
 import midtransClient from 'midtrans-client';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 // ✅ INDEX/INSTANSIASI SNAP API BAWAAN SDK MIDTRANS
 const snap = new midtransClient.Snap({
@@ -15,15 +15,8 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
 
-// ✅ SETUP CONFIGURATION SMTP TRANSPORT EMAIL SKUYGG (PRO-GRADE OPSI B DUAL CONFIG)
-const transporter = nodemailer.createTransport({
-  service: 'gmail', 
-  auth: {
-    // Otomatis membaca EMAIL_USER & EMAIL_PASS lama lo, Ri! Aman tanpa ubah .env
-    user: process.env.EMAIL_SMTP_USER || process.env.EMAIL_USER || 'ariwirayuda24@gmail.com',
-    pass: process.env.EMAIL_SMTP_PASSWORD || process.env.EMAIL_PASS
-  }
-});
+// ✅ SETUP MESIN PENGIRIM EMAIL OTOMATIS (MENGGUNAKAN RESEND API YANG UDAH PASTI GACOR)
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ✅ FUNGSI PEMBANTU: PENGIRIM HTML E-RECEIPT RESMI KE EMAIL DONATUR
 const sendEmailReceiptToDonatur = async (donation) => {
@@ -63,16 +56,16 @@ const sendEmailReceiptToDonatur = async (donation) => {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: '"Skuy.gg Cloud System" <noreply@skuy.gg>',
+    await resend.emails.send({
+      from: 'SkuyGG Transactions <onboarding@resend.dev>',
       to: donation.donatur_email, 
       subject: `[SKUY.GG] Struk Bukti Donasi Sah Bukti Transaksi #${donation.id}`,
       html: emailHTML
     });
 
-    console.log(`✉️ [JALUR 2] E-receipt berhasil dilempar ke email donatur: ${donation.donatur_email}`);
+    console.log(`✉️ [JALUR 2] E-receipt berhasil dilempar via RESEND ke email donatur: ${donation.donatur_email}`);
   } catch (error) {
-    console.error("❌ Sirkuit SMTP Email Sender Jalur 2 Crash:", error.message);
+    console.error("❌ Sirkuit Resend Email Sender Crash:", error.message);
   }
 };
 
@@ -332,8 +325,9 @@ export const updateDonationStatus = async (req, res) => {
         }
         
         // Picu otomatisasi pengiriman struk email donatur jika email terdaftar rill
-        if (donation.donatur_email) {
-          await sendEmailReceiptToDonatur(donation);
+        if (currentDonation.donatur_email) {
+          currentDonation.status = 'SUCCESS';
+          await sendEmailReceiptToDonatur(currentDonation);
         }
     }
     
@@ -486,8 +480,10 @@ export const handleMidtransCallback = async (req, res) => {
             }
 
             // ✅ EKSEKUSI JALUR 2 WEBHOOK NOTIFIKASI AUTOMATION AUTOMATIC
-            if (updatedDonationRow && updatedDonationRow.donatur_email) {
-              await sendEmailReceiptToDonatur(updatedDonationRow);
+            if (donationData && donationData.donatur_email) {
+              donationData.status = 'SUCCESS';
+              donationData.payment_method = paymentType.toUpperCase();
+              await sendEmailReceiptToDonatur(donationData);
             }
         }
     }
