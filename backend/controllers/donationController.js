@@ -532,3 +532,50 @@ export const getSystemAuditLogs = async (req, res) => {
     return res.status(500).json({ success: false, logs: [], error: err.message });
   }
 };
+
+/**
+ * ⚡ 10. RADAR AUTO-SYNC BYPASS (PRODUCTION FALLBACK)
+ * Garansi 100% status berubah sukses walau Webhook Midtrans delay / gagal masuk!
+ */
+export const getDonationStatusWithSync = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = await req.db.query(
+      `SELECT d.*, s.display_name AS streamer_name FROM donations d LEFT JOIN streamers s ON d.streamer_id = s.id WHERE d.id::text = $1`, [orderId]
+    );
+
+    let donationData = result.rows[0];
+    if (!donationData) return res.status(404).json({ success: false, message: "Kwitansi tidak ditemukan!" });
+
+    // Jika status di DB masih PENDING, kita hajar cek langsung ke API Midtrans
+    if (donationData.status === 'PENDING') {
+      try {
+        const midtransStatus = await snap.transaction.status(orderId);
+        const transactionStatus = midtransStatus.transaction_status;
+        const fraudStatus = midtransStatus.fraud_status;
+
+        let updateToStatus = 'PENDING';
+        if (transactionStatus === 'capture') updateToStatus = fraudStatus === 'challenge' ? 'CHALLENGE' : 'SUCCESS';
+        else if (transactionStatus === 'settlement') updateToStatus = 'SUCCESS';
+        else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') updateToStatus = 'FAILED';
+
+        if (updateToStatus === 'SUCCESS') {
+          await req.db.query(`UPDATE donations SET status = $1 WHERE id::text = $2`, [updateToStatus, orderId]);
+          donationData.status = updateToStatus;
+          const streamerIdCast = parseInt(donationData.streamer_id, 10);
+          if (req.io) {
+            req.io.emit(`new-donation-${streamerIdCast}`, { donatur_name: donationData.donatur_name, amount: donationData.gross_amount, message: donationData.message, tier: donationData.tier || 'STANDARD', trigger_effect: true });
+          }
+          if (donationData.donatur_email) await sendEmailReceiptToDonatur(donationData);
+        } else if (updateToStatus !== 'PENDING') {
+          await req.db.query(`UPDATE donations SET status = $1 WHERE id::text = $2`, [updateToStatus, orderId]);
+          donationData.status = updateToStatus;
+        }
+      } catch (midtransErr) { console.warn("Midtrans radar bypass info:", midtransErr.message); }
+    }
+
+    res.json({ success: true, data: donationData });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Gagal memuat status kwitansi" });
+  }
+};

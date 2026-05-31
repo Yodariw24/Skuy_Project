@@ -18,7 +18,8 @@ import {
     withdrawBalance,
     getStreamerAnalytics,
     handleMidtransCallback, // ✅ IMPORT WEBHOOK ENGINE BARU UNTUK OTOMATISASI SANDBOX
-    getSystemAuditLogs // ✅ IMPORT ENGINE POWER BARU UNTUK DATA LOG ADMIN CONTROL
+    getSystemAuditLogs, // ✅ IMPORT ENGINE POWER BARU UNTUK DATA LOG ADMIN CONTROL
+    getDonationStatusWithSync // ✅ IMPORT RADAR AUTO-SYNC
 } from '../controllers/donationController.js';
 
 import { validateDonation } from '../middleware/validator.js';
@@ -148,26 +149,8 @@ router.post('/create', validateDonation, logActivity('DONATION_INITIATED'), crea
 router.put('/status/:id', logActivity('MANUAL_STATUS_UPDATED'), updateDonationStatus); 
 
 // ✅ ENDPOINT BARU: Ambil detail data untuk halaman Kwitansi (DonationSuccess) berdasarkan Order ID
-router.get('/status/:orderId', async (req, res) => {
-    try {
-        const { orderId } = req.params;
-        // Casting id::text agar aman jika orderId mengandung string (seperti TRX-...)
-        const result = await req.db.query(
-            `SELECT d.*, s.display_name AS streamer_name 
-             FROM donations d 
-             LEFT JOIN streamers s ON d.streamer_id = s.id 
-             WHERE d.id::text = $1`, 
-            [orderId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "Kwitansi tidak ditemukan!" });
-        }
-        res.json({ success: true, data: result.rows[0] });
-    } catch (err) {
-        console.error("🔥 Error GET Struk Donasi:", err.message);
-        res.status(500).json({ success: false, message: "Gagal memuat status kwitansi" });
-    }
-});
+// 🚀 DIGANTIKAN OLEH RADAR BYPASS: Akan otomatis ngecek DB + nembak langsung ke API Midtrans
+router.get('/status/:orderId', getDonationStatusWithSync);
 
 // ✅ MIDTRANS WEBHOOK CALLBACK ENDPOINT
 // 📸 MONITOR: Rekam log respon otomatis saat sistem diserang webhook sukses paska simulasi di Sandbox
