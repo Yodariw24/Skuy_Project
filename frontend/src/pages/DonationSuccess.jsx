@@ -44,6 +44,25 @@ function DonationSuccess() {
     return () => { if (intervalId) clearInterval(intervalId); };
   }, [orderId]);
 
+  // ✅ PROTEKSI CRASH: Pindahkan variabel ini ke atas dengan Optional Chaining (?.)
+  const isPending = data?.status?.toUpperCase() === 'PENDING';
+
+  // 🚀 MUNCULKAN POP-UP KETIKA STATUS SUKSES (Baik langsung maupun pasca-pending)
+  // WAJIB diletakkan sebelum statement "if (loading) return" untuk menghindari Crash/Blank Screen di React!
+  useEffect(() => {
+    if (!isPending && !hasShownPopup && data?.status?.toUpperCase() === 'SUCCESS') {
+      Swal.fire({
+        title: 'TRANSMISI BERHASIL!',
+        text: 'Energi dukungan lo udah masuk ke kantong Sultan!',
+        icon: 'success',
+        confirmButtonColor: '#10B981',
+        confirmButtonText: 'MANTAP 🚀',
+        customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#10B981]' }
+      });
+      setHasShownPopup(true);
+    }
+  }, [isPending, hasShownPopup, data]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFF]">
@@ -61,23 +80,6 @@ function DonationSuccess() {
       </div>
     );
   }
-
-  const isPending = data.status?.toUpperCase() === 'PENDING';
-
-  // 🚀 MUNCULKAN POP-UP KETIKA STATUS SUKSES (Baik langsung maupun pasca-pending)
-  useEffect(() => {
-    if (!isPending && !hasShownPopup && data?.status?.toUpperCase() === 'SUCCESS') {
-      Swal.fire({
-        title: 'TRANSMISI BERHASIL!',
-        text: 'Energi dukungan lo udah masuk ke kantong Sultan!',
-        icon: 'success',
-        confirmButtonColor: '#10B981',
-        confirmButtonText: 'MANTAP 🚀',
-        customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#10B981]' }
-      });
-      setHasShownPopup(true);
-    }
-  }, [isPending, hasShownPopup, data]);
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans flex flex-col items-center justify-center p-6 selection:bg-emerald-100">
