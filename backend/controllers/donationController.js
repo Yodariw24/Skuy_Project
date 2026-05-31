@@ -105,7 +105,7 @@ export const getWalletHistory = async (req, res) => {
         id::TEXT, 
         amount, 
         CASE 
-          WHEN bank_info::TEXT LIKE '{%}' THEN ('Penarikan Saldo (' || COALESCE(bank_info->>'bank_name', 'Bank') || ')')::TEXT
+          WHEN bank_info::TEXT LIKE '{%}' THEN ('Penarikan Saldo (' || COALESCE((bank_info::JSONB)->>'bank_name', 'Bank') || ')')::TEXT
           ELSE ('Penarikan Saldo (' || bank_info::TEXT || ')')::TEXT
         END AS description, 
         'OUT'::TEXT AS type, 
