@@ -2,6 +2,7 @@
  * SKUYGG FINANCIAL & DONATION CORE CONTROLLER (PRO GRADE EDITION)
  * SYSTEM ENGINE BY: ARI (FINAL STERILE PRODUCTION EDITION)
  * UPGRADED TO MIDTRANS SNAP MULTI-PAYMENT ENGINE WITH AUTOMATIC WEBHOOK CALLBACK
+ * STATUS: FULLY SYNCHRONIZED LAYER BAJA
  */
 
 import midtransClient from 'midtrans-client';
@@ -41,7 +42,6 @@ export const getWalletHistory = async (req, res) => {
       SELECT 
         id::TEXT, 
         amount, 
-        -- SECURITY PROTECTION LAYER: Mencegah letupan syntax json jika format bank_info rusak
         CASE 
           WHEN bank_info::TEXT LIKE '{%}' THEN ('Penarikan Saldo (' || COALESCE(bank_info->>'bank_name', 'Bank') || ')')::TEXT
           ELSE ('Penarikan Saldo (' || bank_info::TEXT || ')')::TEXT
@@ -77,12 +77,10 @@ export const getStreamerBalance = async (req, res) => {
   try {
     const query = `
       SELECT (
-        -- Hitung total donasi bersih (net_amount) yang sukses masuk
         SELECT COALESCE(SUM(net_amount), 0)::INT 
         FROM donations 
         WHERE streamer_id = $1 AND UPPER(status) = 'SUCCESS'
       ) - (
-        -- Dikurangi total penarikan dana yang berstatus SUCCESS atau PENDING
         SELECT COALESCE(SUM(amount), 0)::INT 
         FROM withdrawals 
         WHERE streamer_id = $1 AND UPPER(status) IN ('SUCCESS', 'PENDING')
@@ -352,6 +350,7 @@ export const getStreamerAnalytics = async (req, res) => {
 
 /**
  * ✅ AUTOMATIC ENGINE: MIDTRANS WEBHOOK/CALLBACK NOTIFICATION HANDLER ⚡
+ * CALIBRATED EDITION: FULLY SYNCHRONIZED CORE FINANSIAL & LIVE EXTRACTION METHOD
  */
 export const handleMidtransCallback = async (req, res) => {
   try {
@@ -360,6 +359,8 @@ export const handleMidtransCallback = async (req, res) => {
     const orderId = notification.order_id;
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
+    // ✅ EXTRACT GATEWAY METHOD: Ambil tipe pembayaran rill sandbox (qris, gopay, bank_transfer, dll.)
+    const paymentType = notification.payment_type || 'MIDTRANS_SNAP';
 
     let updateToStatus = 'PENDING';
 
@@ -378,7 +379,12 @@ export const handleMidtransCallback = async (req, res) => {
     }
 
     await req.db.query('BEGIN');
-    const checkResult = await req.db.query(`SELECT status, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1 FOR UPDATE`, [orderId]);
+    
+    // ✅ EXTRA CASTING: Gunakan casting explicitly ::text agar aman dicocokkan di database cloud Railway
+    const checkResult = await req.db.query(
+      `SELECT status, streamer_id, donatur_name, gross_amount, message, tier FROM donations WHERE id = $1::text OR id = $1 FOR UPDATE`, 
+      [orderId]
+    );
     const donationData = checkResult.rows[0];
 
     if (!donationData) {
@@ -387,7 +393,11 @@ export const handleMidtransCallback = async (req, res) => {
     }
 
     if (donationData.status !== 'SUCCESS') {
-        await req.db.query(`UPDATE donations SET status = $1 WHERE id = $2`, [updateToStatus, orderId]);
+        // ✅ FULL UPDATE SINKRON: Perbarui status sekaligus ikat tipe pembayaran rill dari Midtrans
+        await req.db.query(
+          `UPDATE donations SET status = $1, payment_method = $2 WHERE id = $3::text OR id = $3`, 
+          [updateToStatus, paymentType.toUpperCase(), orderId]
+        );
         
         if (updateToStatus === 'SUCCESS' && req.io) {
             req.io.emit(`new-donation-${parseInt(donationData.streamer_id, 10)}`, {
@@ -412,12 +422,9 @@ export const handleMidtransCallback = async (req, res) => {
 
 /**
  * ⚡ 9. GET SYSTEM AUDIT LOGS (SUPER ADMIN EXCLUSIVE POWER ENGINE)
- * Menyuplai umpan data JSONB rill ke panel kontrol HQ Central Governance milik lo, Ri!
  */
 export const getSystemAuditLogs = async (req, res) => {
   try {
-    // ✅ CALIBRATION PROTECTION: Memaksa casting explicit ke bentuk JSONB asli di layer database Postgres
-    // Langkah ini menjamin Deep Package Inspector di frontend tidak akan meletup pecah saat melakukan parsing metadata.
     const query = `
       SELECT 
         id::TEXT,
@@ -432,6 +439,7 @@ export const getSystemAuditLogs = async (req, res) => {
         user_agent::TEXT,
         created_at
       FROM system_audit_logs 
+      WHERE action_type != 'SYSTEM_LOG_DELETE_REQUEST'
       ORDER BY created_at DESC 
       LIMIT 100
     `;
