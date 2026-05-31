@@ -51,7 +51,7 @@ const sendEmailReceiptToDonatur = async (donation) => {
           <tr><td style="padding: 12px; color: #64748b; font-weight: 500;">Waktu Transaksi</td><td style="padding: 12px; font-weight: 600; text-align: right;">${dateTime}</td></tr>
           <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Metode Pembayaran</td><td style="padding: 12px; font-weight: bold; text-transform: uppercase; text-align: right; color: #7c3aed;">${donation.payment_method || 'MIDTRANS_SNAP'}</td></tr>
           <tr><td style="padding: 12px; color: #64748b; font-weight: 500;">Status Kliring</td><td style="padding: 12px; font-weight: 800; color: #16a34a; text-align: right;">● SETTLEMENT (VERIFIED)</td></tr>
-          <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Target Streamer ID</td><td style="padding: 12px; font-weight: bold; text-align: right;">#${donation.streamer_id}</td></tr>
+          <tr style="background: #f8fafc;"><td style="padding: 12px; color: #64748b; font-weight: 500;">Target Sultan</td><td style="padding: 12px; font-weight: bold; text-align: right; color: #0f172a;">${donation.streamer_name || '#' + donation.streamer_id}</td></tr>
           <tr><td style="padding: 12px; color: #64748b; font-weight: 500; vertical-align: top;">Pesan Dukungan</td><td style="padding: 12px; font-style: italic; color: #475569; text-align: right; max-width: 250px;">"${donation.message || 'Tidak ada pesan tertulis.'}"</td></tr>
           <tr style="background: #f1f5f9; font-size: 16px; font-weight: bold; border-top: 2px solid #0f172a;"><td style="padding: 15px; color: #0f172a;">Total Kontribusi</td><td style="padding: 15px; color: #16a34a; font-family: monospace; text-align: right; font-size: 18px;">${formattedAmount}</td></tr>
         </table>
@@ -294,7 +294,10 @@ export const updateDonationStatus = async (req, res) => {
   try {
     await req.db.query('BEGIN');
 
-    const checkQuery = `SELECT id, status, net_amount, streamer_id, donatur_name, donatur_email, gross_amount, message, tier, payment_method, created_date FROM donations WHERE id = $1 FOR UPDATE`;
+    const checkQuery = `SELECT d.id, d.status, d.net_amount, d.streamer_id, d.donatur_name, d.donatur_email, d.gross_amount, d.message, d.tier, d.payment_method, d.created_date, s.display_name AS streamer_name 
+                        FROM donations d 
+                        LEFT JOIN streamers s ON d.streamer_id = s.id 
+                        WHERE d.id = $1 FOR UPDATE OF d`;
     const checkResult = await req.db.query(checkQuery, [id]);
     const currentDonation = checkResult.rows[0];
 
@@ -448,7 +451,10 @@ export const handleMidtransCallback = async (req, res) => {
     await req.db.query('BEGIN');
     
     const checkResult = await req.db.query(
-      `SELECT id, status, streamer_id, donatur_name, donatur_email, gross_amount, message, tier, created_date FROM donations WHERE id = $1::text OR id = $1 FOR UPDATE`, 
+      `SELECT d.id, d.status, d.streamer_id, d.donatur_name, d.donatur_email, d.gross_amount, d.message, d.tier, d.created_date, s.display_name AS streamer_name 
+       FROM donations d 
+       LEFT JOIN streamers s ON d.streamer_id = s.id 
+       WHERE d.id = $1::text OR d.id = $1 FOR UPDATE OF d`, 
       [orderId]
     );
     const donationData = checkResult.rows[0];
