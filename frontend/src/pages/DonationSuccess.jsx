@@ -4,12 +4,14 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, Printer, Home, Clock } from 'lucide-react';
 import api from '../api/axios';
 import { printDonaturReceipt } from '../utils/receiptPrinter';
+import Swal from 'sweetalert2';
 
 function DonationSuccess() {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hasShownPopup, setHasShownPopup] = useState(false);
 
   useEffect(() => {
     if (!orderId) {
@@ -61,6 +63,21 @@ function DonationSuccess() {
   }
 
   const isPending = data.status?.toUpperCase() === 'PENDING';
+
+  // 🚀 MUNCULKAN POP-UP KETIKA STATUS SUKSES (Baik langsung maupun pasca-pending)
+  useEffect(() => {
+    if (!isPending && !hasShownPopup && data?.status?.toUpperCase() === 'SUCCESS') {
+      Swal.fire({
+        title: 'TRANSMISI BERHASIL!',
+        text: 'Energi dukungan lo udah masuk ke kantong Sultan!',
+        icon: 'success',
+        confirmButtonColor: '#10B981',
+        confirmButtonText: 'MANTAP 🚀',
+        customClass: { popup: 'rounded-[2rem] border-4 border-slate-950 shadow-[10px_10px_0px_0px_#10B981]' }
+      });
+      setHasShownPopup(true);
+    }
+  }, [isPending, hasShownPopup, data]);
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans flex flex-col items-center justify-center p-6 selection:bg-emerald-100">
