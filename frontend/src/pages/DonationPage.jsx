@@ -1,4 +1,4 @@
-import { useEffect,专心, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/axios' 
@@ -92,9 +92,8 @@ function DonationPage() {
         if (window.snap) {
           window.snap.pay(token, {
             onSuccess: function (result) {
-              alert("Energi donasi berhasil ditransmisikan, Sultan!");
-              fetchData(); // Refresh info saldo & feed riwayat
-              setFormData({ donatur_name: '', donatur_email: '', amount: '', message: '' });
+              // ✅ FIXED: Arahkan langsung ke halaman DonationSuccess beserta parameter order_id
+              navigate(`/donation-success?order_id=${result.order_id || res.data.data.id}`);
             },
             onPending: function (result) {
               alert("Menunggu penyelesaian transmisi pembayaran...");

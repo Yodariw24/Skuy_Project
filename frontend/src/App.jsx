@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useCallback } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import HomePage from './pages/HomePage';
@@ -37,7 +37,8 @@ const AdminRoute = ({ children }) => {
     return children;
   }
 
-  alert("Akses ilegal! Area ini hanya untuk Pemegang Kuasa PT SkuyGG, Ri!");
+  // ⚠️ FIX: Menghindari pemanggilan alert() langsung saat render karena memblokir UI thread di React
+  console.warn("Akses ilegal! Area ini hanya untuk Pemegang Kuasa PT SkuyGG, Ri!");
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -45,7 +46,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [isSyncing, setIsSyncing] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
 
   // ✅ SYNC USER: Ambil data Sultan terbaru dari Cloud Railway saat boot-up awal
   const syncUser = useCallback(async () => {
