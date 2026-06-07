@@ -59,9 +59,10 @@ function App() {
     try {
       const res = await api.get('/user/dashboard-sync');
       if (res.data.success) {
-        // ⚡ INJECTION FORCE: Jika server backend belum kirim key role, paksa injeksi role SUPER_ADMIN khusus untuk email lo di sisi client
+        // ⚡ INJECTION FORCE: Injeksi otomatis status SUPER_ADMIN untuk para petinggi PT
         let userData = res.data.user;
-        if (userData.email === 'ariwirayuda24@gmail.com') {
+        const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+        if (superAdmins.includes(userData.email)) {
           userData.role = 'SUPER_ADMIN';
         }
 

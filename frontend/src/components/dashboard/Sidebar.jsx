@@ -209,7 +209,8 @@ function Sidebar({ user, balance }) {
 
         {/* 🛡️ OPTION A: EXCLUSIVE GOVERNANCE CONTROL GATEWAY */}
         {/* Tombol ini otomatis gaib, cuma merangkak muncul pas email lo terverifikasi sistem, Ri! */}
-        {(role === 'super_admin' || user?.email === 'ariwirayuda24@gmail.com') && (
+        {(role === 'super_admin' || 
+          ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'].includes(user?.email)) && (
           <button 
             type="button"
             onClick={() => navigate('/pt-owner/audit-center')}
