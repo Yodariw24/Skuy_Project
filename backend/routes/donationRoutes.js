@@ -121,7 +121,7 @@ router.get('/profile/:username', async (req, res) => {
     try {
         // ✅ FIXED TYPO: Membersihkan objek request database asli (req.db)
         const result = await req.db.query(
-            `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, u.is_two_fa_enabled 
+            `SELECT s.id, s.user_id, s.username, s.display_name, s.bio, s.theme_color, s.profile_picture, s.instagram, s.tiktok, s.youtube, u.is_two_fa_enabled 
              FROM streamers s 
              JOIN users u ON s.user_id = u.id 
              WHERE s.username ILIKE $1`,
