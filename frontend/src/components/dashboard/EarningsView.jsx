@@ -10,13 +10,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import socket from '../../api/socket'; 
 
-function EarningsView({ user, bankData, openEditModal }) {
+function EarningsView({ user, balance: propBalance, bankData, openEditModal }) {
   const [filter, setFilter] = useState('Semua');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [transactions, setTransactions] = useState([]);
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(propBalance || 0);
   const [loading, setLoading] = useState(true);
 
   // 🛡️ LOCK LOKAL STATE: Mengamankan fitur Show/Hide balance biar berfungsi mandiri saat diklik
@@ -25,13 +25,14 @@ function EarningsView({ user, bankData, openEditModal }) {
   // 📡 PROTOKOL SYNCHRONIZATION DATA LIVE (CLEAN PATHS)
   const fetchWalletData = useCallback(async () => {
     if (!user?.id) return;
+    const targetId = user?.streamer_id || user?.id;
     try {
       setLoading(true);
       
       // ✅ SINKRON TOTAL: Memanggil endpoint internal murni yang sudah dibersihkan dari double prefix /api
       const [resHistory, resBalance] = await Promise.all([
         api.get('/donations/history'), 
-        api.get('/donations/balance')  
+        api.get(`/donations/balance/${targetId}`)  
       ]);
       
       if (resHistory.data && Array.isArray(resHistory.data.history)) {
@@ -59,6 +60,12 @@ function EarningsView({ user, bankData, openEditModal }) {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (propBalance !== undefined) {
+      setBalance(propBalance);
+    }
+  }, [propBalance]);
 
   useEffect(() => { 
     if (user?.id) {
