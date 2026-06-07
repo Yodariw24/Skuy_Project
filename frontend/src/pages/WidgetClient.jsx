@@ -6,7 +6,7 @@ import { io } from 'socket.io-client';
 import api from '../api/axios'; 
 
 const WidgetClient = () => {
-  const { streamKey, type } = useParams(); 
+  const { username, type } = useParams(); 
   const [activeAlert, setActiveAlert] = useState(null);
   
   // ✅ LOCK POINTER: Amankan slot memori timer agar terbebas dari tabrakan multi-donation
@@ -23,9 +23,13 @@ const WidgetClient = () => {
 
   // --- 1. FETCH SETTINGS VIA USERNAME (Sync Railway Cloud) ---
   useEffect(() => {
+    // 🌐 SULTAN OBS HACK: Bikin body HTML jadi transparan penuh biar di OBS gak ada background putih
+    document.body.style.backgroundColor = 'transparent';
+    document.body.style.backgroundImage = 'none';
+
     const fetchSettings = async () => {
       try {
-        const res = await api.get(`/user/widgets/settings/${streamKey}/${type || 'tip'}`);
+        const res = await api.get(`/user/widgets/settings/${username}/${type || 'tip'}`);
         if (res.data.success) {
           setSettings(res.data.data);
         }
@@ -33,8 +37,14 @@ const WidgetClient = () => {
         console.warn("⚠️ Widget Node Offline, menggunakan konfigurasi visual pangkalan.");
       }
     };
-    if (streamKey) fetchSettings();
-  }, [streamKey, type]);
+    if (username) fetchSettings();
+
+    return () => {
+       // Cleanup
+       document.body.style.backgroundColor = '';
+       document.body.style.backgroundImage = '';
+    };
+  }, [username, type]);
 
   // --- 2. SOCKET.IO REAL-TIME PROTOCOL (STABILIZED) 📡 ---
   useEffect(() => {

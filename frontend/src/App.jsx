@@ -110,7 +110,7 @@ function App() {
           <Route path="/explore" element={<Explore />} />
 
           {/* --- 2. SULTAN OVERLAY PROTOCOL (OBS) --- */}
-          <Route path="/widget/:streamKey/:type" element={<WidgetClient />} />
+          <Route path="/widget/:username/:type" element={<WidgetClient />} />
 
           {/* --- 3. DASHBOARD ENGINE (SUB-ROUTING ENABLED) --- */}
           <Route 
