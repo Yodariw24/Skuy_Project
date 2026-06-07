@@ -52,7 +52,13 @@ const WidgetClient = () => {
         if (settingsRes.ok) {
            const settingsData = await settingsRes.json();
            if (settingsData.success && settingsData.data) {
-             setSettings(prev => ({ ...prev, ...settingsData.data, streamer_id: targetId }));
+             let parsedConfig = {};
+             if (typeof settingsData.data.config === 'string') {
+               try { parsedConfig = JSON.parse(settingsData.data.config); } catch (e) {}
+             } else if (settingsData.data.config) {
+               parsedConfig = settingsData.data.config;
+             }
+             setSettings(prev => ({ ...prev, ...settingsData.data, config: parsedConfig, streamer_id: targetId }));
            }
         }
       } catch (err) {
@@ -85,27 +91,35 @@ const WidgetClient = () => {
       // ✅ ANTI-CRASH SHIELD: Bersihkan sisa antrean timer donasi sebelumnya jika ada
       if (timerRef.current) clearTimeout(timerRef.current);
 
+      const rawAmount = Number(data.gross_amount || data.amount) || 0;
+
       setActiveAlert({
-        sender: data.donatur_name,
-        amount: data.amount,
-        message: data.message,
+        sender: data.donatur_name || data.sender || 'Hamba Allah',
+        amount: rawAmount,
+        message: data.message || '',
         alertType: 'tip'
       });
 
-      // Timer Sultan: Menggunakan referensi memori statis pointer
-      timerRef.current = setTimeout(() => {
-        setActiveAlert(null);
-      }, (settings.duration || 8) * 1000);
+      // 📈 SULTAN SYNC: Ambil state terbaru untuk durasi dan auto-nambah progress bar Milestone!
+      setSettings(prev => {
+         const durationSec = Number(prev.config?.duration) || Number(prev.duration) || 8;
+         
+         // Timer Sultan: Otomatis hilang setelah durasi selesai
+         timerRef.current = setTimeout(() => {
+           setActiveAlert(null);
+         }, durationSec * 1000);
 
-      // 📈 SULTAN SYNC: Auto-nambah progress bar Milestone saat donasi masuk!
-      if (type === 'milestone') {
-         setSettings(prev => {
-            if (prev.config && prev.config.goal_current !== undefined) {
-               return { ...prev, config: { ...prev.config, goal_current: Number(prev.config.goal_current) + Number(data.amount) } };
-            }
-            return prev;
-         });
-      }
+         if (type === 'milestone') {
+            return { 
+               ...prev, 
+               config: { 
+                  ...prev.config, 
+                  goal_current: (Number(prev.config?.goal_current) || 0) + rawAmount 
+               } 
+            };
+         }
+         return prev;
+      });
     });
 
     // Dengarkan jika ada kustomisasi warna/tema real-time dari Dashboard lo, Ri!
@@ -130,7 +144,8 @@ const WidgetClient = () => {
   const AlertRender = useMemo(() => {
     if (!activeAlert) return null;
 
-    const isSultan = activeAlert.amount >= 100000;
+    const minTipSultan = Number(settings.config?.min_tip) || 100000;
+    const isSultan = Number(activeAlert.amount) >= minTipSultan;
 
     return (
       <motion.div 
@@ -181,7 +196,7 @@ const WidgetClient = () => {
 
             <div className="mt-10 pt-8 border-t-4 border-white/10 flex items-center justify-between">
                 <h1 style={{ color: isSultan ? '#fbbf24' : settings.accent_color }} className="text-5xl font-black italic tracking-tighter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)]">
-                  Rp {formatR(activeAlert.amount)}
+                  Rp {formatR(Number(activeAlert.amount))}
                 </h1>
                 <Zap size={32} className="text-white/20 animate-bounce" fill="currentColor" />
             </div>
