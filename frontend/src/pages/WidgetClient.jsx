@@ -25,14 +25,35 @@ const WidgetClient = () => {
   // --- 1. FETCH SETTINGS VIA USERNAME (Sync Railway Cloud) ---
   useEffect(() => {
     // 🌐 SULTAN OBS HACK: Bikin body HTML jadi transparan penuh biar di OBS gak ada background putih
+    document.documentElement.style.backgroundColor = 'transparent';
     document.body.style.backgroundColor = 'transparent';
     document.body.style.backgroundImage = 'none';
+    const rootNode = document.getElementById('root');
+    if (rootNode) rootNode.style.backgroundColor = 'transparent';
 
     const fetchSettings = async () => {
       try {
-        const res = await api.get(`/user/widgets/settings/${username}/${type || 'tip'}`);
-        if (res.data.success) {
-          setSettings(prev => ({ ...prev, ...res.data.data })); // Merge config yang masuk
+        const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api$/, "") : 'https://skuyproject-production.up.railway.app';
+        
+        // 🚀 1. BYPASS INTERCEPTOR: Pakai native fetch biar OBS gak ditendang ke halaman Login (penyebab Whitescreen)
+        const profileRes = await fetch(`${API_BASE}/api/donations/profile/${username}`);
+        const profileData = await profileRes.json();
+        
+        let targetId = null;
+        if (profileData.success && profileData.data) {
+           targetId = profileData.data.id;
+           setSettings(prev => ({ ...prev, streamer_id: targetId }));
+        } else {
+           return;
+        }
+
+        // 2. Tarik visual config (Abaikan jika 401/404, widget tetap jalan pakai warna default)
+        const settingsRes = await fetch(`${API_BASE}/api/user/widgets/settings/${username}/${type || 'tip'}`);
+        if (settingsRes.ok) {
+           const settingsData = await settingsRes.json();
+           if (settingsData.success && settingsData.data) {
+             setSettings(prev => ({ ...prev, ...settingsData.data, streamer_id: targetId }));
+           }
         }
       } catch (err) {
         console.warn("⚠️ Widget Node Offline, menggunakan konfigurasi visual pangkalan.");
@@ -42,8 +63,10 @@ const WidgetClient = () => {
 
     return () => {
        // Cleanup
+       document.documentElement.style.backgroundColor = '';
        document.body.style.backgroundColor = '';
        document.body.style.backgroundImage = '';
+       if (rootNode) rootNode.style.backgroundColor = '';
     };
   }, [username, type]);
 
@@ -73,6 +96,16 @@ const WidgetClient = () => {
       timerRef.current = setTimeout(() => {
         setActiveAlert(null);
       }, (settings.duration || 8) * 1000);
+
+      // 📈 SULTAN SYNC: Auto-nambah progress bar Milestone saat donasi masuk!
+      if (type === 'milestone') {
+         setSettings(prev => {
+            if (prev.config && prev.config.goal_current !== undefined) {
+               return { ...prev, config: { ...prev.config, goal_current: Number(prev.config.goal_current) + Number(data.amount) } };
+            }
+            return prev;
+         });
+      }
     });
 
     // Dengarkan jika ada kustomisasi warna/tema real-time dari Dashboard lo, Ri!
