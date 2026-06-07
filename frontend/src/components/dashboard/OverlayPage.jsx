@@ -12,6 +12,10 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 🌐 SULTAN SYNC: URL Dinamis anti-hardcode, auto-detect localhost atau prod domain
+  const currentUrl = window.location.origin;
+  const widgetUrl = `${currentUrl}/widget/${user?.username || user?.id}/${activeSubMenu}`;
+
   // 1. BRANDING STATE (Sync dengan widget_settings di database lo)
   const [colors, setColors] = useState({
     primary: '#7C3AED',   
@@ -205,11 +209,11 @@ const OverlayPage = ({ activeSubMenu = 'tip', user }) => {
              <div className="flex-1 w-full text-left relative z-10">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-6 flex items-center gap-3 italic"> <ShieldCheck size={16} className="text-indigo-400" /> OBS Browser Source Protocol </h3>
                 <div className="bg-white/5 border-2 border-white/10 p-6 rounded-3xl flex items-center justify-between backdrop-blur-md">
-                    <code className="text-[11px] font-mono text-indigo-300 font-bold truncate italic mr-8"> {showUrl ? `https://skuy-project.vercel.app/widget/${user?.username}/${activeSubMenu}` : '••••••••••••••••••••••••••••••••••••••••'} </code>
+                    <code className="text-[11px] font-mono text-indigo-300 font-bold truncate italic mr-8"> {showUrl ? widgetUrl : '••••••••••••••••••••••••••••••••••••••••'} </code>
                     <button type="button" onClick={() => setShowUrl(!showUrl)} className="text-white/40 hover:text-white transition-colors bg-transparent border-0 cursor-pointer"> {showUrl ? <EyeOff size={22}/> : <Eye size={22}/>} </button>
                 </div>
              </div>
-             <button type="button" onClick={() => { navigator.clipboard.writeText(`https://skuy-project.vercel.app/widget/${user?.username}/${activeSubMenu}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-7 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl border-0 cursor-pointer ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={20} /> : <Copy size={20} />} {copied ? 'Linked' : 'Copy Key'} </button>
+             <button type="button" onClick={() => { navigator.clipboard.writeText(widgetUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className={`relative z-10 px-12 py-7 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl border-0 cursor-pointer ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950 hover:bg-slate-50'}`}> {copied ? <Check size={20} /> : <Copy size={20} />} {copied ? 'Linked' : 'Copy Key'} </button>
           </div>
         </div>
 

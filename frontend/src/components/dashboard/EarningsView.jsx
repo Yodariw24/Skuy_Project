@@ -19,6 +19,10 @@ function EarningsView({ user, balance: propBalance, bankData, openEditModal }) {
   const [balance, setBalance] = useState(propBalance || 0);
   const [loading, setLoading] = useState(true);
 
+  // 🌐 SULTAN SYNC: Generator link donasi dinamis
+  const currentUrl = window.location.origin;
+  const donationUrl = `${currentUrl}/${user?.username}`;
+
   // 🛡️ LOCK LOKAL STATE: Mengamankan fitur Show/Hide balance biar berfungsi mandiri saat diklik
   const [localShowBalance, setLocalShowBalance] = useState(false);
 
@@ -298,8 +302,8 @@ function EarningsView({ user, balance: propBalance, bankData, openEditModal }) {
               skuy.gg/<span className="text-violet-600">{user?.username}</span>
             </div>
             <div className="flex flex-col gap-3">
-              <button type="button" onClick={() => copyToClipboard(`https://skuy-project.vercel.app/${user?.username}`, "Link Donasi Sultan Siap Disebar!")} className="w-full py-5 bg-violet-50 text-violet-600 border-2 border-violet-100 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-violet-100 transition-all cursor-pointer">Copy Link</button>
-              <a href={`/${user?.username}`} target="_blank" rel="noreferrer" className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-xl italic tracking-widest hover:translate-y-[-2px] transition-all no-underline">Visit Page <ExternalLink size={14}/></a>
+              <button type="button" onClick={() => copyToClipboard(donationUrl, "Link Donasi Sultan Siap Disebar!")} className="w-full py-5 bg-violet-50 text-violet-600 border-2 border-violet-100 rounded-2xl text-[10px] font-black uppercase italic tracking-widest hover:bg-violet-100 transition-all cursor-pointer">Copy Link</button>
+              <a href={donationUrl} target="_blank" rel="noreferrer" className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase text-center flex items-center justify-center gap-2 shadow-xl italic tracking-widest hover:translate-y-[-2px] transition-all no-underline">Visit Page <ExternalLink size={14}/></a>
             </div>
           </div>
 
