@@ -44,7 +44,8 @@ export const protect = async (req, res, next) => {
             // ✅ HARDLOCKED FORCE OVERRIDE LAYER:
             // Menjamin jika kueri database telat sinkron, email utama lo dipastikan 
             // dikunci mutlak memegang kekuasaan SUPER_ADMIN di memori session request backend, Ri!
-            if (userData.email === 'ariwirayuda24@gmail.com') {
+            const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+            if (superAdmins.includes(userData.email)) {
                 userData.role = 'SUPER_ADMIN';
             }
 
@@ -80,7 +81,8 @@ export const protect = async (req, res, next) => {
 export const authorize = (...roles) => {
     return (req, res, next) => {
         // ✅ UPGRADE INTERCEPTOR: Loloskan otomatis jika email utama lo yang nembak rute authorize biasa
-        if (req.user && req.user.email === 'ariwirayuda24@gmail.com') {
+        const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+        if (req.user && superAdmins.includes(req.user.email)) {
             return next();
         }
 

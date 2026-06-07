@@ -11,8 +11,9 @@ export const adminProtect = (req, res, next) => {
     const userEmail = req.user.email ? req.user.email.toLowerCase() : '';
 
     // ✅ FIXED MULTI-TENANT WHITE-LIST: 
-    // Loloskan jika rolenya 'SUPER_ADMIN', 'ADMIN', atau jika emailnya rill milik lo, Ri!
-    if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userEmail === 'ariwirayuda24@gmail.com') {
+    // Loloskan jika rolenya 'SUPER_ADMIN', 'ADMIN', atau jika emailnya masuk jajaran direksi PT
+    const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+    if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || superAdmins.includes(userEmail)) {
       return next(); // Lolos saringan kasta tertinggi, lanjut ke controller admin panel
     }
   } 

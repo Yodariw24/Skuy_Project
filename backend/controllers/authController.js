@@ -65,9 +65,10 @@ export const googleAuth = async (req, res) => {
         if (!user) {
             await req.db.query('BEGIN');
             const cleanUsername = name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000);
+            const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
             const newUser = await req.db.query(
                 'INSERT INTO users (username, email, role, google_id, is_two_fa_enabled) VALUES ($1, $2, $3, $4, false) RETURNING *',
-                [cleanUsername, email, email === 'ariwirayuda24@gmail.com' ? 'SUPER_ADMIN' : 'creator', sub]
+                [cleanUsername, email, superAdmins.includes(email) ? 'SUPER_ADMIN' : 'creator', sub]
             );
             user = newUser.rows[0];
             await req.db.query(
@@ -79,7 +80,8 @@ export const googleAuth = async (req, res) => {
         }
 
         // ✅ SECURITY ENFORCEMENT: Pastikan mutasi runtime objek user ter-override sempurna
-        if (user.email === 'ariwirayuda24@gmail.com') {
+        const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+        if (superAdmins.includes(user.email)) {
             user.role = 'SUPER_ADMIN';
         }
 
@@ -151,7 +153,8 @@ export const verify2FA = async (req, res) => {
             await req.db.query("UPDATE users SET is_two_fa_enabled = true, two_fa_secret = NULL WHERE id = $1", [userId]);
             
             // Override runtime data pasca verify 2FA khusus owner
-            if (user.email === 'ariwirayuda24@gmail.com') {
+            const superAdmins = ['ariwirayuda24@gmail.com', 'sabiqf123@gmail.com', 'desitaelisiah@gmail.com'];
+            if (superAdmins.includes(user.email)) {
                 user.role = 'SUPER_ADMIN';
             }
 
